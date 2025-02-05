@@ -6,113 +6,110 @@
  */
 
 import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+import { store } from './views/redux';
+import { Provider } from 'react-redux'
+import {SafeAreaView,ScrollView,StyleSheet,Text,TouchableOpacity,useColorScheme,View,} from 'react-native';
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+import {Colors} from 'react-native/Libraries/NewAppScreen';
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+
+import { NavigationContainer, createStaticNavigation, useNavigation } from '@react-navigation/native';
+
+
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import Home from "./views/home/Home";
+import Login from "./views/auth/Login";
+import Monitoring from "./views/monitoring/Monitoring";
+import Zona from "./views/monitoring/Zona";
+import Perbandingan from "./views/monitoring/Perbandingan";
+import Usulan from "./views/usulan_peta/Usulan";
+import AddUsulan from "./views/usulan_peta/AddUsulan";
+import EditUsulan from "./views/usulan_peta/EditUsulan";
+import MetodeText from "./views/usulan_peta/MetodeText";
+import User from "./views/user/User";
+import PetaDasar from "./views/peta_dasar/PetaDasar";
+import PetaFinal from "./views/peta_final/PetaFinal";
+import LihatUsulan from "./views/usulan_peta/LihatUsulan";
+
+const Stack = createNativeStackNavigator();
+// const navigation = useNavigation();
+
+// const Login = ()=>{
+//   const navigation = useNavigation();
+
+//   const Route = (routex)=>{
+//     navigation.navigate(routex)
+//   }
+
+//   return (
+//     <View>
+//       <Text>Saya Login</Text>
+//       <TouchableOpacity onPress={()=>Route('Home')}>
+//         <Text>Click Saya untuk back ke Home</Text>
+//       </TouchableOpacity>
+//     </View>
+//   )
+// }
+
+// const Home = ()=>{
+//   const navigation = useNavigation();
+
+//   const Route = (routex)=>{
+//     navigation.navigate(routex)
+//   }
+
+
+//   return (
+//     <View>
+//       <Text>Saya Home</Text>
+//       <TouchableOpacity onPress={()=>Route('Login')}>
+//         <Text>
+//           Click Saya untuk ke Login
+//         </Text>
+//       </TouchableOpacity>
+//       {/* <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+//         <Text>
+//           Click Saya untuk ke Login
+//         </Text>
+//       </TouchableOpacity> */}
+//     </View>
+//   )
+// }
+
+
+
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <Provider store={store}>
+
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="Monitoring" component={Monitoring} />
+        <Stack.Screen name="Zona" component={Zona} />
+        <Stack.Screen name="MetodeText" component={MetodeText} />
+        <Stack.Screen name="AddUsulan" component={AddUsulan} />
+        <Stack.Screen name="EditUsulan" component={EditUsulan} />
+        <Stack.Screen name="Perbandingan" component={Perbandingan} />
+        <Stack.Screen name="Usulan" component={Usulan} />
+        <Stack.Screen name="User" component={User} />
+        <Stack.Screen name="PetaDasar" component={PetaDasar} />
+        <Stack.Screen name="PetaFinal" component={PetaFinal} />
+        <Stack.Screen name="LihatUsulan" component={LihatUsulan} />
+      </Stack.Navigator>
+    </NavigationContainer>
+    </Provider>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
+  
 });
 
 export default App;

@@ -1,4 +1,4 @@
-package com.simbada
+package com.simbadakonsel
 
 import android.app.Application
 import com.facebook.react.PackageList

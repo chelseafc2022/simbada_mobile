@@ -1,0 +1,251 @@
+//import liraries
+import React, { Component, useState, useEffect } from 'react';
+import styles from '../assets/style'
+import { View, Text, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView } from 'react-native';
+import FastImage from "react-native-fast-image";
+import TabBar from '../components/TabBar'
+import PdfWebViewModal from './PdfWebViewModal';
+
+import moment from "moment";
+import { useSelector } from 'react-redux'
+import { useIsFocused } from "@react-navigation/native";
+
+import { Assets } from '@react-navigation/elements';
+
+// create a component
+const Usulan = ({navigation, route}) => {
+    const Route = (routex)=>{
+        navigation.navigate(routex)
+      }
+    const isFocused = useIsFocused();
+
+    const store = useSelector(state => state)
+    const [isLoading, setIsLoading] = useState(true);
+    const [DATA_USULAN, SET_USULAN] = useState([]);
+    
+    const [isModalVisible, setModalVisible] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState('');
+
+    const openPdf = (file) => {
+        const url = "https://server-simbada.konaweselatankab.go.id/uploads/" + file;
+        setPdfUrl(url);
+        setModalVisible(true);
+    };
+
+    const getView = async () => {
+        try {
+          setIsLoading(true);
+
+          const userStatus = store.PROFILE.profile?.status;
+            const idDesaUser = store.PROFILE.profile?.id_desa;
+            const idKecamatanUser = store.PROFILE.profile?.id_kecamatan;
+
+              // Log debugging untuk memastikan parameter benar
+        console.log('User Status:', userStatus);
+        console.log('ID Desa:', idDesaUser);
+        console.log('ID Kecamatan:', idKecamatanUser);
+
+            const requestBody = {
+                data_ke: 1,
+                cari_value: "",
+                id: store.PROFILE.id,
+                status: userStatus,
+                ...(userStatus === "2" && { id_des_kel: idDesaUser }),
+                ...(userStatus === "3" && { id_kecamatan: idKecamatanUser }), // Filter desa jika status user 2
+            };
+    
+          const response = await fetch(store.URL.URL_ADD_ZONA + "viewUsulanNative", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "kikensbatara " + store.TOKEN,
+            },
+            body: JSON.stringify(requestBody),
+          });
+    
+          const result = await response.json();
+    
+          if (response.ok) {
+            SET_USULAN(result[0].data1); // Simpan data ke state
+          } else {
+            console.error("Error fetching data:", result);
+          }
+        } catch (error) {
+          console.error("Fetch Error:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+
+      const dataparams = route.params;
+
+      useEffect(
+              ()=>{
+                //   console.log(dataparams);
+                  getView()
+              }
+           , [isFocused]);
+
+
+
+    return (
+
+        <View style={{flex:1}}>
+                <View style={styles.navTop}>
+                    <TouchableOpacity style={styles.top1} onPress={() => navigation.goBack()} >
+                        <FastImage 
+                            style={styles.backIcon}
+                            source={require('../assets/img/chevron-left.png')}
+                            resizeMode={FastImage.resizeMode.contain}
+                        />
+                    </TouchableOpacity>
+                    
+                    <View style={styles.top2}>
+                        <Text style={styles.headerTitle}>
+                        Pengajuan Batas Desa
+                        </Text>
+                    </View>
+
+                    <View style={styles.top3}>
+                        <Text>
+                            
+                        </Text>
+                    </View>
+
+                </View>
+
+
+                <View  style={styles.body}>
+
+                
+                <ImageBackground
+                    source={require('../assets/img/bgbg.jpg')}
+                    style={styles.background}
+                    resizeMode="cover"
+                >
+                <TouchableOpacity style={styles.addbatas} onPress={() => navigation.navigate('AddUsulan')}>
+                    <Text style={styles.addbatasx}>
+                        + Tambah Usulan Batas Desa
+                    </Text>
+                </TouchableOpacity>
+                
+
+                {isLoading ? (
+                    <ActivityIndicator size="large" color="#208DC0" />
+                ) : (
+                    <ScrollView>
+
+                        {
+                        DATA_USULAN.map((item, index, data) => (
+
+                        <TouchableOpacity key={item.id || index} 
+                        style={[
+                            styles.batas,
+                            item.status_pengajuan === '2' && { backgroundColor: '#FFCDD2' },
+                            item.status_pengajuan === '3' && { backgroundColor: '#BAD8B6' }
+                        ]} 
+                        onPress={() => navigation.navigate('Zona', {
+                            id_usulan: item.id,
+                            nik: item.nik,
+                            nama: item.nama,
+                            alamat: item.alamat,
+                            id_kecamatan: item.kecamatan_id,
+                            nama_kecamatan: item.nama_kecamatan,
+                            id_des_kel: item.des_kel_id,
+                            nama_des_kel: item.nama_des_kel,
+                            rwrt: item.rwrt,
+                            no_telp: item.no_telp,
+                            catatan: item.catatan,
+                            lokasi: item.lokasi,
+                            file: item.file,
+                            status_pengajuan: item.status_pengajuan,
+                        })}>
+                        <View style={styles.batasx}>
+                            <Text style={{ flexDirection:'row',fontSize:26, marginLeft:10, fontWeight:'bold', color:'#208DC0' }}>
+                            {item.nama} 
+                            
+
+                                    {/* Badge berdasarkan status_pengajuan */}
+
+                                    {item.status_pengajuan === '1' && (
+                                    <View>
+                                        <Text> ⌛️</Text>
+                                    </View>
+                                    )}
+                                    
+
+                                    {item.status_pengajuan === '2' && (
+                                    <View>
+                                        <Text> 🚫</Text>
+                                    </View>
+                                    )}
+                                    {item.status_pengajuan === '3' && (
+                                    <View>
+                                        <Text> ✅</Text>
+                                    </View>
+                                    )}
+
+                            </Text>
+
+
+
+                            <Text style={{fontSize:12, marginLeft:10, color:'#080808' }}>
+                                {item.alamat}
+                            </Text>
+                            <Text style={{fontSize:8, marginLeft:10, fontWeight:'600', color:'#737373' }}>
+                                ⏰ {moment(data.createAt).format("DD MMMM YYYY")}
+                            </Text>
+                            <Text style={{fontSize:8, marginLeft:10, fontWeight:'600', color:'#737373' }}>
+                            {item.nama_des_kel}
+                            </Text>
+                        </View>
+
+                        <View style={styles.batasy}>
+                                {/* Tombol Lampiran */}
+                            <TouchableOpacity
+                                style={[styles.button, { marginRight: 10 }]}
+                                onPress={() => openPdf(item.file)}
+                                >
+                                <FastImage 
+                                    style={{width: 60, height: 60, alignSelf : 'center'}}
+                                    source={require('../assets/img/lampiran-icon.png')}
+                                    resizeMode={FastImage.resizeMode.contain}
+                                />
+                                {/* <Text style={{fontSize:8, fontWeight:'bold', color:'#208DC0', textAlign: 'center' }}>
+                                    Lampiran
+                                </Text> */}
+                            </TouchableOpacity>
+                            {/* Modal WebView */}
+                            <PdfWebViewModal 
+                                isVisible={isModalVisible} 
+                                onClose={() => setModalVisible(false)} 
+                                pdfUrl={pdfUrl}
+                            />
+
+                            {/* Tombol Edit Data */}
+                            
+                        </View>
+                        </TouchableOpacity>
+                        ))}
+
+                </ScrollView>
+                )}
+           </ImageBackground>
+
+           </View>
+
+           <TabBar/>
+            
+           
+        
+        </View>
+
+
+    );
+};
+
+
+
+//make this component available to the app
+export default Usulan;

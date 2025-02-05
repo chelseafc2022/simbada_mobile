@@ -1,4 +1,4 @@
-package com.simbada
+package com.simbadakonsel
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
