@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Simbada Konsel</string>
+    <string name="google_maps_key">AIzaSyAyxqp-DfwUF6UnXBwpbQeAF1EHBJ4-jh0</string>
+
 </resources>

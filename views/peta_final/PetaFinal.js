@@ -242,7 +242,7 @@ const PetaFinal = ({navigation}) => {
             </View>
 
             
-            <View style={styles.body}>
+            <View style={{ flex: 1 }}>
             <ImageBackground
                     source={require('../assets/img/bgbg.jpg')}
                     style={styles.background}
@@ -274,7 +274,7 @@ const PetaFinal = ({navigation}) => {
                 <Text style={{ color: '#208DC0', fontWeight: 'bold', fontSize: 16 , marginBottom:30}}>Sedang Memuat Peta...</Text>
               </View>
             ) : (
-                <View style={styles.mapxdasar}>
+              <View style={{ flex: 1 }}>
                 <MapView
                     style={styles.map}
                     provider="google"

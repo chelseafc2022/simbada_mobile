@@ -10,6 +10,10 @@ const User = ({ navigation }) => {
     const [userInfo, setUserInfo] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const store = useSelector(state => state);
+    const dummyStatus = null; // coba ganti ke null, 1, 2, dll
+
+// Ganti semua akses status di komponen dengan dummyStatus untuk tes
+const userStatus = dummyStatus;
 
     const statusMapping = {
         1: 'Administrator',
@@ -99,6 +103,12 @@ const User = ({ navigation }) => {
         return (
             <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>Gagal memuat data pengguna.</Text>
+                <View style={styles.top3}>
+                <TouchableOpacity onPress={() => logOut(navigation)} style={styles.logoutButton}>
+                    <Text style={styles.menuText}>❌ Logout</Text>
+                </TouchableOpacity>
+            </View>
+                
             </View>
         );
     }
@@ -152,6 +162,12 @@ const User = ({ navigation }) => {
                         </TouchableOpacity>
                     </View>
                     )} */}
+
+                {/* {userStatus == null && (
+                <TouchableOpacity onPress={() => logOut(navigation)} style={styles.logoutButton}>
+                    <Text style={styles.menuText}>❌ Logout</Text>
+                </TouchableOpacity>
+                )} */}
                 </View>
 
                 {/* Tampilkan jika status adalah Administrator */}

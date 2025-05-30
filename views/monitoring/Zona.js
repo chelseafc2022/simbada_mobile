@@ -7,6 +7,7 @@ import MapView, { Polygon } from 'react-native-maps';
 import TabBar from '../components/TabBar'
 import { useSelector } from 'react-redux'
 import { useFocusEffect } from '@react-navigation/native';
+import PdfWebViewModal from '../usulan_peta/PdfWebViewModal';
 
 // create a component
 const Zona = ({navigation, route}) => {
@@ -24,6 +25,14 @@ const Zona = ({navigation, route}) => {
     const [petaDasar, setPetaDasar] = useState([]);
     const [mapRegion, setMapRegion] = useState(null);
     const [isPolygonReady, setIsPolygonReady] = useState(false);
+    const [isModalVisible, setModalVisible] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState('');
+      
+          const openPdf = (file) => {
+              const url = "https://server-simbada.konaweselatankab.go.id/uploads/" + file;
+              setPdfUrl(url);
+              setModalVisible(true);
+          };
 
     const getPetaPengajuan = async () => {
         try {
@@ -305,6 +314,27 @@ const Zona = ({navigation, route}) => {
                         fontSize: 12,
                     }}>Zona Batas Tanah</Text>
 
+                    <TouchableOpacity
+                            onPress={() => openPdf(file)}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: '#f2f2f2',
+                                paddingVertical: 2,
+                                paddingHorizontal: 6,
+                                borderRadius: 6,
+                            }}
+                            >
+                            <FastImage
+                                source={require('../assets/img/lampiran-icon.png')}
+                                style={{ width: 30, height: 30, marginRight: 4 }}
+                                resizeMode={FastImage.resizeMode.contain}
+                            />
+                            <Text style={{ fontSize: 16, color: '#208DC0', fontWeight: '600' }}>
+                                Lihat Lampiran
+                            </Text>
+                            </TouchableOpacity>
+
                     {/* Tombol Edit Data hanya muncul jika status_pengajuan == 2 */}
                     {status_pengajuan === '2' && (
                         <TouchableOpacity
@@ -416,6 +446,13 @@ const Zona = ({navigation, route}) => {
 )}
 
             </View>
+
+            {/* Modal PDF */}
+          <PdfWebViewModal
+            isVisible={isModalVisible}
+            onClose={() => setModalVisible(false)}
+            pdfUrl={pdfUrl}
+          />
 
            </ScrollView>
 

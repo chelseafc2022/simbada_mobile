@@ -391,7 +391,79 @@ export default StyleSheet.create({
     width : '90%',
     alignSelf : 'center',
     backgroundColor: '#FFF',
-}
+}, 
+
+  infoContainer: {
+    flex: 1,
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "center",
+    marginTop: 30,
+  },
+  infoCard: {
+    width: "40%",
+    height: 110, // Sedikit lebih tinggi untuk tampilan yang lebih seimbang
+    borderRadius: 20,
+    overflow: "hidden", // Agar efek gradient tidak keluar dari border
+    elevation: 5, // Efek shadow untuk Android
+    shadowColor: "#208DC0", // Shadow untuk iOS
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  gradientBackground: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 10,
+  },
+  infoTitle: {
+    color: "#208DC0",
+    fontWeight: "bold",
+    fontSize: 18,
+    marginBottom: 5,
+    textTransform: "uppercase",
+  },
+  infoValue: {
+    color: "#208DC0",
+    fontWeight: "bold",
+    fontSize: 20,
+  },
+    tableHeader: {
+      width: "30%", // Pastikan setiap header memiliki lebar yang sama
+      fontWeight: "bold",
+      color: "white",
+      textAlign: "center",
+      paddingVertical: 10,
+    },
+    tableRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: "#208DC0",
+    },
+    tableCell: {
+      width: "30%", // Sama seperti header agar sejajar
+      textAlign: "center",
+      color: "#208DC0",
+      fontSize: 14,
+    },
+
+    lampiranButton: {
+      backgroundColor: '#208DC0',
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 6,
+    },
+    lampiranButtonText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    
+  
+
      
 
 

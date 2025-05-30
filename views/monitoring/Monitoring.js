@@ -5,7 +5,7 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, ImageBackg
 import FastImage from "react-native-fast-image";
 import { useSelector } from 'react-redux'
 import { useIsFocused } from "@react-navigation/native";
-import PdfWebViewModal from '../usulan_peta/PdfWebViewModal';
+// import PdfWebViewModal from '../usulan_peta/PdfWebViewModal';
 
 import TabBar from '../components/TabBar'
 import { Assets } from '@react-navigation/elements';
@@ -27,13 +27,13 @@ const Monitoring = ({navigation}) => {
       const [searchQuery, setSearchQuery] = useState('');
       const [filteredData, setFilteredData] = useState([]);
       const [page, setPage] = useState(1);
-          const [pdfUrl, setPdfUrl] = useState('');
+        //   const [pdfUrl, setPdfUrl] = useState('');
       
-          const openPdf = (file) => {
-              const url = "https://server-simbada.konaweselatankab.go.id/uploads/" + file;
-              setPdfUrl(url);
-              setModalVisible(true);
-          };
+        //   const openPdf = (file) => {
+        //       const url = "https://server-simbada.konaweselatankab.go.id/uploads/" + file;
+        //       setPdfUrl(url);
+        //       setModalVisible(true);
+        //   };
 
 
      
@@ -102,123 +102,166 @@ const Monitoring = ({navigation}) => {
 
     return (
 
-        <View style={{flex:1}}>
-            
-            <View style={styles.navTop}>
-                    <TouchableOpacity style={styles.top1} onPress={() => navigation.goBack()} >
-                        <FastImage 
-                            style={styles.backIcon}
-                            source={require('../assets/img/chevron-left.png')}
-                            resizeMode={FastImage.resizeMode.contain}
-                        />
-                    </TouchableOpacity>
-                    
-                    <View style={styles.top2}>
-                        <Text style={styles.headerTitle}>
-                        Monitoring
-                        </Text>
-                    </View>
+        <View style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
+  {/* Header Navigation */}
+  <View style={styles.navTop}>
+    <TouchableOpacity style={styles.top1} onPress={() => navigation.goBack()}>
+      <FastImage
+        style={styles.backIcon}
+        source={require('../assets/img/chevron-left.png')}
+        resizeMode={FastImage.resizeMode.contain}
+      />
+    </TouchableOpacity>
 
-                    <View style={styles.top3}>
-                        <Text>
-                            
-                        </Text>
-                    </View>
+    <View style={styles.top2}>
+      <Text style={styles.headerTitle}>Monitoring</Text>
+    </View>
 
-                </View>
+    <View style={styles.top3}>
+      <Text>{/* Kosongkan jika tidak ada aksi */}</Text>
+    </View>
+  </View>
 
-                
-                <View style={styles.body}>
-                    <ImageBackground
-                        source={require('../assets/img/bgbg.jpg')}
-                        style={styles.background}
-                        resizeMode="cover"
-                    >
-
-                        {userStatus === "2" ? (
-                            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                                <FastImage
-                                    style={{ width: 100, height: 100, marginBottom: 20 }}
-                                    source={require('../assets/img/error.png')}
-                                    resizeMode={FastImage.resizeMode.contain}
-                                />
-                                <Text style={{ color: '#721c24', fontWeight: 'bold', fontSize: 22, textAlign: 'center', paddingHorizontal: 20 }}>
-                                    ⚠️ Akses Ditolak
-                                </Text>
-                                <Text style={{ color: '#721c24', fontSize: 16, textAlign: 'center', marginTop: 10, paddingHorizontal: 20 }}>
-                                    Halaman Monitoring ini tidak bisa diakses oleh Operator Desa.
-                                </Text>
-                            </View>
-                        ) : isLoading ? (
-                            <ActivityIndicator style={{ marginTop: 20 }} size="large" color="#208DC0" />
-                        ) : (
-                            <ScrollView>
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Cari berdasarkan nama desa"
-                                    placeholderTextColor="#aaa"
-                                    value={searchQuery}
-                                    onChangeText={handleSearch}
-                                />
-                                {filteredData.map((item, index) => (
-                                    <TouchableOpacity key={`item-${index}`}
-                                        style={[
-                                            styles.batas,
-                                            item.status_pengajuan === '2' && { backgroundColor: '#FFCDD2' },
-                                            item.status_pengajuan === '3' && { backgroundColor: '#BAD8B6' }
-                                        ]}
-                                        onPress={() => navigation.navigate('Zona', {
-                                            nama_kecamatan: item.nama_kecamatan,
-                                            nama_des_kel: item.nama_des_kel,
-                                            id_kecamatan: item.kecamatan_id,
-                                            id_des_kel: item.des_kel_id,
-                                        })}
-                                    >
-                                        <View style={styles.batasx}>
-                                            <Text style={{ flexDirection: 'row', fontSize: 26, marginLeft: 10, fontWeight: 'bold', color: '#208DC0' }}>
-                                                {item.nama_des_kel}
-                                                {item.status_pengajuan === '1' && <Text> ⌛️</Text>}
-                                                {item.status_pengajuan === '2' && <Text> 🚫</Text>}
-                                                {item.status_pengajuan === '3' && <Text> ✅</Text>}
-                                            </Text>
-                                            <Text style={{ fontSize: 12, marginLeft: 10, color: '#080808' }}>
-                                                {item.nama_kecamatan}
-                                            </Text>
-                                            <Text style={{ fontSize: 8, marginLeft: 10, fontWeight: '600', color: '#737373' }}>
-                                                ⏰ {moment(item.createAt).format("DD MMMM YYYY")}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.batasy}>
-                                            <TouchableOpacity
-                                                style={[styles.button, { marginRight: 10 }]}
-                                                onPress={() => openPdf(item.file)}
-                                            >
-                                                <FastImage
-                                                    style={{ width: 60, height: 60, alignSelf: 'center' }}
-                                                    source={require('../assets/img/lampiran-icon.png')}
-                                                    resizeMode={FastImage.resizeMode.contain}
-                                                />
-                                            </TouchableOpacity>
-                                            <PdfWebViewModal
-                                                isVisible={isModalVisible}
-                                                onClose={() => setModalVisible(false)}
-                                                pdfUrl={pdfUrl}
-                                            />
-                                        </View>
-                                    </TouchableOpacity>
-                                    
-                                ))}
-                                
-                            </ScrollView>
-                        )}
-                    </ImageBackground>
-                </View>
-
-
-            
-           <TabBar/>
-        
+  {/* Body */}
+  <View style={styles.body}>
+    <ImageBackground
+      source={require('../assets/img/bgbg.jpg')}
+      style={styles.background}
+      resizeMode="cover"
+    >
+      {userStatus === "2" ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <FastImage
+            style={{ width: 100, height: 100, marginBottom: 20 }}
+            source={require('../assets/img/error.png')}
+            resizeMode={FastImage.resizeMode.contain}
+          />
+          <Text style={{ color: '#721c24', fontWeight: 'bold', fontSize: 22, textAlign: 'center', paddingHorizontal: 20 }}>
+            ⚠️ Akses Ditolak
+          </Text>
+          <Text style={{ color: '#721c24', fontSize: 16, textAlign: 'center', marginTop: 10, paddingHorizontal: 20 }}>
+            Halaman Monitoring ini tidak bisa diakses oleh Operator Desa.
+          </Text>
         </View>
+      ) : isLoading ? (
+        <ActivityIndicator style={{ marginTop: 20 }} size="large" color="#208DC0" />
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+          {/* Search Input */}
+          <TextInput
+            style={[styles.searchInput, { marginHorizontal: 16, marginBottom: 12 }]}
+            placeholder="🔍 Cari nama desa"
+            placeholderTextColor="#888"
+            value={searchQuery}
+            onChangeText={handleSearch}
+          />
+
+<View
+  style={{
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  }}
+>
+  {filteredData.map((item, index) => (
+    <TouchableOpacity
+      key={`item-${index}`}
+      style={{
+        width: '48%',
+        backgroundColor:
+          item.status_pengajuan === '2'
+            ? '#FFEBEE'
+            : item.status_pengajuan === '3'
+            ? '#E8F5E9'
+            : '#FFFFFF',
+        marginBottom: 12,
+        borderRadius: 12,
+        padding: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        elevation: 3,
+      }}
+      onPress={() =>
+        navigation.navigate('Zona', {
+          nama_kecamatan: item.nama_kecamatan,
+          nama_des_kel: item.nama_des_kel,
+          id_kecamatan: item.kecamatan_id,
+          id_des_kel: item.des_kel_id,
+          file: item.file
+        })
+      }
+    >
+      {/* Nama Desa */}
+      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#208DC0' }}>
+        {item.nama_des_kel}
+        {item.status_pengajuan === '1' && ' ⌛️'}
+        {item.status_pengajuan === '2' && ' 🚫'}
+        {item.status_pengajuan === '3' && ' ✅'}
+      </Text>
+
+      {/* Kecamatan */}
+      <Text style={{ fontSize: 12, color: '#444', marginTop: 4 }}>
+        {item.nama_kecamatan}
+      </Text>
+
+      {/* Waktu + Lihat Lampiran */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: 6,
+        }}
+      >
+        <Text style={{ fontSize: 10, color: '#777' }}>
+          ⏰ {moment(item.createAt).format('DD MMM YYYY')}
+        </Text>
+
+        {/* <TouchableOpacity
+          onPress={() => openPdf(item.file)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#f2f2f2',
+            paddingVertical: 2,
+            paddingHorizontal: 6,
+            borderRadius: 6,
+          }}
+        >
+          <FastImage
+            source={require('../assets/img/lampiran-icon.png')}
+            style={{ width: 10, height: 10, marginRight: 4 }}
+            resizeMode={FastImage.resizeMode.contain}
+          />
+          <Text style={{ fontSize: 9, color: '#208DC0', fontWeight: '600' }}>
+            Lihat Lampiran
+          </Text>
+        </TouchableOpacity> */}
+      </View>
+    </TouchableOpacity>
+  ))}
+</View>
+
+
+          {/* Modal PDF */}
+          {/* <PdfWebViewModal
+            isVisible={isModalVisible}
+            onClose={() => setModalVisible(false)}
+            pdfUrl={pdfUrl}
+          /> */}
+        </ScrollView>
+      )}
+    </ImageBackground>
+  </View>
+
+  {/* Tab Bar */}
+  <TabBar />
+</View>
+
+
 
     );
 };

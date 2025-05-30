@@ -1,8 +1,9 @@
 //import liraries
 import React, { Component, useEffect, useState } from 'react';
 import styles from '../assets/style'
-import { View, Text, TextInput, TouchableOpacity, ScrollView , ImageBackground} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView , ImageBackground, Alert} from 'react-native';
 import FastImage from "react-native-fast-image";
+import NetInfo from '@react-native-community/netinfo';
 
 import { useSelector } from 'react-redux'
 import { useIsFocused } from "@react-navigation/native";
@@ -41,6 +42,8 @@ const Login = ({navigation}) => {
         }
     }
 
+    
+
     const [form, SET_FORM] = useState({
         username : '',
         password : ''
@@ -75,6 +78,17 @@ const Login = ({navigation}) => {
 
     console.log(form)
       // console.log(store.URL.LOGIN_URL)
+
+      NetInfo.fetch().then(state => {
+        if (!state.isConnected) {
+            SET_LOADING('false');
+            SET_CHECK_LOAD(false);
+            SET_ERROR_STATUS(true);
+            SET_ERROR_MESSAGE('No internet connection. Please check your network and try again.');
+            Alert.alert('Connection Failed', 'No internet connection. Please check your network and try again.');
+
+            return;
+        }
 
     fetch(store.URL.LOGIN_URL, {
         method: "POST",
@@ -148,6 +162,7 @@ const Login = ({navigation}) => {
           SET_LOADING('false')
           SET_ERROR_MESSAGE(error.message)
           SET_ERROR_STATUS(true);
+      });
       });
   }
 
@@ -237,7 +252,7 @@ const Login = ({navigation}) => {
                   <View style={{flex:1}}>
                       <View style={{justifyContent:'center', alignItems:'center'}}>
                           <FastImage
-                              style={{ width: 500, height: 500, opacity: 0.5 }}
+                              style={{ width: 100, height: 100, opacity: 0.5 }}
                               source={require('../assets/img/loading.gif')}
                               resizeMode={FastImage.resizeMode.contain}
                           />

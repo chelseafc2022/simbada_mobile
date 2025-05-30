@@ -4,7 +4,7 @@ import styles from '../assets/style'
 import { View, Text, TouchableOpacity, ImageBackground, ActivityIndicator, ScrollView } from 'react-native';
 import FastImage from "react-native-fast-image";
 import TabBar from '../components/TabBar'
-import PdfWebViewModal from './PdfWebViewModal';
+// import PdfWebViewModal from './PdfWebViewModal';
 
 import moment from "moment";
 import { useSelector } from 'react-redux'
@@ -24,13 +24,13 @@ const Usulan = ({navigation, route}) => {
     const [DATA_USULAN, SET_USULAN] = useState([]);
     
     const [isModalVisible, setModalVisible] = useState(false);
-    const [pdfUrl, setPdfUrl] = useState('');
+    // const [pdfUrl, setPdfUrl] = useState('');
 
-    const openPdf = (file) => {
-        const url = "https://server-simbada.konaweselatankab.go.id/uploads/" + file;
-        setPdfUrl(url);
-        setModalVisible(true);
-    };
+    // const openPdf = (file) => {
+    //     const url = "https://server-simbada.konaweselatankab.go.id/uploads/" + file;
+    //     setPdfUrl(url);
+    //     setModalVisible(true);
+    // };
 
     const getView = async () => {
         try {
@@ -92,6 +92,25 @@ const Usulan = ({navigation, route}) => {
     return (
 
         <View style={{flex:1}}>
+            <TouchableOpacity
+                onPress={() => navigation.navigate('AddUsulan')}
+                style={{
+                    position: 'absolute',
+                    bottom: 80, // sesuaikan agar tidak ketumpuk tab bar
+                    right: 20,
+                    backgroundColor: '#208DC0',
+                    width: 60,
+                    height: 60,
+                    borderRadius: 30,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: 5,
+                    zIndex: 999,
+                }}
+                >
+                <Text style={{ color: '#fff', fontSize: 30, marginTop: -2 }}>+</Text>
+                </TouchableOpacity>
+
                 <View style={styles.navTop}>
                     <TouchableOpacity style={styles.top1} onPress={() => navigation.goBack()} >
                         <FastImage 
@@ -124,112 +143,85 @@ const Usulan = ({navigation, route}) => {
                     style={styles.background}
                     resizeMode="cover"
                 >
-                <TouchableOpacity style={styles.addbatas} onPress={() => navigation.navigate('AddUsulan')}>
-                    <Text style={styles.addbatasx}>
-                        + Tambah Usulan Batas Desa
-                    </Text>
-                </TouchableOpacity>
                 
 
                 {isLoading ? (
                     <ActivityIndicator size="large" color="#208DC0" />
                 ) : (
-                    <ScrollView>
+                    <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', padding: 10 }}>
+  {DATA_USULAN.map((item, index) => (
+    <TouchableOpacity
+      key={item.id || index}
+      style={[
+        {
+          width: '48%',
+          backgroundColor: '#fff',
+          borderRadius: 8,
+          marginBottom: 15,
+          padding: 10,
+          elevation: 2,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 1,
+        },
+        item.status_pengajuan === '2' && { backgroundColor: '#FFCDD2' },
+        item.status_pengajuan === '3' && { backgroundColor: '#BAD8B6' },
+      ]}
+      onPress={() => navigation.navigate('Zona', {
+        id_usulan: item.id,
+        nik: item.nik,
+        nama: item.nama,
+        alamat: item.alamat,
+        id_kecamatan: item.kecamatan_id,
+        nama_kecamatan: item.nama_kecamatan,
+        id_des_kel: item.des_kel_id,
+        nama_des_kel: item.nama_des_kel,
+        rwrt: item.rwrt,
+        no_telp: item.no_telp,
+        catatan: item.catatan,
+        lokasi: item.lokasi,
+        file: item.file,
+        status_pengajuan: item.status_pengajuan,
+      })}
+    >
+      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#208DC0', marginBottom: 4 }}>
+        {item.nama}{' '}
+        {item.status_pengajuan === '1' && '⌛️'}
+        {item.status_pengajuan === '2' && '🚫'}
+        {item.status_pengajuan === '3' && '✅'}
+      </Text>
+      <Text style={{ fontSize: 12, color: '#080808', marginBottom: 2 }}>{item.alamat}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+  <Text style={{ fontSize: 10, color: '#737373' }}>
+    ⏰ {moment(item.createAt).format("DD MMMM YYYY")}
+  </Text>
 
-                        {
-                        DATA_USULAN.map((item, index, data) => (
-
-                        <TouchableOpacity key={item.id || index} 
-                        style={[
-                            styles.batas,
-                            item.status_pengajuan === '2' && { backgroundColor: '#FFCDD2' },
-                            item.status_pengajuan === '3' && { backgroundColor: '#BAD8B6' }
-                        ]} 
-                        onPress={() => navigation.navigate('Zona', {
-                            id_usulan: item.id,
-                            nik: item.nik,
-                            nama: item.nama,
-                            alamat: item.alamat,
-                            id_kecamatan: item.kecamatan_id,
-                            nama_kecamatan: item.nama_kecamatan,
-                            id_des_kel: item.des_kel_id,
-                            nama_des_kel: item.nama_des_kel,
-                            rwrt: item.rwrt,
-                            no_telp: item.no_telp,
-                            catatan: item.catatan,
-                            lokasi: item.lokasi,
-                            file: item.file,
-                            status_pengajuan: item.status_pengajuan,
-                        })}>
-                        <View style={styles.batasx}>
-                            <Text style={{ flexDirection:'row',fontSize:26, marginLeft:10, fontWeight:'bold', color:'#208DC0' }}>
-                            {item.nama} 
-                            
-
-                                    {/* Badge berdasarkan status_pengajuan */}
-
-                                    {item.status_pengajuan === '1' && (
-                                    <View>
-                                        <Text> ⌛️</Text>
-                                    </View>
-                                    )}
-                                    
-
-                                    {item.status_pengajuan === '2' && (
-                                    <View>
-                                        <Text> 🚫</Text>
-                                    </View>
-                                    )}
-                                    {item.status_pengajuan === '3' && (
-                                    <View>
-                                        <Text> ✅</Text>
-                                    </View>
-                                    )}
-
-                            </Text>
+  {/* <TouchableOpacity
+    onPress={() => openPdf(item.file)}
+    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+  >
+    <FastImage
+      source={require('../assets/img/lampiran-icon.png')}
+      style={{ width: 14, height: 14 }}
+      resizeMode={FastImage.resizeMode.contain}
+    />
+    <Text style={{ color: '#208DC0', fontSize: 10, fontWeight: 'bold' }}>
+      Lihat Lampiran
+    </Text>
+  </TouchableOpacity> */}
+</View>
 
 
+      {/* <PdfWebViewModal
+        isVisible={isModalVisible}
+        onClose={() => setModalVisible(false)}
+        pdfUrl={pdfUrl}
+      /> */}
+    </TouchableOpacity>
+  ))}
+</ScrollView>
 
-                            <Text style={{fontSize:12, marginLeft:10, color:'#080808' }}>
-                                {item.alamat}
-                            </Text>
-                            <Text style={{fontSize:8, marginLeft:10, fontWeight:'600', color:'#737373' }}>
-                                ⏰ {moment(data.createAt).format("DD MMMM YYYY")}
-                            </Text>
-                            <Text style={{fontSize:8, marginLeft:10, fontWeight:'600', color:'#737373' }}>
-                            {item.nama_des_kel}
-                            </Text>
-                        </View>
-
-                        <View style={styles.batasy}>
-                                {/* Tombol Lampiran */}
-                            <TouchableOpacity
-                                style={[styles.button, { marginRight: 10 }]}
-                                onPress={() => openPdf(item.file)}
-                                >
-                                <FastImage 
-                                    style={{width: 60, height: 60, alignSelf : 'center'}}
-                                    source={require('../assets/img/lampiran-icon.png')}
-                                    resizeMode={FastImage.resizeMode.contain}
-                                />
-                                {/* <Text style={{fontSize:8, fontWeight:'bold', color:'#208DC0', textAlign: 'center' }}>
-                                    Lampiran
-                                </Text> */}
-                            </TouchableOpacity>
-                            {/* Modal WebView */}
-                            <PdfWebViewModal 
-                                isVisible={isModalVisible} 
-                                onClose={() => setModalVisible(false)} 
-                                pdfUrl={pdfUrl}
-                            />
-
-                            {/* Tombol Edit Data */}
-                            
-                        </View>
-                        </TouchableOpacity>
-                        ))}
-
-                </ScrollView>
                 )}
            </ImageBackground>
 
