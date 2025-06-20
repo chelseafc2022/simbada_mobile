@@ -12,7 +12,6 @@ var URLX = 'https://server-simbada.konaweselatankab.go.id/';
 
 const initialState = {
     VERSI_APP : '0.0.4',
-    AUTH_STAT : 'true',
     URL: {
         URL_APP: URL,
         URL_APPX: URLX,
@@ -29,15 +28,25 @@ const initialState = {
     },
 
 
-    AUTH_STAT : 'true',
-    TOKEN   : 'xx',
+    AUTH_STAT : false,
+    TOKEN   : '',
+    PROFILE: null,
     
 }
 
 // state = initialState artinya jika state belumpunya nilai maka setup awalnya initialState,,, jadi boleh juga di tulis begini (state, action)
-const reducer = (state = initialState, action)=>{
-    return state
-}
+const reducer = (state = initialState, action = {}) => {
+  switch (action.type) {
+    case 'SET_TOKEN':
+      return { ...state, TOKEN: action.payload, AUTH_STAT: true };
+    case 'SET_PROFILE':
+      return { ...state, PROFILE: action.payload };
+    case 'RESET_AUTH':
+      return { ...state, TOKEN: '', PROFILE: null, AUTH_STAT: false };
+    default:
+      return state;
+  }
+};
 
 // Simpan lokasi ke AsyncStorage
 const saveLocations = async (locations) => {

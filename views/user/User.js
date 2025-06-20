@@ -2,14 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import FastImage from "react-native-fast-image";
 import TabBar from '../components/TabBar';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+
+
 const User = ({ navigation }) => {
+    const dispatch = useDispatch();
     const [selectedUser, setSelectedUser] = useState(null);
     const [userInfo, setUserInfo] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const store = useSelector(state => state);
+    // const TOKEN = useSelector(state => state.TOKEN);
+      const PROFILE = useSelector(state => state.PROFILE);
+      const URL = useSelector(state => state.URL);
     const dummyStatus = null; // coba ganti ke null, 1, 2, dll
 
 // Ganti semua akses status di komponen dengan dummyStatus untuk tes
@@ -49,7 +54,7 @@ const userStatus = dummyStatus;
             setIsLoading(true);
             const token = await AsyncStorage.getItem('TOKEN');
 
-            const response = await fetch(store.URL.URL_PENGGUNA + "view", {
+            const response = await fetch(URL.URL_PENGGUNA + "view", {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -59,9 +64,9 @@ const userStatus = dummyStatus;
                 body: JSON.stringify({
                     data_ke: 1, 
                     cari_value: "", 
-                    id: store.PROFILE.id,
-                    status: store.PROFILE.profile?.status || 1, 
-                    id_kecamatan: store.PROFILE.profile?.id_kecamatan || ""
+                    id: PROFILE.id,
+                    status: PROFILE.profile?.status || 1, 
+                    id_kecamatan: PROFILE.profile?.id_kecamatan || ""
                 }),
             });
 
@@ -69,7 +74,7 @@ const userStatus = dummyStatus;
             console.log('Response JSON:', result);
 
             if (response.ok && Array.isArray(result) && result.length > 0) {
-                if (store.PROFILE.profile?.status === 1) {
+                if (PROFILE.profile?.status === 1) {
                     // Jika status Administrator, ambil hanya 1 pengguna
                     setSelectedUser(result[0]?.data1[0] || null);
                 } else {
@@ -88,7 +93,7 @@ const userStatus = dummyStatus;
 
     useEffect(() => {
         fetchUserProfile();
-        console.log("User Status dari Redux:", store.PROFILE.profile?.status);
+        console.log("User Status dari Redux:", PROFILE.profile?.status);
     }, []);
 
     if (isLoading) {
@@ -115,27 +120,26 @@ const userStatus = dummyStatus;
 
     const logOut = async (navigation) => {
         try {
-          // Hapus data dari AsyncStorage
-          await AsyncStorage.removeItem('TOKEN');
-          await AsyncStorage.removeItem('PROFILE');
-      
-          // Reset nilai di store
-          store.TOKEN = '';
-          store.PROFILE = '';
-          store.AUTH_STAT = false;
-      
-          // console.log('Logout berhasil. Token dan profil telah dihapus.');
-      
-          // Reset navigasi ke halaman Login
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }], // Pastikan 'Login' adalah nama screen login Anda
-          });
+            await AsyncStorage.removeItem('TOKEN');
+            await AsyncStorage.removeItem('PROFILE');
+            await AsyncStorage.removeItem('LAST_LOGIN');
+            await AsyncStorage.removeItem('lokasiPolylineData');
+            await AsyncStorage.removeItem('lokasiData');
+
+
+            // Reset nilai di Redux menggunakan dispatch
+            dispatch({ type: 'RESET_AUTH' });
+
+            // Arahkan ke halaman Login
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+            });
         } catch (error) {
-          console.error('Error saat logout:', error);
-          Alert.alert('Error', 'Gagal melakukan logout. Silakan coba lagi.');
+            console.error('Error saat logout:', error);
+            Alert.alert('Error', 'Gagal melakukan logout. Silakan coba lagi.');
         }
-      };
+    };
     return (
         <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
             <ScrollView style={styles.body}>
@@ -155,7 +159,7 @@ const userStatus = dummyStatus;
                     </View>
 
                     {/* Tombol Logout (Hanya jika status_user === 3) */}
-                    {/* {parseInt(store.PROFILE.profile?.status) === 3 && (
+                    {/* {parseInt(PROFILE.profile?.status) === 3 && (
                     <View style={styles.top3}>
                         <TouchableOpacity onPress={() => logOut(navigation)} style={styles.logoutButton}>
                             <Text style={styles.menuText}>❌</Text>
@@ -171,7 +175,7 @@ const userStatus = dummyStatus;
                 </View>
 
                 {/* Tampilkan jika status adalah Administrator */}
-                {parseInt(store.PROFILE.profile?.status) === 1 && selectedUser && (
+                {parseInt(PROFILE.profile?.status) === 1 && selectedUser && (
                 <View style={styles.profileContainer}>
                     <FastImage 
                         style={styles.profileImage}
@@ -187,7 +191,7 @@ const userStatus = dummyStatus;
             )}
 
             {/* Tampilkan tabel hanya untuk status 3 (Operator Kecamatan) */}
-            {parseInt(store.PROFILE.profile?.status) === 3 && (
+            {parseInt(PROFILE.profile?.status) === 3 && (
                 <View style={styles.tableContainer}>
                     <Text style={styles.tableHeader}>Desa di Kecamatan</Text>
                     <View style={styles.tableRowHeader}>
@@ -206,7 +210,7 @@ const userStatus = dummyStatus;
             )}
 
                 {/* Tampilkan data list untuk status user selain Administrator */}
-                {parseInt(store.PROFILE.profile?.status) !== 1 || 3 && userInfo.map((user, index) => (
+                {parseInt(PROFILE.profile?.status) !== 1 || 3 && userInfo.map((user, index) => (
                     <View key={index} style={styles.profileContainer}>
                         <FastImage 
                             style={styles.profileImage}
@@ -228,7 +232,7 @@ const userStatus = dummyStatus;
                 ))}
 
                 {/* Tampilkan data list untuk status user selain Administrator */}
-                {parseInt(store.PROFILE.profile?.status) == 2 && userInfo.map((user, index) => (
+                {parseInt(PROFILE.profile?.status) == 2 && userInfo.map((user, index) => (
                     <View key={index} style={styles.profileContainer}>
                         <FastImage 
                             style={styles.profileImage}
@@ -254,7 +258,7 @@ const userStatus = dummyStatus;
                     <TouchableOpacity
                         style={styles.menuOption}
                         onPress={() => {
-                            const userStatus = store.PROFILE.profile?.status || 1; // Ambil status user dari Redux Store
+                            const userStatus = PROFILE.profile?.status || 1; // Ambil status user dari Redux Store
                             const driveLink = getDriveLink(userStatus); // Dapatkan link sesuai status
                             Linking.openURL(driveLink);
                         }}

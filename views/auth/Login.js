@@ -10,11 +10,13 @@ import { useIsFocused } from "@react-navigation/native";
 import { Assets } from '@react-navigation/elements';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LIB from '../library/riswan'
+import { useDispatch } from 'react-redux';
 // import { Provider } from 'react-redux';
 
 
 // create a component
 const Login = ({navigation}) => {
+    const dispatch = useDispatch();
 
     // const navigation = useNavigation();
     const Route = (routex)=>{
@@ -23,9 +25,11 @@ const Login = ({navigation}) => {
 
     const isFocused = useIsFocused();
 
-    const store = useSelector(state => state);
+    const token = useSelector(state => state.TOKEN);
+      const PROFILE = useSelector(state => state.PROFILE);
+      const URL = useSelector(state => state.URL);
 
-    const [TOKEN, SET_TOKEN] = useState('')
+    // const [TOKEN, SET_TOKEN] = useState('')
       // const [FCM_TOKEN, SET_FCM_TOKEN] = useState('')
     const [CheckLoad, SET_CHECK_LOAD] = useState(false)
     const [LOADING, SET_LOADING] = useState('false')
@@ -67,7 +71,7 @@ const Login = ({navigation}) => {
     }
 
     const login = async () => {
-    console.log(store.URL.LOGIN_URL)
+    console.log(URL.LOGIN_URL)
     SET_LOADING('true')
     SET_CHECK_LOAD(true);
     SET_ERROR_STATUS(false);
@@ -77,7 +81,7 @@ const Login = ({navigation}) => {
 
 
     console.log(form)
-      // console.log(store.URL.LOGIN_URL)
+      // console.log(URL.LOGIN_URL)
 
       NetInfo.fetch().then(state => {
         if (!state.isConnected) {
@@ -90,7 +94,7 @@ const Login = ({navigation}) => {
             return;
         }
 
-    fetch(store.URL.LOGIN_URL, {
+    fetch(URL.LOGIN_URL, {
         method: "POST",
         headers: {
             Accept: 'application/json',
@@ -99,7 +103,7 @@ const Login = ({navigation}) => {
             body: JSON.stringify({
                 username : form.username,
                 password : form.password,
-              // VERSI_APP: store.VERSI_APP,
+              // VERSI_APP: VERSI_APP,
             })
         })
     .then((response)=>{
@@ -126,14 +130,16 @@ const Login = ({navigation}) => {
           // console.log(res_data)
           await saveDataToken('TOKEN', res_data.token)
           await saveDataToken('PROFILE', JSON.stringify(res_data.profile))
+          await AsyncStorage.setItem('LAST_LOGIN', Date.now().toString()); /// coba implementasi login
           
           SET_ERROR_STATUS(false);
           
           readDataToken('TOKEN')
-          store.AUTH_STAT = true
+          AUTH_STAT = true
           await LIB.GetStorage();
 
-          store.TOKEN =  res_data.token
+          dispatch({ type: 'SET_TOKEN', payload: res_data.token })
+          dispatch({ type: 'SET_PROFILE', payload: res_data.profile })
           SET_LOADING('false')
           saveUserNamePassword();
 
@@ -166,13 +172,48 @@ const Login = ({navigation}) => {
       });
   }
 
-  const checkToken = async ()=>{
-      const token =  await AsyncStorage.getItem("TOKEN")
-      console.log('tokennya adalahh = '+token)
-      if (store.TOKEN) {
-          navigation.navigate('Home')
-      }
-  }
+
+// const checkToken = async () => {
+//     const token = await AsyncStorage.getItem("TOKEN");
+//     if (!token || token === '') {
+//         // Kosong atau expired, tetap di halaman login
+//         return;
+//     }
+
+//     // Jika token ada, arahkan ke home
+//     navigation.reset({
+//         index: 0,
+//         routes: [{ name: 'Home' }],
+//     });
+// };
+
+
+const checkToken = async () => {
+    const token = await AsyncStorage.getItem("TOKEN");
+    const lastLogin = await AsyncStorage.getItem("LAST_LOGIN");
+
+    // Ubah ini ke 1 menit (60000 ms) untuk pengujian cepat
+    const EXPIRATION_TIME = 6 * 60 * 60 * 1000; // 6 jam
+    // const EXPIRATION_TIME = 1 * 60 * 1000; // 1 menit
+
+    const now = Date.now();
+
+    if (!token || !lastLogin || (now - parseInt(lastLogin)) > EXPIRATION_TIME) {
+        console.log("Token expired or invalid. Clearing AsyncStorage...");
+        await AsyncStorage.removeItem("TOKEN");
+        await AsyncStorage.removeItem("PROFILE");
+        await AsyncStorage.removeItem("LAST_LOGIN");
+        return;
+    }
+    // Alert.alert("Sesi Habis", "Anda telah logout otomatis karena tidak aktif terlalu lama.");
+
+    // Jika masih aktif
+    navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+    });
+};
+
 
   const saveFcmToken = async () =>{
 
@@ -180,11 +221,11 @@ const Login = ({navigation}) => {
       var fcmToken = await AsyncStorage.getItem('fcmToken')
       SET_FCM_TOKEN(fcmToken)
 
-      fetch(store.URL.URL_UpdateToken + "add", {
+      fetch(URL.URL_UpdateToken + "add", {
           method: "POST",
           headers: {
               "content-type": "application/json",
-              authorization: "kikensbatara " + store.TOKEN
+              authorization: "kikensbatara " + TOKEN
           },
           body: JSON.stringify({
               token_fcm : FCM_TOKEN,

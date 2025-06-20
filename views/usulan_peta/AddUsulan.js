@@ -9,6 +9,7 @@ import { useSelector } from 'react-redux';
 import DocumentPicker from 'react-native-document-picker';
 import { Picker } from '@react-native-picker/picker';
 // import { LokasiContext } from '../library/context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Assets } from '@react-navigation/elements';
 
@@ -25,7 +26,9 @@ const AddUsulan = ({navigation}) => {
     // const { lokasi, setLokasi } = useContext(LokasiContext);
     
 
-      const store = useSelector((state) => state);
+    const TOKEN = useSelector(state => state.TOKEN);
+    const PROFILE = useSelector(state => state.PROFILE);
+    const URL = useSelector(state => state.URL);
 
 
     //   const [fileName, setFileName] = useState('');
@@ -62,13 +65,14 @@ const AddUsulan = ({navigation}) => {
             status_pengajuan: null,
             file: '',
             lokasi: [],
+            tipe: '', // ⬅️ tambahkan ini
 
         }
       )
 
       useEffect(() => {
-        console.log('Token:', store.TOKEN);
-        console.log('Endpoint:', store.URL.URL_KECAMATAN + 'desa');
+        console.log('Token:', TOKEN);
+        console.log('Endpoint:', URL.URL_KECAMATAN + 'desa');
         // Load Kecamatan on mount
         const loadKecamatan = async () => {
           setLoading(true);
@@ -82,13 +86,13 @@ const AddUsulan = ({navigation}) => {
     
       const getKecamatan = async () => {
         try {
-            console.log('Fetching kecamatan from:', store.URL.URL_KECAMATAN + 'kecamatan');
+            console.log('Fetching kecamatan from:', URL.URL_KECAMATAN + 'kecamatan');
     
-            const response = await fetch(store.URL.URL_KECAMATAN + 'kecamatan', {
+            const response = await fetch(URL.URL_KECAMATAN + 'kecamatan', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: "kikensbatara " + store.TOKEN,
+                    Authorization: "kikensbatara " + TOKEN,
                 },
             });
     
@@ -100,8 +104,8 @@ const AddUsulan = ({navigation}) => {
             console.log('Kecamatan Data:', data);
     
             // Ambil status user dan id_kecamatan user
-            const userStatus = store.PROFILE.profile?.status || "1";
-            const userKecamatanId = store.PROFILE.profile?.id_kecamatan;
+            const userStatus = PROFILE.profile?.status || "1";
+            const userKecamatanId = PROFILE.profile?.id_kecamatan;
     
             console.log('Status User:', userStatus);
             console.log('User Kecamatan ID:', userKecamatanId);
@@ -139,11 +143,11 @@ const AddUsulan = ({navigation}) => {
         try {
           console.log('Fetching desa for kecamatan_id:', kecamatanId); // Debug kecamatan_id
       
-          const response = await fetch(store.URL.URL_KECAMATAN + 'desa', {
+          const response = await fetch(URL.URL_KECAMATAN + 'desa', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: "kikensbatara " + store.TOKEN,
+              Authorization: "kikensbatara " + TOKEN,
             },
             body: JSON.stringify({ kecamatan_id: kecamatanId }),
           });
@@ -284,23 +288,51 @@ const AddUsulan = ({navigation}) => {
             formData.append("file", form.file); // Pastikan file adalah objek hasil DocumentPicker
             formData.append("lokasi", JSON.stringify(form.lokasi)); // Konversi lokasi menjadi string JSON
             formData.append("marker", JSON.stringify(calculateCentroid(form.lokasi))); // Hitung centroid dan tambahkan ke form
-    
+            formData.append("tipe", form.tipe || "polygon"); // ✅ WAJIB PASTIKAN
             console.log("Data yang dikirim:", formData);
     
             // Kirim data ke server
-            const response = await fetch(store.URL.URL_ADD_ZONA + "addData", {
+            const response = await fetch(URL.URL_ADD_ZONA + "addData", {
                 method: "POST",
                 headers: {
-                    Authorization: "kikensbatara " + store.TOKEN, // Token authorization
+                    Authorization: "kikensbatara " + TOKEN, // Token authorization
                 },
                 body: formData,
             });
     
             if (response.ok) {
                 const result = await response.json();
-                console.log("Response server:", result);
-                Alert.alert("Success", "Data berhasil disubmit.");
-            } else {
+            
+                // Kosongkan semua field
+                SET_FORM({
+                    id: '',
+                    nik: '',
+                    nama: '',
+                    alamat: '',
+                    kecamatan_id : '',
+                    nama_kecamatan : '',
+                    des_kel_id : '',
+                    nama_des_kel: '',
+                    rwrt: '',
+                    no_telp: '',
+                    catatan: '',
+                    status_pengajuan: null,
+                    file: '',
+                    lokasi: [],
+                    tipe: '',
+                });
+            
+                // Kosongkan penyimpanan lokal
+                await AsyncStorage.removeItem('lokasiData');
+                await AsyncStorage.removeItem('lokasiPolylineData');
+            
+                // Tampilkan alert dan tetap di halaman ini
+                Alert.alert("Berhasil", "Data berhasil dikirim dan form telah dikosongkan.");
+            }
+            
+            
+            
+            else {
                 const errorText = await response.text();
                 console.error("Error Response Body:", errorText);
                 throw new Error(`Failed to submit data. Status: ${response.status}`);
@@ -504,7 +536,7 @@ const AddUsulan = ({navigation}) => {
                 <View style={{flex:1, alignSelf:'center', width:'90%'}}>
                     <View style={{flexDirection:'row'}}>
                     <TouchableOpacity 
-                        style={styles.metodeText} 
+                        style={[styles.metodeText, { flex: 1, marginLeft: 5 }]} 
                         onPress={() => navigation.navigate('MetodeText', { 
                             lokasiAwal: form.lokasi || [], // Pastikan ini adalah array lokasi terbaru
                             onLokasiUpdate: (updatedLokasi) => {
@@ -512,12 +544,32 @@ const AddUsulan = ({navigation}) => {
                                 SET_FORM((prevForm) => ({
                                     ...prevForm,
                                     lokasi: updatedLokasi, // Perbarui lokasi di form
+                                    tipe: 'polygon' // ⬅️ tandai bahwa ini polygon
+                                    
                                 }));
                             }
                         })}
                         >
-                        <Text style={{ color: 'white' }}>LOKASI</Text>
+                        <Text style={{ color: 'white' }}>POLYGON</Text>
                         </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.metodeText, { flex: 1, marginLeft: 5 }]} 
+                            onPress={() => navigation.navigate('MetodePolyline', { 
+                                lokasiAwal: form.lokasi || [],
+                                onLokasiUpdate: (updatedLokasi) => {
+                                    console.log("Updated from Polyline:", updatedLokasi);
+                                    SET_FORM(prevForm => ({ ...prevForm, 
+                                        lokasi: updatedLokasi,
+                                        tipe: 'polyline' // ⬅️ tandai bahwa ini polyline
+                                    
+                                    }));
+                                }
+                            })}
+                        >
+                            <Text style={{ color: 'white', textAlign: 'center' }}>POLYLINE</Text>
+                        </TouchableOpacity>
+
                     </View>
 
                     {/* Lokasi yang diterima */}

@@ -18,11 +18,14 @@ const Monitoring = ({navigation}) => {
       }
 
       const isFocused = useIsFocused();
-      const store = useSelector(state => state)
+      const token = useSelector(state => state.TOKEN);
+      const profile = useSelector(state => state.PROFILE);
+      const url = useSelector(state => state.URL);
+
       const [isLoading, setIsLoading] = useState(true);
       const [LOADING, SET_LOADING] = useState('false')
       const [DATA_MONITORING, SET_MONITORING] = useState([]);
-      const [userStatus, setUserStatus] = useState(store.PROFILE.profile?.status || "1"); // Ambil status user
+      const [userStatus, setUserStatus] = useState(profile?.profile?.status || "1"); // Ambil status user
       const [isModalVisible, setModalVisible] = useState(false);
       const [searchQuery, setSearchQuery] = useState('');
       const [filteredData, setFilteredData] = useState([]);
@@ -42,23 +45,23 @@ const Monitoring = ({navigation}) => {
             try {
                 setIsLoading(true);
         
-                const idKecamatanUser = store.PROFILE.profile?.id_kecamatan;
+                const idKecamatanUser = profile.profile?.id_kecamatan;
         
                 const requestBody = {
                     data_ke: page,
                     cari_value: "",
-                    id: store.PROFILE.id,
+                    id: profile.id,
                     status: userStatus,
                     ...(userStatus === "3" && { id_kecamatan: idKecamatanUser }), // Hanya tambahkan jika status user 3
                 };
         
                 // console.log('Request Body:', requestBody); // Debug log untuk memastikan parameter benar
         
-                const response = await fetch(store.URL.URL_LIST_MONITORING + "viewmonitornative", {
+                const response = await fetch(url.URL_LIST_MONITORING + "viewmonitornative", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        Authorization: "kikensbatara " + store.TOKEN,
+                        Authorization: `kikensbatara ${token}`
                     },
                     body: JSON.stringify(requestBody),
                 });

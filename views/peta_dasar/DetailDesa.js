@@ -6,7 +6,10 @@ import { useSelector } from 'react-redux';
 
 const DetailDesa = () => {
   const route = useRoute();
-  const store = useSelector(state => state);
+  const TOKEN = useSelector(state => state.TOKEN);
+// const profile = useSelector(state => state.PROFILE);
+const url = useSelector(state => state.URL);
+
   const [isLoading, setIsLoading] = useState(true);
   const [desaDetail, setDesaDetail] = useState(null);
   const [polygonCoordinates, setPolygonCoordinates] = useState([]);
@@ -15,11 +18,11 @@ const DetailDesa = () => {
   useEffect(() => {
     const fetchDesaDetail = async () => {
       try {
-        const response = await fetch(store.URL.URL_HOME + 'petadasar', {
+        const response = await fetch(url.URL_HOME + 'petadasar', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: 'kikensbatara ' + store.TOKEN,
+            Authorization: `kikensbatara ${TOKEN}`
           },
           body: JSON.stringify({ id_desa: route.params.id_desa }),
         });

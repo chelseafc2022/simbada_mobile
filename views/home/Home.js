@@ -1,9 +1,9 @@
 // import pustaka
-import React, { Component, useState, useEffect } from 'react';
+import React, { Component, useState, useEffect, useCallback } from 'react';
 import styles from '../assets/style';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, ImageBackground, ActivityIndicator, Alert } from 'react-native';
 import FastImage from 'react-native-fast-image';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import MapView, { Marker, Polygon }  from 'react-native-maps';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,11 +23,27 @@ const Home = ({ navigation }) => {
   const [kecamatan, setKecamatan] = useState([]);
   const [petadasar, setPetadasar] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const store = useSelector((state) => state);
+  const URL = useSelector(state => state.URL);
+  const TOKEN = useSelector(state => state.TOKEN);
+  const PROFILE = useSelector(state => state.PROFILE);
   const isFocused = useIsFocused();
   const [DATA_FINAL, SET_DATA_FINAL] = useState([]);
   const [isPolygonLoading, setIsPolygonLoading] = useState(false);
   const [desa, setDesa] = useState([]); // State untuk daftar desa
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("📥 Home is focused");
+
+      return () => {
+        console.log("🧹 Cleanup Home");
+        setDesa([]);
+        setPetadasar([]);
+        SET_DATA_FINAL([]);
+        setSelectedKecamatan('');
+      };
+    }, [])
+  );
   
   // Fungsi untuk menyimpan token di AsyncStorage
   const saveDataToken = async (token) => {
@@ -74,11 +90,11 @@ const Home = ({ navigation }) => {
   const getKecamatan = async () => {
     // setIsLoading(true); // Aktifkan indikator loading
     try {
-      const response = await fetch(store.URL.URL_KECAMATAN + "kecamatan_all", {
+      const response = await fetch(URL.URL_KECAMATAN + "kecamatan_all", {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: "kikensbatara " + store.TOKEN, // Ganti dengan token otorisasi Anda
+          Authorization: `kikensbatara ${TOKEN}`
         },
       });
 
@@ -120,11 +136,11 @@ const getDesaByKecamatan = async () => {
   console.log("Mengambil data desa untuk kecamatan:", selectedKecamatan); // Debugging
 
   try {
-    const response = await fetch(store.URL.URL_KECAMATAN + "petadasar", {
+    const response = await fetch(URL.URL_KECAMATAN + "petadasar", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "kikensbatara " + store.TOKEN,
+        Authorization: `kikensbatara ${TOKEN}`
       },
       body: JSON.stringify({ kecamatan_id: selectedKecamatan }),
     });
@@ -156,11 +172,11 @@ const getPetafinal = async () => {
     console.log("DATA_FINAL type:", typeof DATA_FINAL);
 console.log("DATA_FINAL value:", DATA_FINAL);
 
-    const response = await fetch(store.URL.URL_HOME + "peta_final", {
+    const response = await fetch(URL.URL_HOME + "peta_final", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "kikensbatara " + store.TOKEN,
+        Authorization: `kikensbatara ${TOKEN}`
       },
     });
 
@@ -181,11 +197,11 @@ const getPetadasar = async () => {
   setIsPolygonLoading(true);
   setPetadasar([]);
   try {
-    const response = await fetch(`${store.URL.URL_HOME}petadasar`, {
+    const response = await fetch(`${URL.URL_HOME}petadasar`, {
       method: 'POST',
       headers: {
         "Content-Type": "application/json",
-        Authorization: "kikensbatara " + store.TOKEN,
+        Authorization: `kikensbatara ${TOKEN}`
       },
       body: JSON.stringify({ kecamatan_id: selectedKecamatan }),
     });
@@ -243,7 +259,7 @@ useEffect(() => {
           <Text style={styles.fontHomex}>Sistem Informasi Batas Desa</Text>
         </View>
 
-        <View style={{ marginLeft: '55%' }}>
+        <View style={{marginLeft: '55%'}}>
            <TouchableOpacity onPress={()=>Route('PetaFinal')}>
             <FastImage
               style={{ width: 30, height: 30 }}
@@ -270,7 +286,8 @@ useEffect(() => {
       </LinearGradient>
     </View>
 
-    <View style={{ width: "5%" }} /> {/* Spacer antara dua card */}
+   {/* Spacer antara dua card */}
+<View style={{ width: "5%" }} />
 
     <View style={styles.infoCard}>
       <LinearGradient colors={["#F0F8FF", "#E0F7FA"]} style={styles.gradientBackground}>

@@ -1,5 +1,5 @@
 //import liraries
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useCallback } from 'react';
 import styles from '../assets/style'
 import { View, Text, TouchableOpacity, ScrollView , TextInput,StyleSheet, Alert, ActivityIndicator, ImageBackground } from 'react-native';
 import FastImage from "react-native-fast-image";
@@ -8,13 +8,17 @@ import TabBar from '../components/TabBar'
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 
+import {useFocusEffect } from '@react-navigation/native';
+
 // create a component
 const PetaFinal = ({navigation}) => {
     const Route = (routex)=>{
         navigation.navigate(routex)
       }
 
-        const store = useSelector(state => state);
+      const TOKEN = useSelector(state => state.TOKEN);
+      const PROFILE = useSelector(state => state.PROFILE);
+      const URL = useSelector(state => state.URL);
         const [isLoading, setIsLoading] = useState(true);
         const [kecamatanList, setKecamatanList] = useState([]);
         const [desaList, setDesaList] = useState([]);
@@ -24,7 +28,24 @@ const PetaFinal = ({navigation}) => {
         const [filteredPolygonData, setFilteredPolygonData] = useState([]);  // Polygon hasil filter
         const [kecamatanPolygonData, setKecamatanPolygonData] = useState([]);
         const [desaPolygonData, setDesaPolygonData] = useState([]);  // Polygon desa
-        const [userStatus, setUserStatus] = useState(store.PROFILE.profile?.status || "1");
+        const [userStatus, setUserStatus] = useState(PROFILE.profile?.status || "1");
+
+        useFocusEffect(
+          useCallback(() => {
+            console.log("📥 PetaFinal dibuka");
+        
+            return () => {
+              console.log("🧹 Cleanup PetaFinal");
+              setSelectedKecamatan('');
+              setSelectedDesa('');
+              setDesaPolygonData([]);
+              setKecamatanPolygonData([]);
+
+              setInitialPolygonData([]);
+              setFilteredPolygonData([]);
+            };
+          }, [])
+        );
 
     
 
@@ -41,11 +62,11 @@ const PetaFinal = ({navigation}) => {
             const fetchAllPolygonData = async () => {
               setIsLoading(true);
               try {
-                const response = await fetch(store.URL.URL_PETA_FINAL + 'petafinal', {
+                const response = await fetch(URL.URL_PETA_FINAL + 'petafinal', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    Authorization: 'kikensbatara ' + store.TOKEN,
+                    Authorization: 'kikensbatara ' + TOKEN,
                   },
                 });
         
@@ -73,18 +94,18 @@ const PetaFinal = ({navigation}) => {
                 }
             };
             fetchAllPolygonData();
-          }, [store.TOKEN]);
+          }, [TOKEN]);
 
           // **2. Fetch kecamatan**
              // Fetch kecamatan
              useEffect(() => {
                 const fetchKecamatan = async () => {
                   try {
-                    const response = await fetch(store.URL.URL_PETA_FINAL + 'kecamatan', {
+                    const response = await fetch(URL.URL_PETA_FINAL + 'kecamatan', {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
-                        Authorization: 'kikensbatara ' + store.TOKEN,
+                        Authorization: 'kikensbatara ' + TOKEN,
                       },
                     });
                     const data = await response.json();
@@ -113,7 +134,7 @@ const PetaFinal = ({navigation}) => {
                   }
                 };
                 fetchKecamatan();
-              }, [store.TOKEN]);
+              }, [TOKEN]);
               
 
             // **3. Fetch desa berdasarkan kecamatan**
@@ -121,11 +142,11 @@ const PetaFinal = ({navigation}) => {
                 if (selectedKecamatan) {
                   const fetchDesa = async () => {
                     try {
-                      const response = await fetch(store.URL.URL_PETA_FINAL + 'desa', {
+                      const response = await fetch(URL.URL_PETA_FINAL + 'desa', {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
-                          Authorization: 'kikensbatara ' + store.TOKEN,
+                          Authorization: 'kikensbatara ' + TOKEN,
                         },
                         body: JSON.stringify({ kecamatan_id: selectedKecamatan }),
                       });
@@ -150,11 +171,11 @@ const PetaFinal = ({navigation}) => {
                     const fetchPolygonDataKecamatan = async (kecamatanId) => {
                         setIsLoading(true);
                         try {
-                          const response = await fetch(store.URL.URL_APP + 'api/v1/petafinal/petafinal', {
+                          const response = await fetch(URL.URL_APP + 'api/v1/petafinal/petafinal', {
                             method: 'POST',
                             headers: {
                               'Content-Type': 'application/json',
-                              Authorization: 'kikensbatara ' + store.TOKEN,
+                              Authorization: 'kikensbatara ' + TOKEN,
                             },
                             body: JSON.stringify({
                               kecamatan_id: kecamatanId,

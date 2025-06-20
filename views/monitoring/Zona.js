@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import styles from '../assets/style'
 import { View, Text, TouchableOpacity, ScrollView ,StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import FastImage from "react-native-fast-image";
-import MapView, { Polygon } from 'react-native-maps';
+import MapView, { Polygon, Polyline } from 'react-native-maps';
 import TabBar from '../components/TabBar'
 import { useSelector } from 'react-redux'
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,7 +19,10 @@ const Zona = ({navigation, route}) => {
         id_usulan, nik, nama, alamat, id_kecamatan, nama_kecamatan,
         id_des_kel, nama_des_kel, rwrt, no_telp, catatan, lokasi, file, status_pengajuan
     } = route.params; 
-    const store = useSelector(state => state);
+    const TOKEN = useSelector(state => state.TOKEN);
+    // const profile = useSelector(state => state.PROFILE);
+    const URL = useSelector(state => state.URL);
+    
     const [isLoading, setIsLoading] = useState(true);
     const [petaPengajuan, setPetaPengajuan] = useState([]);
     const [petaDasar, setPetaDasar] = useState([]);
@@ -40,11 +43,11 @@ const Zona = ({navigation, route}) => {
             setIsPolygonReady(false);
             // console.log("📌 Mengambil data Peta Pengajuan...");
         
-            const response = await fetch(`${store.URL.URL_APP}api/v1/monitoring/viewnative`, {
+            const response = await fetch(`${URL.URL_APP}api/v1/monitoring/viewnative`, {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: "kikensbatara " + store.TOKEN,
+                    Authorization: `kikensbatara ${TOKEN}`
                 },
                 body: JSON.stringify({ id_kecamatan, id_des_kel, data_ke: 1 })
             });
@@ -54,6 +57,7 @@ const Zona = ({navigation, route}) => {
     
             if (data.length > 0 && data[0].data1.length > 0) {
                 const processedData = data[0].data1.map(polygon => ({
+                    tipe: polygon.tipe || 'polygon', // Ambil tipe
                     coordinates: polygon.lokasi.map(coord => ({
                         latitude: parseFloat(coord.lat), 
                         longitude: parseFloat(coord.lng)
@@ -149,11 +153,11 @@ const Zona = ({navigation, route}) => {
             setIsLoading(true);
             console.log("📌 Mengambil data Peta Dasar untuk desa:", id_des_kel);
     
-            const response = await fetch(`${store.URL.URL_APP}api/v1/monitoring/petadasar`, {
+            const response = await fetch(`${URL.URL_APP}api/v1/monitoring/petadasar`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: "kikensbatara " + store.TOKEN
+                    Authorization: `kikensbatara ${TOKEN}`
                 },
                 body: JSON.stringify({ des_kel_id: id_des_kel })
             });
@@ -416,34 +420,61 @@ const Zona = ({navigation, route}) => {
             
 
             <View style={styles.mapx}>
-           
-{(petaPengajuan.length > 0 || petaDasar.length > 0) ? (
-    <MapView style={{ flex: 1 }} region={mapRegion}>
-        {petaPengajuan.length > 0 &&
-            petaPengajuan.map((polygon, index) => (
-                <Polygon
+
+
+            <View style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('FullMap', {
+                    petaPengajuan,
+                    petaDasar,
+                    region: mapRegion
+                    })}
+                    style={{
+                    backgroundColor: '#208DC0',
+                    padding: 6,
+                    borderRadius: 20,
+                    }}
+                >
+                    <Text style={{ color: 'white', fontSize: 12 }}>[   ]</Text>
+                </TouchableOpacity>
+                </View>
+            {(petaPengajuan.length > 0 || petaDasar.length > 0) ? (
+            <MapView style={{ flex: 1 }} region={mapRegion}>
+                
+                {petaPengajuan.map((item, index) => (
+                item.tipe === 'polyline' ? (
+                    <Polyline
                     key={`pengajuan-${index}`}
-                    coordinates={polygon.coordinates}
+                    coordinates={item.coordinates}
                     strokeColor="blue"
-                    fillColor="rgba(0,0,255,0.5)"
-                />
-            ))}
-        
-        {petaDasar.length > 0 &&
-            petaDasar.map((polygon, index) => (
+                    strokeWidth={3}
+                    />
+                ) : (
+                    <Polygon
+                    key={`pengajuan-${index}`}
+                    coordinates={item.coordinates}
+                    strokeColor="blue"
+                    fillColor="rgba(0,0,255,0.3)"
+                    />
+                )
+                ))}
+
+                {petaDasar.map((item, index) => (
                 <Polygon
                     key={`dasar-${index}`}
-                    coordinates={polygon.coordinates}
+                    coordinates={item.coordinates}
                     strokeColor="red"
-                    fillColor="rgba(255,0,0,0.5)"
+                    fillColor="rgba(255,0,0,0.3)"
                 />
-            ))}
-    </MapView>
-) : (
-    <Text style={{ textAlign: "center", marginTop: 20, color: "gray" }}>
-        🔄 Memuat Peta...
-    </Text>
-)}
+                ))}
+
+            </MapView>
+            ) : (
+            <Text style={{ textAlign: "center", marginTop: 20, color: "gray" }}>
+                🔄 Memuat Peta...
+            </Text>
+            )}
+
 
             </View>
 

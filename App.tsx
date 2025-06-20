@@ -27,10 +27,12 @@ import Usulan from "./views/usulan_peta/Usulan";
 import AddUsulan from "./views/usulan_peta/AddUsulan";
 import EditUsulan from "./views/usulan_peta/EditUsulan";
 import MetodeText from "./views/usulan_peta/MetodeText";
+import MetodePolyline from "./views/usulan_peta/MetodePolyline";
 import User from "./views/user/User";
 import PetaDasar from "./views/peta_dasar/PetaDasar";
 import PetaFinal from "./views/peta_final/PetaFinal";
 import LihatUsulan from "./views/usulan_peta/LihatUsulan";
+import FullMap from './views/monitoring/FullMap';
 
 const Stack = createNativeStackNavigator();
 // const navigation = useNavigation();
@@ -94,6 +96,7 @@ function App(): React.JSX.Element {
         <Stack.Screen name="Monitoring" component={Monitoring} />
         <Stack.Screen name="Zona" component={Zona} />
         <Stack.Screen name="MetodeText" component={MetodeText} />
+        <Stack.Screen name="MetodePolyline" component={MetodePolyline} />
         <Stack.Screen name="AddUsulan" component={AddUsulan} />
         <Stack.Screen name="EditUsulan" component={EditUsulan} />
         <Stack.Screen name="Perbandingan" component={Perbandingan} />
@@ -102,6 +105,7 @@ function App(): React.JSX.Element {
         <Stack.Screen name="PetaDasar" component={PetaDasar} />
         <Stack.Screen name="PetaFinal" component={PetaFinal} />
         <Stack.Screen name="LihatUsulan" component={LihatUsulan} />
+        <Stack.Screen name="FullMap" component={FullMap} />
       </Stack.Navigator>
     </NavigationContainer>
     </Provider>

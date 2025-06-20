@@ -14,7 +14,9 @@ const EditUsulan = ({ route, navigation }) => {
         nama_kecamatan, id_des_kel, nama_des_kel,
         rwrt, no_telp, catatan, lokasi, file
     } = route.params;
-    const store = useSelector((state) => state);
+    const TOKEN = useSelector(state => state.TOKEN);
+    //   const PROFILE = useSelector(state => state.PROFILE);
+      const URL = useSelector(state => state.URL);
 
     const [form, setForm] = useState({
         id: id_usulan, nik, nama, alamat,
@@ -69,10 +71,10 @@ const EditUsulan = ({ route, navigation }) => {
                 status_pengajuan: 1
             });
         
-            const response = await fetch(store.URL.URL_ADD_ZONA + "editDatax", {
+            const response = await fetch(URL.URL_ADD_ZONA + "editDatax", {
                 method: 'POST',
                 headers: {
-                    Authorization: "kikensbatara " + store.TOKEN, // Token authorization
+                    Authorization: "kikensbatara " + TOKEN, // Token authorization
                 },
                 body: formData,
             });

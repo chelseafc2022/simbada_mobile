@@ -1,11 +1,13 @@
 //import liraries
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useCallback } from 'react';
 import styles from '../assets/style'
 import { View, Text, TouchableOpacity, ScrollView , TextInput,StyleSheet, Alert, ActivityIndicator, ImageBackground } from 'react-native';
 import FastImage from "react-native-fast-image";
 import MapView, { Polygon } from 'react-native-maps';
 import TabBar from '../components/TabBar'
 import { Picker } from '@react-native-picker/picker';
+
+import {useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 
 // create a component
@@ -14,7 +16,10 @@ const PetaDasar = ({navigation}) => {
         navigation.navigate(routex)
       }
 
-        const store = useSelector(state => state);
+      const TOKEN = useSelector(state => state.TOKEN);
+      // const PROFILE = useSelector(state => state.PROFILE);
+      const URL = useSelector(state => state.URL);
+      
         const [isLoading, setIsLoading] = useState(true);
         const [kecamatanList, setKecamatanList] = useState([]);
         const [desaList, setDesaList] = useState([]);
@@ -25,15 +30,31 @@ const PetaDasar = ({navigation}) => {
         const [kecamatanPolygonData, setKecamatanPolygonData] = useState([]);
         const [desaPolygonData, setDesaPolygonData] = useState([]);  // Polygon desa
 
+        useFocusEffect(
+          useCallback(() => {
+            console.log("📥 PetaDasar dibuka");
+        
+            return () => {
+              console.log("🧹 Cleanup PetaDasar");
+              setInitialPolygonData([]);
+              setFilteredPolygonData([]);
+              setKecamatanPolygonData([]);
+              setDesaPolygonData([]);
+              setSelectedDesa('');
+              setSelectedKecamatan('');
+            };
+          }, [])
+        );
+
         useEffect(() => {
             const fetchAllPolygonData = async () => {
               setIsLoading(true);
               try {
-                const response = await fetch(store.URL.URL_HOME + 'petadasar', {
+                const response = await fetch(URL.URL_HOME + 'petadasar', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    Authorization: 'kikensbatara ' + store.TOKEN,
+                    Authorization: `kikensbatara ${TOKEN}`
                   },
                 });
         
@@ -56,17 +77,17 @@ const PetaDasar = ({navigation}) => {
               }
             };
             fetchAllPolygonData();
-          }, [store.TOKEN]);
+          }, [TOKEN]);
 
           // **2. Fetch kecamatan**
             useEffect(() => {
                 const fetchKecamatan = async () => {
                 try {
-                    const response = await fetch(store.URL.URL_KECAMATAN + "kecamatan_all", {
+                    const response = await fetch(URL.URL_KECAMATAN + "kecamatan_all", {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: "kikensbatara " + store.TOKEN,
+                        Authorization: `kikensbatara ${TOKEN}`
                     },
                     });
                     const data = await response.json();
@@ -85,18 +106,18 @@ const PetaDasar = ({navigation}) => {
                 }
                 };
                 fetchKecamatan();
-            }, [store.TOKEN]);
+            }, [TOKEN]);
 
             // **3. Fetch desa berdasarkan kecamatan**
                 useEffect(() => {
                     if (selectedKecamatan) {
                     const fetchDesa = async () => {
                         try {
-                        const response = await fetch(store.URL.URL_KECAMATAN + "desa", {
+                        const response = await fetch(URL.URL_KECAMATAN + "desa", {
                             method: 'POST',
                             headers: {
                             'Content-Type': 'application/json',
-                            Authorization: "kikensbatara " + store.TOKEN,
+                            Authorization: `kikensbatara ${TOKEN}`
                             },
                             body: JSON.stringify({ kecamatan_id: selectedKecamatan }),
                         });
@@ -119,16 +140,17 @@ const PetaDasar = ({navigation}) => {
                     fetchDesa();
                     }
                 }, [selectedKecamatan]);
+
   
                     // **4. Fetch polygon kecamatan**
                     const fetchPolygonDataKecamatan = async (kecamatanId) => {
                         setIsLoading(true);
                         try {
-                        const response = await fetch(store.URL.URL_HOME + 'petadasar', {
+                        const response = await fetch(URL.URL_HOME + 'petadasar', {
                             method: 'POST',
                             headers: {
                             'Content-Type': 'application/json',
-                            Authorization: 'kikensbatara ' + store.TOKEN,
+                            Authorization: 'kikensbatara ' + TOKEN,
                             },
                             body: JSON.stringify({ kecamatan_id: kecamatanId }),
                         });

@@ -19,7 +19,9 @@ const Usulan = ({navigation, route}) => {
       }
     const isFocused = useIsFocused();
 
-    const store = useSelector(state => state)
+    const TOKEN = useSelector(state => state.TOKEN);
+      const PROFILE = useSelector(state => state.PROFILE);
+      const URL = useSelector(state => state.URL);
     const [isLoading, setIsLoading] = useState(true);
     const [DATA_USULAN, SET_USULAN] = useState([]);
     
@@ -36,9 +38,9 @@ const Usulan = ({navigation, route}) => {
         try {
           setIsLoading(true);
 
-          const userStatus = store.PROFILE.profile?.status;
-            const idDesaUser = store.PROFILE.profile?.id_desa;
-            const idKecamatanUser = store.PROFILE.profile?.id_kecamatan;
+          const userStatus = PROFILE.profile?.status;
+            const idDesaUser = PROFILE.profile?.id_desa;
+            const idKecamatanUser = PROFILE.profile?.id_kecamatan;
 
               // Log debugging untuk memastikan parameter benar
         console.log('User Status:', userStatus);
@@ -48,17 +50,17 @@ const Usulan = ({navigation, route}) => {
             const requestBody = {
                 data_ke: 1,
                 cari_value: "",
-                id: store.PROFILE.id,
+                id: PROFILE.id,
                 status: userStatus,
                 ...(userStatus === "2" && { id_des_kel: idDesaUser }),
                 ...(userStatus === "3" && { id_kecamatan: idKecamatanUser }), // Filter desa jika status user 2
             };
     
-          const response = await fetch(store.URL.URL_ADD_ZONA + "viewUsulanNative", {
+          const response = await fetch(URL.URL_ADD_ZONA + "viewUsulanNative", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: "kikensbatara " + store.TOKEN,
+              Authorization: "kikensbatara " + TOKEN,
             },
             body: JSON.stringify(requestBody),
           });
