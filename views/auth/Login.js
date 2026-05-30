@@ -3,6 +3,7 @@ import React, { Component, useEffect, useState } from 'react';
 import styles from '../assets/style'
 import { View, Text, TextInput, TouchableOpacity, ScrollView , ImageBackground, Alert} from 'react-native';
 import FastImage from "react-native-fast-image";
+import Icon from 'react-native-vector-icons/Ionicons';
 import NetInfo from '@react-native-community/netinfo';
 
 import { useSelector } from 'react-redux'
@@ -36,6 +37,7 @@ const Login = ({navigation}) => {
     const [ErrorMessage, SET_ERROR_MESSAGE] = useState('')
     const [ErrorStatus, SET_ERROR_STATUS] = useState(false)
     const [SAVE_PASSWORD, SET_SAVE_PASSWORD] = useState(true);
+    const [showPassword, setShowPassword] = useState(false);
     const saveUserNamePassword = () =>{
         if (SAVE_PASSWORD == true) {
             saveDataToken('USERNAME', form.username)
@@ -337,14 +339,22 @@ const checkToken = async () => {
             <Text style={{color: 'black', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
                             Password    
             </Text>
-            <TextInput
-                style={styles.inputLogin}
-                placeholderTextColor="#aaa" // Warna teks placeholder
-                placeholder='Masukan Password'
-                secureTextEntry={true}
-                onChangeText={text => constchangeInput(text, 'password')}
-                value={form.password}
-            />
+            <View style={{ width: '90%', alignSelf: 'center', justifyContent: 'center' }}>
+                <TextInput
+                    style={[styles.inputLogin, { width: '100%', alignSelf: 'auto', paddingRight: 50 }]}
+                    placeholderTextColor="#aaa" // Warna teks placeholder
+                    placeholder='Masukan Password'
+                    secureTextEntry={!showPassword}
+                    onChangeText={text => constchangeInput(text, 'password')}
+                    value={form.password}
+                />
+                <TouchableOpacity 
+                    onPress={() => setShowPassword(!showPassword)} 
+                    style={{position: 'absolute', right: 15, height: '100%', justifyContent: 'center'}}
+                >
+                    <Icon name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#aaa" />
+                </TouchableOpacity>
+            </View>
         </View>
 
         <View>

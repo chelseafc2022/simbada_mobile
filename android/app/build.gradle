@@ -2,6 +2,14 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -98,17 +106,16 @@ android {
         }
         release {
            storeFile file('simbada-release-key.jks')
-            storePassword 'kominfo2018'
+            storePassword localProperties.getProperty('MYAPP_RELEASE_STORE_PASSWORD', '')
             keyAlias 'simbadakey'
-            // keyAlias 'my-key-alias'
-            keyPassword 'kominfo2018'
+            keyPassword localProperties.getProperty('MYAPP_RELEASE_KEY_PASSWORD', '')
         }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         
-    resValue "string", "google_maps_key", "AIzaSyAyxqp-DfwUF6UnXBwpbQeAF1EHBJ4-jh0"
+            resValue "string", "google_maps_key", localProperties.getProperty('GOOGLE_MAPS_API_KEY', '')
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
@@ -118,7 +125,7 @@ android {
             // signingConfig signingConfigs.debug
             // minifyEnabled enableProguardInReleaseBuilds
             // proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            resValue "string", "google_maps_key", "AIzaSyAyxqp-DfwUF6UnXBwpbQeAF1EHBJ4-jh0"
+            resValue "string", "google_maps_key", localProperties.getProperty('GOOGLE_MAPS_API_KEY', '')
             signingConfig signingConfigs.release
             minifyEnabled false // Set to true if you want to enable shrinking and obfuscation
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -142,3 +149,5 @@ dependencies {
     implementation 'com.google.android.gms:play-services-base:17.6.0'  // Jika menggunakan Google Play Services
 
 }
+
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
