@@ -1,7 +1,7 @@
 //import liraries
 import React, { useState, useEffect,useCallback } from 'react';
 import styles from '../assets/style'
-import { View, Text, TouchableOpacity, ScrollView , TextInput,StyleSheet, Alert, ActivityIndicator, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView , TextInput,StyleSheet, Alert, ActivityIndicator, ImageBackground, Switch } from 'react-native';
 import FastImage from "react-native-fast-image";
 import MapView, { Polygon } from 'react-native-maps';
 import TabBar from '../components/TabBar'
@@ -30,6 +30,11 @@ const PetaFinal = ({navigation}) => {
         const [desaPolygonData, setDesaPolygonData] = useState([]);  // Polygon desa
         const [userStatus, setUserStatus] = useState(PROFILE.profile?.status || "1");
 
+        const [showPetaDasar, setShowPetaDasar] = useState(false);
+        const [initialPetaDasarData, setInitialPetaDasarData] = useState([]);
+        const [kecamatanPetaDasarData, setKecamatanPetaDasarData] = useState([]);
+        const [desaPetaDasarData, setDesaPetaDasarData] = useState([]);
+
         useFocusEffect(
           useCallback(() => {
             console.log("📥 PetaFinal dibuka");
@@ -43,6 +48,9 @@ const PetaFinal = ({navigation}) => {
 
               setInitialPolygonData([]);
               setFilteredPolygonData([]);
+              setInitialPetaDasarData([]);
+              setKecamatanPetaDasarData([]);
+              setDesaPetaDasarData([]);
             };
           }, [])
         );
@@ -62,24 +70,35 @@ const PetaFinal = ({navigation}) => {
             const fetchAllPolygonData = async () => {
               setIsLoading(true);
               try {
-                const response = await fetch(URL.URL_PETA_FINAL + 'petafinal', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: 'kikensbatara ' + TOKEN,
-                  },
-                });
+                const [response, resDasar] = await Promise.all([
+                  fetch(URL.URL_PETA_FINAL + 'petafinal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'kikensbatara ' + TOKEN },
+                  }),
+                  fetch(URL.URL_HOME + 'petadasar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'kikensbatara ' + TOKEN },
+                  })
+                ]);
         
                 const data = await response.json();
-                // console.log('🚀 Semua polygon kabupaten:', JSON.stringify(data, null, 2));
-                // console.log('API Response:', data); // Log untuk memeriksa bentuk data
-                    // Cek apakah data adalah array dan lokasi.coordinat ada
-                const validPolygons = data.filter(item => 
-                    item.lokasi && Array.isArray(item.lokasi.coordinat)
-                );
-
+                const dataDasar = await resDasar.json();
+                
+                const validPolygons = data.filter(item => item.lokasi && Array.isArray(item.lokasi.coordinat));
                 setInitialPolygonData(
                     validPolygons.map(polygon => ({
+                    kode_desa: polygon.lokasi.kode_desa,
+                    coordinates: polygon.lokasi.coordinat.map(coord => ({
+                        latitude: parseFloat(coord.lat),
+                        longitude: parseFloat(coord.lng),
+                    })),
+                    }))
+                );
+
+                const validDasar = dataDasar.filter(item => item.lokasi && Array.isArray(item.lokasi.coordinat));
+                setInitialPetaDasarData(
+                    validDasar.map(polygon => ({
+                    kode_desa: polygon.lokasi.kode_desa,
                     coordinates: polygon.lokasi.coordinat.map(coord => ({
                         latitude: parseFloat(coord.lat),
                         longitude: parseFloat(coord.lng),
@@ -171,27 +190,24 @@ const PetaFinal = ({navigation}) => {
                     const fetchPolygonDataKecamatan = async (kecamatanId) => {
                         setIsLoading(true);
                         try {
-                          const response = await fetch(URL.URL_APP + 'api/v1/petafinal/petafinal', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              Authorization: 'kikensbatara ' + TOKEN,
-                            },
-                            body: JSON.stringify({
-                              kecamatan_id: kecamatanId,
-                              des_kel_id: '',  // Kosongkan untuk mengambil semua desa
-                            }),
-                          });
+                          const [response, resDasar] = await Promise.all([
+                              fetch(URL.URL_APP + 'api/v1/petafinal/petafinal', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', Authorization: 'kikensbatara ' + TOKEN },
+                                body: JSON.stringify({ kecamatan_id: kecamatanId, des_kel_id: '' }),
+                              }),
+                              fetch(URL.URL_HOME + 'petadasar', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', Authorization: 'kikensbatara ' + TOKEN },
+                                body: JSON.stringify({ kecamatan_id: kecamatanId }),
+                              })
+                          ]);
                       
                           const data = await response.json();
-                        //   console.log('Data kecamatan yang diterima:', data);  // Debug log
+                          const dataDasar = await resDasar.json();
                       
                           // Validasi data dan filter polygon
-                          const validPolygons = data.filter((polygon) => 
-                            polygon.lokasi && 
-                            Array.isArray(polygon.lokasi.coordinat) && 
-                            polygon.lokasi.coordinat.length > 0  // Pastikan koordinat tidak kosong
-                          );
+                          const validPolygons = data.filter((polygon) => polygon.lokasi && Array.isArray(polygon.lokasi.coordinat) && polygon.lokasi.coordinat.length > 0);
                       
                           if (validPolygons.length > 0) {
                             setKecamatanPolygonData(
@@ -204,8 +220,22 @@ const PetaFinal = ({navigation}) => {
                               }))
                             );
                           } else {
-                            Alert.alert('Info', 'Polygon kecamatan tidak ditemukan.');
                             setKecamatanPolygonData([]);  // Reset jika tidak ada polygon
+                          }
+
+                          const validDasar = dataDasar.filter((polygon) => polygon.lokasi && Array.isArray(polygon.lokasi.coordinat) && polygon.lokasi.coordinat.length > 0);
+                          if (validDasar.length > 0) {
+                            setKecamatanPetaDasarData(
+                              validDasar.map((polygon) => ({
+                                kode_desa: polygon.lokasi.kode_desa,
+                                coordinates: polygon.lokasi.coordinat.map((coord) => ({
+                                  latitude: parseFloat(coord.lat),
+                                  longitude: parseFloat(coord.lng),
+                                })),
+                              }))
+                            );
+                          } else {
+                            setKecamatanPetaDasarData([]);
                           }
                         } catch (error) {
                           console.error('Error fetching data for kecamatan:', error);
@@ -225,13 +255,19 @@ const PetaFinal = ({navigation}) => {
                       
                         // Filter polygon berdasarkan desa yang dipilih
                         const filteredPolygons = kecamatanPolygonData.filter((polygon) => polygon.kode_desa === formattedDesaId);
+                        const filteredDasar = kecamatanPetaDasarData.filter((polygon) => polygon.kode_desa === formattedDesaId);
                       
                         if (filteredPolygons.length > 0) {
                           setDesaPolygonData(filteredPolygons);  // Set polygon desa ke state
                         } else {
-                          console.log("Tidak ada polygon untuk desa yang dipilih");
-                          Alert.alert('Info', 'Tidak ada polygon untuk desa yang dipilih');
+                          Alert.alert('Info', 'Tidak ada polygon final untuk desa yang dipilih');
                           setDesaPolygonData([]);  // Reset jika tidak ada polygon
+                        }
+
+                        if (filteredDasar.length > 0) {
+                          setDesaPetaDasarData(filteredDasar);
+                        } else {
+                          setDesaPetaDasarData([]);
                         }
                       };
        
@@ -307,12 +343,22 @@ const PetaFinal = ({navigation}) => {
                     }}
                     key={JSON.stringify(selectedDesa ? desaPolygonData : (selectedKecamatan ? kecamatanPolygonData : initialPolygonData))}
                 >
+                    {showPetaDasar && (selectedDesa ? desaPetaDasarData : (selectedKecamatan ? kecamatanPetaDasarData : initialPetaDasarData)).map((polygon, index) => (
+                        <Polygon
+                        key={`dasar-${index}`}
+                        coordinates={polygon.coordinates}
+                        strokeColor="#808080"
+                        fillColor="rgba(128,128,128,0.5)"
+                        zIndex={1}
+                        />
+                    ))}
                     {(selectedDesa ? desaPolygonData : (selectedKecamatan ? kecamatanPolygonData : initialPolygonData)).map((polygon, index) => (
                         <Polygon
-                        key={index}
+                        key={`final-${index}`}
                         coordinates={polygon.coordinates}
                         strokeColor="blue"
                         fillColor="rgba(0,0,255,0.5)"
+                        zIndex={2}
                         />
                     ))}
                 </MapView>
@@ -320,7 +366,7 @@ const PetaFinal = ({navigation}) => {
             </View> 
         )}
 
-            <View style={{borderTopRightRadius:20, borderTopLeftRadius:20, marginTop:-15, height: 200, backgroundColor:'#fff', borderBottomColor:'white', borderWidth:1, borderColor:'white'}}>
+            <View style={{borderTopRightRadius:20, borderTopLeftRadius:20, marginTop:-15, height: 250, backgroundColor:'#fff', borderBottomColor:'white', borderWidth:1, borderColor:'white'}}>
                 <Text style={{
                 color: '#208DC0', 
                 fontWeight:'bold', 
@@ -332,6 +378,16 @@ const PetaFinal = ({navigation}) => {
 
                 SELECT LOCATION
             </Text>
+
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, marginTop: 10, padding: 10, backgroundColor: '#F0F4F8', borderRadius: 10, borderColor: '#208DC0', borderWidth: 1}}>
+                <Text style={{color: '#208DC0', fontWeight: 'bold', fontSize: 14}}>Tampilkan Peta Dasar</Text>
+                <Switch
+                    trackColor={{ false: "#767577", true: "#81b0ff" }}
+                    thumbColor={showPetaDasar ? "#208DC0" : "#f4f3f4"}
+                    onValueChange={() => setShowPetaDasar(!showPetaDasar)}
+                    value={showPetaDasar}
+                />
+            </View>
 
             {/* <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
                 Pilih Kecamatan

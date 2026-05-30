@@ -149,7 +149,14 @@ const getDesaByKecamatan = async () => {
     console.log("Response dari API desa:", result); // Debugging
 
     if (result.length > 0) {
-      setDesa(result); // Simpan daftar desa ke state
+      const processedDesa = result.map(item => {
+        let area = "0";
+        if (item?.lokasi?.coordinat) {
+          area = calculateArea(item.lokasi.coordinat);
+        }
+        return { ...item, calculatedArea: area };
+      });
+      setDesa(processedDesa); // Simpan daftar desa ke state
     } else {
       setDesa([]); // Kosongkan daftar jika tidak ada desa
     }
@@ -157,10 +164,12 @@ const getDesaByKecamatan = async () => {
     console.error("Fetch Error:", error);
   }
 };
-// Panggil getDesaByKecamatan setiap kali selectedKecamatan berubah
+
+// Panggil API desa dan peta dasar setiap kali selectedKecamatan berubah
 useEffect(() => {
   if (selectedKecamatan) {
     getDesaByKecamatan();
+    getPetadasar();
   }
 }, [selectedKecamatan]);
 
@@ -232,11 +241,7 @@ const getPetadasar = async () => {
   }
 };
 
-useEffect(() => {
-  if (selectedKecamatan) {
-    getPetadasar(); // Panggil jika kecamatan sudah dipilih
-  }
-}, [selectedKecamatan]);
+// useEffect untuk getPetadasar sudah digabung ke useEffect getDesaByKecamatan di atas.
 
 
   
@@ -396,7 +401,7 @@ useEffect(() => {
               {item?.lokasi?.nama_desa ? String(item.lokasi.nama_desa) : "Tidak Diketahui"}
             </Text>
             <Text style={[styles.tableCell, styles.columnArea]}>
-              {calculateArea(item.lokasi.coordinat) ? String(calculateArea(item.lokasi.coordinat)) : "0"} km²
+              {item.calculatedArea ? String(item.calculatedArea) : "0"} km²
             </Text>
           </View>
         ))
