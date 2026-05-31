@@ -1,18 +1,114 @@
 // import pustaka
 import React, { Component, useState, useEffect, useCallback } from 'react';
 import styles from '../assets/style';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ImageBackground, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ImageBackground, ActivityIndicator, Alert, StyleSheet as RNStyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import MapView, { Marker, Polygon }  from 'react-native-maps';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import TabBar from '../components/TabBar'
 import LinearGradient from 'react-native-linear-gradient';
 import * as turf from '@turf/turf';
+import NetInfo from '@react-native-community/netinfo';
+import NotificationService from '../library/NotificationService';
 
 import { Assets } from '@react-navigation/elements';
+
+const homeStyles = RNStyleSheet.create({
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    backgroundColor: '#F44336',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  notifBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  offlineBanner: {
+    backgroundColor: '#FFF3E0',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 10,
+  },
+  offlineBannerText: {
+    fontSize: 12,
+    color: '#E65100',
+    fontWeight: '600',
+  },
+  offlineSyncLink: {
+    fontSize: 11,
+    color: '#208DC0',
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  shortcutContainer: {
+    marginHorizontal: 15,
+    marginTop: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 15,
+    padding: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  shortcutTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#208DC0',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  shortcutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  shortcutCard: {
+    alignItems: 'center',
+    width: 70,
+  },
+  shortcutIcon: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  shortcutLabel: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '600',
+    lineHeight: 13,
+  },
+  shortcutBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#F44336',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  shortcutBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+});
 
 // buat komponen utama
 const Home = ({ navigation }) => {
@@ -26,6 +122,10 @@ const Home = ({ navigation }) => {
   const URL = useSelector(state => state.URL);
   const TOKEN = useSelector(state => state.TOKEN);
   const PROFILE = useSelector(state => state.PROFILE);
+  const IS_ONLINE = useSelector(state => state.IS_ONLINE);
+  const NOTIFICATION_COUNT = useSelector(state => state.NOTIFICATION_COUNT);
+  const OFFLINE_QUEUE_COUNT = useSelector(state => state.OFFLINE_QUEUE_COUNT);
+  const dispatch = useDispatch();
   const isFocused = useIsFocused();
   const [DATA_FINAL, SET_DATA_FINAL] = useState([]);
   const [isPolygonLoading, setIsPolygonLoading] = useState(false);
@@ -264,7 +364,17 @@ const getPetadasar = async () => {
           <Text style={styles.fontHomex}>Sistem Informasi Batas Desa</Text>
         </View>
 
-        <View style={{marginLeft: '55%'}}>
+        <View style={{marginLeft: '40%', flexDirection: 'row', alignItems: 'center'}}>
+           {/* Notification Bell */}
+           <TouchableOpacity onPress={()=>Route('NotificationList')} style={{marginRight: 12, position: 'relative'}}>
+            <Text style={{fontSize: 22}}>🔔</Text>
+            {NOTIFICATION_COUNT > 0 && (
+              <View style={homeStyles.notifBadge}>
+                <Text style={homeStyles.notifBadgeText}>{NOTIFICATION_COUNT > 9 ? '9+' : NOTIFICATION_COUNT}</Text>
+              </View>
+            )}
+           </TouchableOpacity>
+
            <TouchableOpacity onPress={()=>Route('PetaFinal')}>
             <FastImage
               style={{ width: 30, height: 30 }}
@@ -282,6 +392,59 @@ const getPetadasar = async () => {
           resizeMode="cover"
         >
           <ScrollView style={{ flex: 1 }}>
+
+  {/* === OFFLINE BANNER === */}
+  {IS_ONLINE === false && (
+    <View style={homeStyles.offlineBanner}>
+      <Text style={homeStyles.offlineBannerText}>📴 Mode Offline — Beberapa fitur terbatas</Text>
+      {OFFLINE_QUEUE_COUNT > 0 && (
+        <TouchableOpacity onPress={() => Route('OfflineSync')}>
+          <Text style={homeStyles.offlineSyncLink}>📤 {OFFLINE_QUEUE_COUNT} data menunggu sync →</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  )}
+
+  {/* === SHORTCUT MODUL BARU === */}
+  <View style={homeStyles.shortcutContainer}>
+    <Text style={homeStyles.shortcutTitle}>FITUR BARU</Text>
+    <View style={homeStyles.shortcutRow}>
+      <TouchableOpacity style={homeStyles.shortcutCard} onPress={() => Route('NavigasiKoordinat')}>
+        <Text style={homeStyles.shortcutIcon}>🧭</Text>
+        <Text style={homeStyles.shortcutLabel}>Navigasi{"\n"}Koordinat</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={homeStyles.shortcutCard} onPress={() => Route('GeoTagCamera')}>
+        <Text style={homeStyles.shortcutIcon}>📷</Text>
+        <Text style={homeStyles.shortcutLabel}>Smart{"\n"}Geo-Tag</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={homeStyles.shortcutCard} onPress={() => Route('OfflineSync')}>
+        <View style={{position: 'relative'}}>
+          <Text style={homeStyles.shortcutIcon}>📴</Text>
+          {OFFLINE_QUEUE_COUNT > 0 && (
+            <View style={homeStyles.shortcutBadge}>
+              <Text style={homeStyles.shortcutBadgeText}>{OFFLINE_QUEUE_COUNT}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={homeStyles.shortcutLabel}>Offline{"\n"}Sync</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={homeStyles.shortcutCard} onPress={() => Route('NotificationList')}>
+        <View style={{position: 'relative'}}>
+          <Text style={homeStyles.shortcutIcon}>🔔</Text>
+          {NOTIFICATION_COUNT > 0 && (
+            <View style={homeStyles.shortcutBadge}>
+              <Text style={homeStyles.shortcutBadgeText}>{NOTIFICATION_COUNT}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={homeStyles.shortcutLabel}>Notifi-{"\n"}kasi</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+
   {/* Bagian Info Peta Dasar & Peta Final */}
   <View style={styles.infoContainer}>
     <View style={styles.infoCard}>
@@ -423,4 +586,5 @@ const getPetadasar = async () => {
 };
 
 // Menyediakan komponen ini untuk aplikasi
+
 export default Home;

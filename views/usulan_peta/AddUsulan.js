@@ -5,11 +5,13 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput,ImageBackground, Bu
 import FastImage from "react-native-fast-image";
 // import DocumentPicker from 'react-native-document-picker';
 import TabBar from '../components/TabBar'
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import DocumentPicker from 'react-native-document-picker';
 import { Picker } from '@react-native-picker/picker';
 // import { LokasiContext } from '../library/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import OfflineManager from '../library/OfflineManager';
 
 import { Assets } from '@react-navigation/elements';
 
@@ -18,17 +20,27 @@ const AddUsulan = ({navigation}) => {
     const Route = (routex, data)=>{
         navigation.navigate(routex, data)
       }
+    const dispatch = useDispatch();
 
       const [kecamatan, setKecamatan] = useState([]);
     const [desa, setDesa] = useState([]);
     const [loading, setLoading] = useState(false);
     const [fileName, setFileName] = useState(null); // State untuk menyimpan nama file
+    const [isOnline, setIsOnline] = useState(true); // Status koneksi
     // const { lokasi, setLokasi } = useContext(LokasiContext);
     
 
     const TOKEN = useSelector(state => state.TOKEN);
     const PROFILE = useSelector(state => state.PROFILE);
     const URL = useSelector(state => state.URL);
+
+    // Monitor status koneksi
+    useEffect(() => {
+      const unsubscribe = NetInfo.addEventListener(state => {
+        setIsOnline(state.isConnected);
+      });
+      return () => unsubscribe();
+    }, []);
 
 
     //   const [fileName, setFileName] = useState('');
@@ -270,6 +282,56 @@ const AddUsulan = ({navigation}) => {
             }
 
             const desKelIdFormatted = formatDesKelId(form.des_kel_id);
+
+            // === CEK KONEKSI: Jika offline, simpan ke antrian ===
+            const netState = await NetInfo.fetch();
+            if (!netState.isConnected) {
+                const offlineData = {
+                    nik: form.nik,
+                    nama: form.nama,
+                    alamat: form.alamat,
+                    kecamatan_id: form.kecamatan_id,
+                    nama_kecamatan: form.nama_kecamatan,
+                    des_kel_id: desKelIdFormatted,
+                    nama_des_kel: form.nama_des_kel,
+                    rwrt: form.rwrt,
+                    catatan: form.catatan,
+                    no_telp: form.no_telp,
+                    status_pengajuan: form.status_pengajuan || 1,
+                    file: form.file,
+                    lokasi: form.lokasi,
+                    marker: calculateCentroid(form.lokasi),
+                    tipe: form.tipe || 'polygon',
+                };
+
+                await OfflineManager.addToQueue(
+                    offlineData,
+                    URL.URL_ADD_ZONA + 'addData',
+                    TOKEN
+                );
+
+                // Update offline queue count di Redux
+                const stats = await OfflineManager.getQueueStats();
+                dispatch({ type: 'SET_OFFLINE_QUEUE_COUNT', payload: stats.pending + stats.failed });
+
+                // Reset form
+                SET_FORM({
+                    id: '', nik: '', nama: '', alamat: '',
+                    kecamatan_id: '', nama_kecamatan: '',
+                    des_kel_id: '', nama_des_kel: '',
+                    rwrt: '', no_telp: '', catatan: '',
+                    status_pengajuan: null, file: '', lokasi: [], tipe: '',
+                });
+                setFileName(null);
+
+                Alert.alert(
+                    '📴 Disimpan Offline',
+                    'Data berhasil disimpan di perangkat. Data akan otomatis terkirim saat koneksi internet tersedia.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+            // === END OFFLINE CHECK ===
     
             const formData = new FormData();
     
@@ -325,9 +387,14 @@ const AddUsulan = ({navigation}) => {
                 // Kosongkan penyimpanan lokal
                 await AsyncStorage.removeItem('lokasiData');
                 await AsyncStorage.removeItem('lokasiPolylineData');
-            
-                // Tampilkan alert dan tetap di halaman ini
-                Alert.alert("Berhasil", "Data berhasil dikirim dan form telah dikosongkan.");
+
+                // Setelah berhasil submit online, coba sync antrian offline juga
+                const offlineResult = await OfflineManager.syncAll();
+                if (offlineResult.synced > 0) {
+                    Alert.alert("Berhasil", `Data berhasil dikirim.\n\n📤 ${offlineResult.synced} data offline juga berhasil disinkronkan.`);
+                } else {
+                    Alert.alert("Berhasil", "Data berhasil dikirim dan form telah dikosongkan.");
+                }
             }
             
             
@@ -378,6 +445,12 @@ const AddUsulan = ({navigation}) => {
     return (
 
         <View style={{flex:1}}>
+            {/* === OFFLINE STATUS BANNER === */}
+            {!isOnline && (
+              <View style={{backgroundColor: '#FFF3E0', flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 15}}>
+                <Text style={{fontSize: 12, color: '#E65100', fontWeight: '600'}}>📴 Mode Offline — Data akan disimpan di perangkat</Text>
+              </View>
+            )}
                 <View style={styles.navTop}>
                     <TouchableOpacity style={styles.top1} onPress={() => navigation.goBack()} >
                         <FastImage 

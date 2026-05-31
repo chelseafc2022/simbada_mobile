@@ -31,6 +31,11 @@ const initialState = {
     AUTH_STAT : false,
     TOKEN   : '',
     PROFILE: null,
+
+    // === State baru untuk modul upgrade ===
+    IS_ONLINE: true,            // Status koneksi internet
+    OFFLINE_QUEUE_COUNT: 0,     // Jumlah item di antrian offline
+    NOTIFICATION_COUNT: 0,      // Jumlah notifikasi belum dibaca
     
 }
 
@@ -43,6 +48,13 @@ const reducer = (state = initialState, action = {}) => {
       return { ...state, PROFILE: action.payload };
     case 'RESET_AUTH':
       return { ...state, TOKEN: '', PROFILE: null, AUTH_STAT: false };
+    // === Action baru untuk modul upgrade ===
+    case 'SET_ONLINE_STATUS':
+      return { ...state, IS_ONLINE: action.payload };
+    case 'SET_OFFLINE_QUEUE_COUNT':
+      return { ...state, OFFLINE_QUEUE_COUNT: action.payload };
+    case 'SET_NOTIFICATION_COUNT':
+      return { ...state, NOTIFICATION_COUNT: action.payload };
     default:
       return state;
   }

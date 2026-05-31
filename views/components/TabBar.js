@@ -22,6 +22,9 @@ const TabBar = (props) => {
     const isFocused = useIsFocused();
     const navigation = useNavigation();
     // const store = useSelector(state => state)
+    const NOTIFICATION_COUNT = useSelector(state => state.NOTIFICATION_COUNT);
+    const IS_ONLINE = useSelector(state => state.IS_ONLINE);
+    const OFFLINE_QUEUE_COUNT = useSelector(state => state.OFFLINE_QUEUE_COUNT);
 
     const [FCM_TOKEN, SET_FCM_TOKEN] = useState('')
 
@@ -48,6 +51,10 @@ const TabBar = (props) => {
 
     return (
         <View style={styles.nav}>
+            {/* Offline indicator */}
+            {IS_ONLINE === false && (
+              <View style={tabStyles.offlineDot} />
+            )}
             
             <TouchableOpacity style={styles.navCol} onPress={()=>Route('Home')}>
                 <FastImage 
@@ -71,6 +78,12 @@ const TabBar = (props) => {
                     source={require('../assets/img/titik.png')}
                     resizeMode={FastImage.resizeMode.contain}
                 />
+                {/* Offline queue badge */}
+                {OFFLINE_QUEUE_COUNT > 0 && (
+                  <View style={tabStyles.badge}>
+                    <Text style={tabStyles.badgeText}>{OFFLINE_QUEUE_COUNT > 9 ? '9+' : OFFLINE_QUEUE_COUNT}</Text>
+                  </View>
+                )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.navCol}  onPress={() => navigation.navigate('PetaDasar')}>
                 <FastImage 
@@ -85,6 +98,12 @@ const TabBar = (props) => {
                     source={require('../assets/img/user.png')}
                     resizeMode={FastImage.resizeMode.contain}
                 />
+                {/* Notification badge */}
+                {NOTIFICATION_COUNT > 0 && (
+                  <View style={tabStyles.badge}>
+                    <Text style={tabStyles.badgeText}>{NOTIFICATION_COUNT > 9 ? '9+' : NOTIFICATION_COUNT}</Text>
+                  </View>
+                )}
             </TouchableOpacity>
 
             </View>
@@ -93,9 +112,34 @@ const TabBar = (props) => {
 
 
 // define your styles
-const stylesx = StyleSheet.create({
-    tengah: {
-        flex: 1,
+const tabStyles = StyleSheet.create({
+    badge: {
+        position: 'absolute',
+        top: 5,
+        right: 10,
+        backgroundColor: '#F44336',
+        borderRadius: 8,
+        minWidth: 16,
+        height: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 3,
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: 'bold',
+    },
+    offlineDot: {
+        position: 'absolute',
+        top: 3,
+        left: '50%',
+        marginLeft: -4,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FF9800',
+        zIndex: 10,
     },
 });
 
