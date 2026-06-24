@@ -16,7 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import FastImage from 'react-native-fast-image';
+import { launchCamera } from 'react-native-image-picker';
 import { useSelector } from 'react-redux';
 import moment from 'moment';
 
@@ -36,10 +36,8 @@ const GeoTagCamera = ({ navigation, route }) => {
   const [timestamp, setTimestamp] = useState(moment().format('DD-MM-YYYY HH:mm:ss'));
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [cameraError, setCameraError] = useState(null);
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
-  const [cameraAvailable, setCameraAvailable] = useState(false);
-  const [Camera, setCamera] = useState(null);
-  const cameraRef = useRef(null);
 
   // Update timestamp setiap detik
   useEffect(() => {
@@ -71,7 +69,7 @@ const GeoTagCamera = ({ navigation, route }) => {
             });
           },
           (err) => {
-            Alert.alert('GPS Error', 'Tidak bisa mendapatkan lokasi. Pastikan GPS aktif.');
+            setCameraError('Tidak bisa mendapatkan lokasi. Pastikan GPS aktif.');
           },
           { enableHighAccuracy: true, timeout: 15000 }
         );
@@ -82,82 +80,41 @@ const GeoTagCamera = ({ navigation, route }) => {
     return () => Geolocation.clearWatch(watchId);
   }, []);
 
-  // Check camera permission & availability
-  useEffect(() => {
-    checkCameraPermission();
-    checkCameraAvailability();
-  }, []);
-
-  const checkCameraPermission = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          {
-            title: 'Izin Kamera',
-            message: 'SIMBADA membutuhkan akses kamera untuk fitur Geo-Tagging',
-            buttonPositive: 'Izinkan',
-          }
-        );
-        setHasCameraPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
-      } catch (err) {
-        console.error('[GeoTagCamera] Permission error:', err);
-      }
-    } else {
-      setHasCameraPermission(true); // iOS handled differently
-    }
-  };
-
-  const checkCameraAvailability = async () => {
-    try {
-      // Coba import vision camera
-      const VisionCamera = require('react-native-vision-camera');
-      if (VisionCamera && VisionCamera.Camera) {
-        const devices = await VisionCamera.Camera.getAvailableCameraDevices();
-        if (devices.length > 0) {
-          setCamera(() => VisionCamera.Camera);
-          setCameraAvailable(true);
-          return;
-        }
-      }
-    } catch (e) {
-      console.log('[GeoTagCamera] Vision Camera not available, using fallback mode');
-    }
-    setCameraAvailable(false);
-  };
+  // Permission handled by image picker automatically
 
   /**
-   * Capture foto (mode fallback tanpa vision camera)
-   * Menggunakan react-native-image-picker atau simulasi
+   * Capture foto
+   * Menggunakan react-native-image-picker
    */
   const capturePhoto = async () => {
+    setCameraError(null);
     if (!currentPosition) {
-      Alert.alert('Tunggu', 'Menunggu posisi GPS...');
+      setCameraError('Menunggu posisi GPS...');
       return;
     }
 
     setIsCapturing(true);
 
     try {
-      // Coba gunakan vision camera jika tersedia
-      if (cameraAvailable && cameraRef.current) {
-        const photo = await cameraRef.current.takePhoto({
-          qualityPrioritization: 'balanced',
-        });
-        
-        const photoData = {
-          uri: `file://${photo.path}`,
-          width: photo.width,
-          height: photo.height,
-          metadata: buildMetadata(),
-        };
+      // Request camera permission at runtime (required because CAMERA is in AndroidManifest)
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Izin Kamera',
+            message: 'Aplikasi memerlukan akses kamera untuk mengambil foto patok.',
+            buttonPositive: 'OK',
+            buttonNegative: 'Batal',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setCameraError('Izin kamera ditolak. Aktifkan di Pengaturan.');
+          setIsCapturing(false);
+          return;
+        }
+      }
 
-        setCapturedPhoto(photoData);
-      } else {
-        // Fallback: Gunakan image picker
-        try {
-          const { launchCamera } = require('react-native-image-picker');
-          launchCamera(
+      launchCamera(
             {
               mediaType: 'photo',
               quality: 0.8,
@@ -168,7 +125,7 @@ const GeoTagCamera = ({ navigation, route }) => {
               if (response.didCancel) {
                 console.log('[GeoTagCamera] User cancelled');
               } else if (response.errorCode) {
-                Alert.alert('Error', response.errorMessage);
+                setCameraError(`Camera Error: ${response.errorMessage || response.errorCode}`);
               } else if (response.assets && response.assets.length > 0) {
                 const asset = response.assets[0];
                 setCapturedPhoto({
@@ -181,26 +138,11 @@ const GeoTagCamera = ({ navigation, route }) => {
               setIsCapturing(false);
             }
           );
-          return; // Return early, callback will handle state
-        } catch (pickerError) {
-          // Final fallback: show alert with metadata info
-          Alert.alert(
-            'Info',
-            'Kamera tidak tersedia. Install react-native-vision-camera atau react-native-image-picker.\n\n' +
-            'Data Geo-Tag yang akan ditambahkan:\n' +
-            `Lat: ${currentPosition.latitude.toFixed(6)}\n` +
-            `Lng: ${currentPosition.longitude.toFixed(6)}\n` +
-            `Waktu: ${timestamp}\n` +
-            `Desa: ${desaNama} (${desaId})`
-          );
-        }
-      }
     } catch (error) {
       console.error('[GeoTagCamera] Capture error:', error);
-      Alert.alert('Error', 'Gagal mengambil foto: ' + error.message);
+      setCameraError('Gagal mengambil foto: ' + error.message);
+      setIsCapturing(false);
     }
-
-    setIsCapturing(false);
   };
 
   /**
@@ -277,35 +219,18 @@ const GeoTagCamera = ({ navigation, route }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 10 }}>
+          <Text style={{ fontSize: 24, color: '#333' }}>⬅</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Smart Geo-Tagging</Text>
         <View style={{ width: 20 }} />
       </View>
 
-      {/* Camera area / placeholder */}
+      {/* Camera Preview */}
       <View style={styles.cameraArea}>
-        {cameraAvailable && Camera ? (
-          <Camera
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            device="back"
-            isActive={true}
-            photo={true}
-          />
-        ) : (
-          <View style={styles.cameraPlaceholder}>
-            <Text style={styles.cameraPlaceholderIcon}>📷</Text>
-            <Text style={styles.cameraPlaceholderText}>
-              Tap tombol capture di bawah{'\n'}untuk membuka kamera
-            </Text>
-          </View>
-        )}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: '#aaa', marginBottom: 20 }}>Tekan tombol di bawah untuk mengambil foto patok</Text>
+        </View>
 
         {/* Watermark Overlay (always visible) */}
         <View style={styles.watermarkOverlay}>
@@ -328,6 +253,13 @@ const GeoTagCamera = ({ navigation, route }) => {
             )}
           </View>
         </View>
+
+        {/* Error Message */}
+        {cameraError && (
+          <View style={{ backgroundColor: 'rgba(255,0,0,0.8)', padding: 10, marginHorizontal: 20, borderRadius: 8, marginTop: 10 }}>
+            <Text style={{ color: '#fff', textAlign: 'center' }}>{cameraError}</Text>
+          </View>
+        )}
 
         {/* GPS status indicator */}
         <View style={styles.gpsIndicator}>
