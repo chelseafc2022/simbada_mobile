@@ -73,7 +73,7 @@ const Login = ({navigation}) => {
     }
 
     const login = async () => {
-    console.log(URL.LOGIN_URL)
+    // console.log(URL.LOGIN_URL)
     SET_LOADING('true')
     SET_CHECK_LOAD(true);
     SET_ERROR_STATUS(false);
@@ -82,7 +82,7 @@ const Login = ({navigation}) => {
     saveDataToken('PROFILE', '')
 
 
-    console.log(form)
+    // console.log(form)
       // console.log(URL.LOGIN_URL)
 
       NetInfo.fetch().then(state => {
@@ -111,7 +111,7 @@ const Login = ({navigation}) => {
     .then((response)=>{
           // SET_LOADING(false)
         SET_LOADING('false')
-        console.log(response)
+        // console.log(response)
         if (response.ok) {
               SET_CHECK_LOAD(false);
               // console.log("sudah betul")
@@ -127,7 +127,7 @@ const Login = ({navigation}) => {
       })
 
       .then(async (res_data) => {
-          console.log(res_data)
+          // console.log(res_data)
 
           // console.log(res_data)
           await saveDataToken('TOKEN', res_data.token)
@@ -146,15 +146,15 @@ const Login = ({navigation}) => {
           saveUserNamePassword();
 
           const profile = JSON.parse(await AsyncStorage.getItem('PROFILE'));
-            console.log('Status User:', profile.status_user);  // Debugging status user
+            // console.log('Status User:', profile.status_user);  // Debugging status user
 
             // Navigasi ke halaman sesuai status user
             if (profile.status_user === 1) {
-                console.log('User adalah Administrator');
+                // console.log('User adalah Administrator');
             } else if (profile.status_user === 4) {
-                console.log('User adalah Operator Desa');
+                // console.log('User adalah Operator Desa');
             } else {
-                console.log('Status user tidak diketahui');
+                // console.log('Status user tidak diketahui');
             }
 
 
@@ -166,7 +166,7 @@ const Login = ({navigation}) => {
       })
       .catch(error => {
           // console.log('PESAN GAGAL :')
-          console.log(error.message)
+          // console.log(error.message)
           SET_LOADING('false')
           SET_ERROR_MESSAGE(error.message)
           SET_ERROR_STATUS(true);
@@ -193,6 +193,7 @@ const Login = ({navigation}) => {
 const checkToken = async () => {
     const token = await AsyncStorage.getItem("TOKEN");
     const lastLogin = await AsyncStorage.getItem("LAST_LOGIN");
+    const profileStr = await AsyncStorage.getItem("PROFILE");
 
     // Ubah ini ke 1 menit (60000 ms) untuk pengujian cepat
     const EXPIRATION_TIME = 6 * 60 * 60 * 1000; // 6 jam
@@ -201,15 +202,26 @@ const checkToken = async () => {
     const now = Date.now();
 
     if (!token || !lastLogin || (now - parseInt(lastLogin)) > EXPIRATION_TIME) {
-        console.log("Token expired or invalid. Clearing AsyncStorage...");
+        // console.log("Token expired or invalid. Clearing AsyncStorage...");
         await AsyncStorage.removeItem("TOKEN");
         await AsyncStorage.removeItem("PROFILE");
         await AsyncStorage.removeItem("LAST_LOGIN");
         return;
     }
-    // Alert.alert("Sesi Habis", "Anda telah logout otomatis karena tidak aktif terlalu lama.");
 
-    // Jika masih aktif
+    // ✅ KRITIS: Restore token & profile ke Redux agar semua modul bisa fetch data
+    dispatch({ type: 'SET_TOKEN', payload: token });
+    if (profileStr) {
+        try {
+            const profile = JSON.parse(profileStr);
+            dispatch({ type: 'SET_PROFILE', payload: profile });
+            // console.log('✅ Sesi dipulihkan dari penyimpanan lokal. Status User:', profile.status_user || profile.status);
+        } catch (e) {
+            console.error('Gagal parsing PROFILE dari AsyncStorage:', e);
+        }
+    }
+
+    // Jika masih aktif, langsung masuk ke Home tanpa login ulang
     navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
@@ -235,7 +247,7 @@ const checkToken = async () => {
       })
           .then(res => res.json())
           .then(res_data => {
-              console.log(res_data)
+              // console.log(res_data)
 
       });
 
