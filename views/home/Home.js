@@ -1,5 +1,5 @@
 // import pustaka
-import React, { Component, useState, useEffect, useCallback } from 'react';
+import React, { Component, useState, useEffect, useCallback, useRef } from 'react';
 import styles from '../assets/style';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, ImageBackground, ActivityIndicator, Alert, StyleSheet as RNStyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
@@ -130,13 +130,14 @@ const Home = ({ navigation }) => {
   const [DATA_FINAL, SET_DATA_FINAL] = useState([]);
   const [isPolygonLoading, setIsPolygonLoading] = useState(false);
   const [desa, setDesa] = useState([]); // State untuk daftar desa
+  const mapRef = useRef(null); // Ref untuk mengontrol peta
 
   useFocusEffect(
     useCallback(() => {
-      console.log("📥 Home is focused");
+      // console.log("📥 Home is focused");
 
       return () => {
-        console.log("🧹 Cleanup Home");
+        // console.log("🧹 Cleanup Home");
         setDesa([]);
         setPetadasar([]);
         SET_DATA_FINAL([]);
@@ -202,7 +203,8 @@ const Home = ({ navigation }) => {
       const tampung = [];
     //   console.log("Data Kecamatannya:", kecamatan);
 
-      res_data.forEach((item) => {
+      if (Array.isArray(res_data)) {
+        res_data.forEach((item) => {
         let kode = '';
         if (item.hasil.kode < 10) {
           kode = `0${item.hasil.kode}`;
@@ -215,6 +217,9 @@ const Home = ({ navigation }) => {
           nama_kecamatan: item.hasil.uraian,
         });
       });
+      } else {
+        console.warn("getKecamatan: res_data is not an array", res_data);
+      }
 
       setKecamatan(tampung); // Simpan hasil ke state
     } catch (error) {
@@ -248,7 +253,7 @@ const getDesaByKecamatan = async () => {
     const result = await response.json();
     console.log("Response dari API desa:", result); // Debugging
 
-    if (result.length > 0) {
+    if (Array.isArray(result) && result.length > 0) {
       const processedDesa = result.map(item => {
         let area = "0";
         if (item?.lokasi?.coordinat) {
@@ -278,8 +283,8 @@ useEffect(() => {
 const getPetafinal = async () => {
   try {
     setIsLoading(true);
-    console.log("DATA_FINAL type:", typeof DATA_FINAL);
-console.log("DATA_FINAL value:", DATA_FINAL);
+    // console.log("DATA_FINAL type:", typeof DATA_FINAL);
+    // console.log("DATA_FINAL value:", DATA_FINAL);
 
     const response = await fetch(URL.URL_HOME + "peta_final", {
       method: "POST",
@@ -302,7 +307,10 @@ console.log("DATA_FINAL value:", DATA_FINAL);
 
 
 const getPetadasar = async () => {
-  // if (!selectedKecamatan) return;
+  if (!selectedKecamatan) {
+    setIsPolygonLoading(false);
+    return;
+  }
   setIsPolygonLoading(true);
   setPetadasar([]);
   try {
@@ -316,8 +324,8 @@ const getPetadasar = async () => {
     });
 
     const data = await response.json();
-    if (!data || data.length === 0) {
-      console.warn('Polygon data is empty');
+    if (!Array.isArray(data) || data.length === 0) {
+      console.warn('Polygon data is empty or not an array:', data);
       return;
     }
 
@@ -326,10 +334,10 @@ const getPetadasar = async () => {
         ...polygon,
         lokasi: {
           ...polygon.lokasi,
-          coordinat: polygon.lokasi.coordinat.map(({ lat, lng }) => ({
-            latitude: lat,
-            longitude: lng,
-          })),
+          coordinat: polygon.lokasi?.coordinat ? polygon.lokasi.coordinat.map(({ lat, lng }) => ({
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lng),
+          })) : [],
         },
       }))
     );
@@ -354,6 +362,27 @@ const getPetadasar = async () => {
     };
     fetchData();
   }, [isFocused]);
+
+  // Efek untuk menggeser kamera peta ke area polygon begitu data petadasar dimuat
+  useEffect(() => {
+    if (petadasar.length > 0 && mapRef.current) {
+      const allCoords = [];
+      petadasar.forEach(polygon => {
+        if (polygon.lokasi?.coordinat) {
+          allCoords.push(...polygon.lokasi.coordinat);
+        }
+      });
+      if (allCoords.length > 0) {
+        // Berikan delay sedikit agar map selesai di-render dulu sebelum digeser
+        setTimeout(() => {
+            mapRef.current?.fitToCoordinates(allCoords, {
+              edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+              animated: true,
+            });
+        }, 500);
+      }
+    }
+  }, [petadasar]);
 
  
   return (
@@ -474,6 +503,7 @@ const getPetadasar = async () => {
   ) : (
     <View style={styles.mapDashboard}>
       <MapView
+        ref={mapRef}
         style={{ flex: 1 }}
         provider="google"
         initialRegion={{
@@ -494,6 +524,7 @@ const getPetadasar = async () => {
                 coordinates={polygon.lokasi.coordinat}
                 strokeColor="#FF0000"
                 fillColor="rgba(255,0,0,0.5)"
+                strokeWidth={2}
                 tappable
               />
             )
