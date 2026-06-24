@@ -83,22 +83,36 @@ const AddUsulan = ({navigation}) => {
       )
 
       useEffect(() => {
-        console.log('Token:', TOKEN);
-        console.log('Endpoint:', URL.URL_KECAMATAN + 'desa');
-        // Load Kecamatan on mount
-        const loadKecamatan = async () => {
-          setLoading(true);
-          const kecamatanList = await getKecamatan();
-          setKecamatan(kecamatanList);
-          setLoading(false);
-        };
-      
-        loadKecamatan();
+        // console.log('Token:', TOKEN);
+        // console.log('Endpoint:', URL.URL_KECAMATAN + 'desa');
+        
+        // Cek apakah user adalah Operator Desa (bukan admin)
+        const userStatus = PROFILE?.profile?.status?.toString();
+        if (userStatus && userStatus !== '1') {
+            // Auto-fill dari profile
+            SET_FORM(prev => ({
+                ...prev,
+                kecamatan_id: PROFILE?.profile?.id_kecamatan || '',
+                nama_kecamatan: PROFILE?.profile?.nama_kecamatan || '',
+                des_kel_id: PROFILE?.profile?.id_desa || PROFILE?.profile?.id_kelurahan || '',
+                nama_des_kel: PROFILE?.profile?.nama_desa || PROFILE?.profile?.nama_kelurahan || ''
+            }));
+            // Jika dia operator, tidak perlu load seluruh daftar kecamatan untuk dipilih
+        } else {
+            // Load Kecamatan on mount hanya untuk Admin (status == 1)
+            const loadKecamatan = async () => {
+              setLoading(true);
+              const kecamatanList = await getKecamatan();
+              setKecamatan(kecamatanList);
+              setLoading(false);
+            };
+            loadKecamatan();
+        }
       }, []);
     
       const getKecamatan = async () => {
         try {
-            console.log('Fetching kecamatan from:', URL.URL_KECAMATAN + 'kecamatan');
+            // console.log('Fetching kecamatan from:', URL.URL_KECAMATAN + 'kecamatan');
     
             const response = await fetch(URL.URL_KECAMATAN + 'kecamatan', {
                 method: 'POST',
@@ -113,24 +127,21 @@ const AddUsulan = ({navigation}) => {
             }
     
             const data = await response.json();
-            console.log('Kecamatan Data:', data);
+            // console.log('Kecamatan Data:', data);
+    
+            // Simpan ke cache untuk offline
+            await AsyncStorage.setItem('CACHE_KECAMATAN', JSON.stringify(data));
     
             // Ambil status user dan id_kecamatan user
             const userStatus = PROFILE.profile?.status || "1";
             const userKecamatanId = PROFILE.profile?.id_kecamatan;
     
-            console.log('Status User:', userStatus);
-            console.log('User Kecamatan ID:', userKecamatanId);
-    
             // Filter kecamatan hanya untuk user status 2
             const filteredKecamatan = userStatus === "2"
                 ? data.filter(item => {
-                    // Ambil no_kab dan kode dengan fallback value untuk menghindari undefined
                     const no_kab = item.hasil?.no_kab ? item.hasil.no_kab.toString().padStart(2, '0') : "00";
                     const kode = item.hasil?.kode ? item.hasil.kode.toString().padStart(2, '0') : "00";
                     const kecamatanId = `${item.hasil.no_prop}.${no_kab}.${kode}`;
-    
-                    console.log('Checking kecamatanId:', kecamatanId); // Debugging kecamatanId
                     return kecamatanId === userKecamatanId;
                 })
                 : data;
@@ -145,7 +156,34 @@ const AddUsulan = ({navigation}) => {
                 };
             });
         } catch (error) {
-            console.error('Error fetching kecamatan:', error.message);
+            console.warn('Error fetching kecamatan, mencoba load dari cache offline:', error.message);
+            try {
+                const cached = await AsyncStorage.getItem('CACHE_KECAMATAN');
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    const userStatus = PROFILE.profile?.status || "1";
+                    const userKecamatanId = PROFILE.profile?.id_kecamatan;
+                    
+                    const filteredKecamatan = userStatus === "2"
+                        ? data.filter(item => {
+                            const no_kab = item.hasil?.no_kab ? item.hasil.no_kab.toString().padStart(2, '0') : "00";
+                            const kode = item.hasil?.kode ? item.hasil.kode.toString().padStart(2, '0') : "00";
+                            return `${item.hasil.no_prop}.${no_kab}.${kode}` === userKecamatanId;
+                        })
+                        : data;
+            
+                    return filteredKecamatan.map((item) => {
+                        const no_kab = item.hasil?.no_kab ? item.hasil.no_kab.toString().padStart(2, '0') : "00";
+                        const kode = item.hasil?.kode ? item.hasil.kode.toString().padStart(2, '0') : "00";
+                        return {
+                            id: `${item.hasil.no_prop}.${no_kab}.${kode}`,
+                            nama: item.hasil.uraian,
+                        };
+                    });
+                }
+            } catch (e) {
+                console.error('Gagal load cache kecamatan:', e);
+            }
             return [];
         }
     };
@@ -153,7 +191,7 @@ const AddUsulan = ({navigation}) => {
 
       const getDesa = async (kecamatanId) => {
         try {
-          console.log('Fetching desa for kecamatan_id:', kecamatanId); // Debug kecamatan_id
+          // console.log('Fetching desa for kecamatan_id:', kecamatanId); // Debug kecamatan_id
       
           const response = await fetch(URL.URL_KECAMATAN + 'desa', {
             method: 'POST',
@@ -164,23 +202,36 @@ const AddUsulan = ({navigation}) => {
             body: JSON.stringify({ kecamatan_id: kecamatanId }),
           });
       
-          console.log('HTTP Status:', response.status);
+          // console.log('HTTP Status:', response.status);
       
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error Response Body:', errorText); // Debug body error dari backend
             throw new Error(`Failed to fetch desa. Status: ${response.status}`);
           }
       
           const data = await response.json();
-          console.log('Desa Data:', data);
+          // console.log('Desa Data:', data);
+          
+          // Simpan ke cache untuk offline, gunakan key per kecamatan
+          await AsyncStorage.setItem(`CACHE_DESA_${kecamatanId}`, JSON.stringify(data));
       
           return data.map((item) => ({
             id: `${item.no_prop}.${item.no_kab}.${item.no_kec}.${item.kode}`,
             nama: item.uraian,
           }));
         } catch (error) {
-          console.error('Error fetching desa:', error.message);
+          console.warn('Error fetching desa, mencoba load dari cache offline:', error.message);
+          try {
+            const cached = await AsyncStorage.getItem(`CACHE_DESA_${kecamatanId}`);
+            if (cached) {
+                const data = JSON.parse(cached);
+                return data.map((item) => ({
+                    id: `${item.no_prop}.${item.no_kab}.${item.no_kec}.${item.kode}`,
+                    nama: item.uraian,
+                }));
+            }
+          } catch (e) {
+              console.error('Gagal load cache desa:', e);
+          }
           return [];
         }
       };
@@ -213,7 +264,7 @@ const AddUsulan = ({navigation}) => {
       // Contoh penggunaan
       let originalDesKelId = "74.5.2.2006";
       let formattedDesKelId = formatDesKelId(originalDesKelId);
-      console.log(formattedDesKelId); // Output: 74.05.02.2006
+      // console.log(formattedDesKelId); // Output: 74.05.02.2006
       
       
       const handleKecamatanChange = async (kecamatanId) => {
@@ -222,7 +273,7 @@ const AddUsulan = ({navigation}) => {
         const selectedKecamatan = kecamatan.find(item => item.id === formattedKecamatanId);
         const namaKecamatan = selectedKecamatan ? selectedKecamatan.nama : '';
         
-        console.log('Formatted Kecamatan ID:', formattedKecamatanId); // Debugging
+        // console.log('Formatted Kecamatan ID:', formattedKecamatanId); // Debugging
       
         SET_FORM({ 
             ...form, 
@@ -234,7 +285,7 @@ const AddUsulan = ({navigation}) => {
       
         try {
           const desaList = await getDesa(formattedKecamatanId); // Kirim formatted kecamatan_id
-          console.log('Desa List:', desaList); // Debug daftar desa
+          // console.log('Desa List:', desaList); // Debug daftar desa
           setDesa(desaList); // Perbarui state desa
         } catch (error) {
           console.error('Error in handleKecamatanChange:', error.message);
@@ -351,7 +402,7 @@ const AddUsulan = ({navigation}) => {
             formData.append("lokasi", JSON.stringify(form.lokasi)); // Konversi lokasi menjadi string JSON
             formData.append("marker", JSON.stringify(calculateCentroid(form.lokasi))); // Hitung centroid dan tambahkan ke form
             formData.append("tipe", form.tipe || "polygon"); // ✅ WAJIB PASTIKAN
-            console.log("Data yang dikirim:", formData);
+            // console.log("Data yang dikirim:", formData);
     
             // Kirim data ke server
             const response = await fetch(URL.URL_ADD_ZONA + "addData", {
@@ -427,7 +478,7 @@ const AddUsulan = ({navigation}) => {
             lng: totalLng / locations.length,
         };
     
-        console.log("Centroid:", centroid);
+        // console.log("Centroid:", centroid);
         return centroid;
     };
     
@@ -545,45 +596,60 @@ const AddUsulan = ({navigation}) => {
                 <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
                     Kecamatan    
                 </Text>
-                {loading && <ActivityIndicator size="small" color="#0000ff" />}
-                <Picker
-                selectedValue={form.kecamatan_id}
-                onValueChange={(value) => {
-                    console.log('Selected Kecamatan ID:', value); // Debug kecamatan_id
-                    handleKecamatanChange(value);
-                  }}
-                style={styles.input}
-                >
-                <Picker.Item label="Pilih Kecamatan" value="" />
-                {kecamatan.map((item) => (
-                    <Picker.Item key={item.id} label={item.nama} value={item.id} />
-                ))}
-                </Picker>
-
-
+                
+                {PROFILE?.profile?.status?.toString() === '1' ? (
+                    <>
+                        {loading && <ActivityIndicator size="small" color="#0000ff" />}
+                        <Picker
+                            selectedValue={form.kecamatan_id}
+                            onValueChange={(value) => {
+                                console.log('Selected Kecamatan ID:', value); // Debug kecamatan_id
+                                handleKecamatanChange(value);
+                            }}
+                            style={styles.input}
+                        >
+                            <Picker.Item label="Pilih Kecamatan" value="" />
+                            {kecamatan.map((item) => (
+                                <Picker.Item key={item.id} label={item.nama} value={item.id} />
+                            ))}
+                        </Picker>
+                    </>
+                ) : (
+                    <TextInput
+                        style={[styles.input, { backgroundColor: '#e0e0e0', color: '#555' }]}
+                        value={form.nama_kecamatan || 'Memuat...'}
+                        editable={false}
+                    />
+                )}
 
                 <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
                     Desa
-                    </Text>
-                    {/* <Text>{JSON.stringify(desa)}</Text> */}
+                </Text>
 
+                {PROFILE?.profile?.status?.toString() === '1' ? (
                     <Picker
-                    selectedValue={form.des_kel_id}
-                    onValueChange={(value) => {
-                        const selectedDesa = desa.find((item) => item.id === value); // Temukan nama desa berdasarkan ID
-                        console.log('Selected Desa:', selectedDesa); // Debugging
-
-                        console.log('Selected Desa ID:', value); // Log desa_id yang dipilih
-                        SET_FORM({ ...form, des_kel_id: value, nama_des_kel: selectedDesa ? selectedDesa.nama : '' });
-                      }}
-                    style={styles.input}
-                    enabled={!!form.kecamatan_id && desa.length > 0} // Dropdown hanya aktif jika kecamatan dipilih
+                        selectedValue={form.des_kel_id}
+                        onValueChange={(value) => {
+                            const selectedDesa = desa.find((item) => item.id === value);
+                            console.log('Selected Desa:', selectedDesa); // Debugging
+                            console.log('Selected Desa ID:', value); // Log desa_id yang dipilih
+                            SET_FORM({ ...form, des_kel_id: value, nama_des_kel: selectedDesa ? selectedDesa.nama : '' });
+                        }}
+                        style={styles.input}
+                        enabled={!!form.kecamatan_id && desa.length > 0} // Dropdown hanya aktif jika kecamatan dipilih
                     >
-                    <Picker.Item label="Pilih Desa" value="" />
-                    {desa.map((item) => (
-                        <Picker.Item key={item.id} label={item.nama} value={item.id} />
-                    ))}
+                        <Picker.Item label="Pilih Desa" value="" />
+                        {desa.map((item) => (
+                            <Picker.Item key={item.id} label={item.nama} value={item.id} />
+                        ))}
                     </Picker>
+                ) : (
+                    <TextInput
+                        style={[styles.input, { backgroundColor: '#e0e0e0', color: '#555' }]}
+                        value={form.nama_des_kel || 'Memuat...'}
+                        editable={false}
+                    />
+                )}
                     
                 
 
