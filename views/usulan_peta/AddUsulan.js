@@ -1,7 +1,7 @@
 //import liraries
 import React, { Component, useState, useEffect, useContext } from 'react';
 import styles from '../assets/style'
-import { View, Text, TouchableOpacity, ScrollView, TextInput,ImageBackground, Button,  Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput,ImageBackground, Button,  Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import FastImage from "react-native-fast-image";
 // import DocumentPicker from 'react-native-document-picker';
 import TabBar from '../components/TabBar'
@@ -537,234 +537,179 @@ const AddUsulan = ({navigation}) => {
              >
 
              
-            <ScrollView>
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:20, alignSelf:'center'}}>
-                    NIK
-                </Text>
-                <TextInput
-                
-                    style={styles.input}
-                    value={form.nik}
-                    onChangeText={(value) => {
-                        // Pastikan hanya angka yang diterima
-                        const numericValue = value.replace(/[^0-9]/g, ''); // Hapus karakter non-angka
-                        SET_FORM({ ...form, nik: numericValue });
-                      }}
-                      keyboardType="numeric" // Membuka keyboard angka
-                      maxLength={16} // Maksimal 16 digit untuk NIK
-                      placeholder="Masukkan NIK"
-                      placeholderTextColor="#aaa"
-                />
-                
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    NAMA
-                </Text>
-                <TextInput
-                
-                    style={styles.input}
-                    value={form.nama}
-                    onChangeText={(value) => SET_FORM({ ...form, nama: value })}
-                    // placeholder="Enter NIK"
-                    placeholderTextColor="#aaa" // Warna teks placeholder
-                />
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                {/* KARTU 1: Informasi Pemohon */}
+                <View style={localStyles.card}>
+                    <Text style={localStyles.cardTitle}>Informasi Pemohon</Text>
 
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    ALAMAT    
-                </Text>
-                <TextInput
-                
-                    style={styles.input}
-                    value={form.alamat}
-                    onChangeText={(value) => SET_FORM({ ...form, alamat: value })}
-                    // placeholder="Enter NIK"
-                    placeholderTextColor="#aaa" // Warna teks placeholder
-                />
-
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    RT / RW    
-                </Text>
-                <TextInput
-                
-                    style={styles.input}
-                    value={form.rwrt}
-                    onChangeText={(value) => SET_FORM({ ...form, rwrt: value })}
-                    // placeholder="Enter NIK"
-                    placeholderTextColor="#aaa" // Warna teks placeholder
-                />
-
-
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    Kecamatan    
-                </Text>
-                
-                {PROFILE?.profile?.status?.toString() === '1' ? (
-                    <>
-                        {loading && <ActivityIndicator size="small" color="#0000ff" />}
-                        <Picker
-                            selectedValue={form.kecamatan_id}
-                            onValueChange={(value) => {
-                                console.log('Selected Kecamatan ID:', value); // Debug kecamatan_id
-                                handleKecamatanChange(value);
-                            }}
-                            style={styles.input}
-                        >
-                            <Picker.Item label="Pilih Kecamatan" value="" />
-                            {kecamatan.map((item) => (
-                                <Picker.Item key={item.id} label={item.nama} value={item.id} />
-                            ))}
-                        </Picker>
-                    </>
-                ) : (
+                    <Text style={localStyles.inputLabel}>NIK</Text>
                     <TextInput
-                        style={[styles.input, { backgroundColor: '#e0e0e0', color: '#555' }]}
-                        value={form.nama_kecamatan || 'Memuat...'}
-                        editable={false}
-                    />
-                )}
-
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    Desa
-                </Text>
-
-                {PROFILE?.profile?.status?.toString() === '1' ? (
-                    <Picker
-                        selectedValue={form.des_kel_id}
-                        onValueChange={(value) => {
-                            const selectedDesa = desa.find((item) => item.id === value);
-                            console.log('Selected Desa:', selectedDesa); // Debugging
-                            console.log('Selected Desa ID:', value); // Log desa_id yang dipilih
-                            SET_FORM({ ...form, des_kel_id: value, nama_des_kel: selectedDesa ? selectedDesa.nama : '' });
+                        style={localStyles.inputModern}
+                        value={form.nik}
+                        onChangeText={(value) => {
+                            const numericValue = value.replace(/[^0-9]/g, '');
+                            SET_FORM({ ...form, nik: numericValue });
                         }}
-                        style={styles.input}
-                        enabled={!!form.kecamatan_id && desa.length > 0} // Dropdown hanya aktif jika kecamatan dipilih
-                    >
-                        <Picker.Item label="Pilih Desa" value="" />
-                        {desa.map((item) => (
-                            <Picker.Item key={item.id} label={item.nama} value={item.id} />
-                        ))}
-                    </Picker>
-                ) : (
-                    <TextInput
-                        style={[styles.input, { backgroundColor: '#e0e0e0', color: '#555' }]}
-                        value={form.nama_des_kel || 'Memuat...'}
-                        editable={false}
+                        keyboardType="numeric"
+                        maxLength={16}
+                        placeholder="Masukkan 16 digit NIK"
+                        placeholderTextColor="#aaa"
                     />
-                )}
-                    
-                
 
+                    <Text style={localStyles.inputLabel}>Nama Lengkap</Text>
+                    <TextInput
+                        style={localStyles.inputModern}
+                        value={form.nama}
+                        onChangeText={(value) => SET_FORM({ ...form, nama: value })}
+                        placeholder="Nama Lengkap sesuai KTP"
+                        placeholderTextColor="#aaa"
+                    />
 
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    Telepon
-                </Text>
-                <TextInput
-                
-                    style={styles.input}
-                    value={form.no_telp}
-                    onChangeText={(value) => SET_FORM({ ...form, no_telp: value })}
-                    // placeholder="Enter NIK"
-                    placeholderTextColor="#aaa" // Warna teks placeholder
-                />
+                    <Text style={localStyles.inputLabel}>Nomor Telepon</Text>
+                    <TextInput
+                        style={localStyles.inputModern}
+                        value={form.no_telp}
+                        onChangeText={(value) => SET_FORM({ ...form, no_telp: value })}
+                        placeholder="Contoh: 08123456789"
+                        keyboardType="phone-pad"
+                        placeholderTextColor="#aaa"
+                    />
+                </View>
 
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                    Metode 
-                </Text>
+                {/* KARTU 2: Detail Lokasi */}
+                <View style={localStyles.card}>
+                    <Text style={localStyles.cardTitle}>Detail Lokasi</Text>
 
-                
+                    <Text style={localStyles.inputLabel}>Kecamatan</Text>
+                    {PROFILE?.profile?.status?.toString() === '1' ? (
+                        <>
+                            {loading && <ActivityIndicator size="small" color="#208DC0" style={{marginTop: 5}} />}
+                            <View style={localStyles.pickerContainer}>
+                                <Picker
+                                    selectedValue={form.kecamatan_id}
+                                    onValueChange={(value) => handleKecamatanChange(value)}
+                                    style={localStyles.pickerElement}
+                                >
+                                    <Picker.Item label="Pilih Kecamatan" value="" />
+                                    {kecamatan.map((item) => (
+                                        <Picker.Item key={item.id} label={item.nama} value={item.id} />
+                                    ))}
+                                </Picker>
+                            </View>
+                        </>
+                    ) : (
+                        <TextInput
+                            style={[localStyles.inputModern, { backgroundColor: '#f0f0f0', color: '#555' }]}
+                            value={form.nama_kecamatan || 'Memuat...'}
+                            editable={false}
+                        />
+                    )}
 
-                <View style={{flex:1, alignSelf:'center', width:'90%'}}>
-                    <View style={{flexDirection:'row'}}>
-                    <TouchableOpacity 
-                        style={[styles.metodeText, { flex: 1, marginLeft: 5 }]} 
-                        onPress={() => navigation.navigate('MetodeText', { 
-                            lokasiAwal: form.lokasi || [], // Pastikan ini adalah array lokasi terbaru
-                            onLokasiUpdate: (updatedLokasi) => {
-                                console.log("Received updated lokasi[] from MetodeText:", updatedLokasi);
-                                SET_FORM((prevForm) => ({
-                                    ...prevForm,
-                                    lokasi: updatedLokasi, // Perbarui lokasi di form
-                                    tipe: 'polygon' // ⬅️ tandai bahwa ini polygon
-                                    
-                                }));
-                            }
-                        })}
-                        >
-                        <Text style={{ color: 'white' }}>POLYGON</Text>
-                        </TouchableOpacity>
+                    <Text style={localStyles.inputLabel}>Desa / Kelurahan</Text>
+                    {PROFILE?.profile?.status?.toString() === '1' ? (
+                        <View style={[localStyles.pickerContainer, !(!!form.kecamatan_id && desa.length > 0) && {opacity: 0.5}]}>
+                            <Picker
+                                selectedValue={form.des_kel_id}
+                                onValueChange={(value) => {
+                                    const selectedDesa = desa.find((item) => item.id === value);
+                                    SET_FORM({ ...form, des_kel_id: value, nama_des_kel: selectedDesa ? selectedDesa.nama : '' });
+                                }}
+                                style={localStyles.pickerElement}
+                                enabled={!!form.kecamatan_id && desa.length > 0}
+                            >
+                                <Picker.Item label="Pilih Desa" value="" />
+                                {desa.map((item) => (
+                                    <Picker.Item key={item.id} label={item.nama} value={item.id} />
+                                ))}
+                            </Picker>
+                        </View>
+                    ) : (
+                        <TextInput
+                            style={[localStyles.inputModern, { backgroundColor: '#f0f0f0', color: '#555' }]}
+                            value={form.nama_des_kel || 'Memuat...'}
+                            editable={false}
+                        />
+                    )}
 
+                    <Text style={localStyles.inputLabel}>Alamat Detail</Text>
+                    <TextInput
+                        style={localStyles.inputModern}
+                        value={form.alamat}
+                        onChangeText={(value) => SET_FORM({ ...form, alamat: value })}
+                        placeholder="Nama Jalan, Gedung, dll"
+                        placeholderTextColor="#aaa"
+                    />
+
+                    <Text style={localStyles.inputLabel}>RT / RW</Text>
+                    <TextInput
+                        style={localStyles.inputModern}
+                        value={form.rwrt}
+                        onChangeText={(value) => SET_FORM({ ...form, rwrt: value })}
+                        placeholder="Contoh: 001/002"
+                        placeholderTextColor="#aaa"
+                    />
+                </View>
+
+                {/* KARTU 3: Pemetaan & Lampiran */}
+                <View style={localStyles.card}>
+                    <Text style={localStyles.cardTitle}>Pemetaan & Lampiran</Text>
+
+                    <Text style={localStyles.inputLabel}>Pilih Metode Pemetaan</Text>
+                    <View style={localStyles.methodContainer}>
                         <TouchableOpacity 
-                            style={[styles.metodeText, { flex: 1, marginLeft: 5 }]} 
-                            onPress={() => navigation.navigate('MetodePolyline', { 
+                            style={[localStyles.methodButton, { backgroundColor: '#208DC0' }]} 
+                            onPress={() => navigation.navigate('MetodeText', { 
                                 lokasiAwal: form.lokasi || [],
                                 onLokasiUpdate: (updatedLokasi) => {
-                                    console.log("Updated from Polyline:", updatedLokasi);
-                                    SET_FORM(prevForm => ({ ...prevForm, 
+                                    SET_FORM((prevForm) => ({
+                                        ...prevForm,
                                         lokasi: updatedLokasi,
-                                        tipe: 'polyline' // ⬅️ tandai bahwa ini polyline
-                                    
+                                        tipe: 'polygon'
                                     }));
                                 }
                             })}
                         >
-                            <Text style={{ color: 'white', textAlign: 'center' }}>POLYLINE</Text>
+                            <Text style={localStyles.methodButtonText}>📍 POLYGON</Text>
                         </TouchableOpacity>
 
+                        <TouchableOpacity 
+                            style={[localStyles.methodButton, { backgroundColor: '#26A69A' }]} 
+                            onPress={() => navigation.navigate('MetodePolyline', { 
+                                lokasiAwal: form.lokasi || [],
+                                onLokasiUpdate: (updatedLokasi) => {
+                                    SET_FORM(prevForm => ({ 
+                                        ...prevForm, 
+                                        lokasi: updatedLokasi,
+                                        tipe: 'polyline'
+                                    }));
+                                }
+                            })}
+                        >
+                            <Text style={localStyles.methodButtonText}>〰️ POLYLINE</Text>
+                        </TouchableOpacity>
                     </View>
 
-                    {/* Lokasi yang diterima */}
-                    {/* <Text style={{ color: '#98A9B9', fontWeight: 'bold', fontSize: 12, height: 'auto', width: '90%', marginTop: 10, alignSelf: 'center' }}>
-                            Lokasi Terpilih:
-                        </Text>
-                        <Text style={{ color: '#000', fontSize: 12, width: '90%', alignSelf: 'center' }}>
-                            {JSON.stringify(form.lokasi, null, 2)}
-                        </Text> */}
+                    {/* Indikator Status Lokasi */}
+                    {form.lokasi && form.lokasi.length > 0 && (
+                        <View style={localStyles.statusLokasi}>
+                            <Text style={localStyles.statusLokasiText}>
+                                ✅ Tersimpan {form.lokasi.length} titik koordinat ({form.tipe === 'polygon' ? 'Polygon' : 'Polyline'})
+                            </Text>
+                        </View>
+                    )}
+
+                    <Text style={[localStyles.inputLabel, { marginTop: 15 }]}>Dokumen / File Pendukung</Text>
+                    <TouchableOpacity onPress={handleFileUpload} style={localStyles.docButton}>
+                        <Text style={localStyles.docButtonText}>{fileName || '📎 Pilih Dokumen'}</Text>
+                    </TouchableOpacity>
                 </View>
 
-                <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                DOKUMEN / FILE PENDUKUNG    
-                </Text>
-                <TouchableOpacity onPress={handleFileUpload} style={styles.inputDoc}>
-                    <Text style={styles.textSelected}>{fileName || '📎 Pilih Dokumen'}</Text>
-                </TouchableOpacity>
-               
-
-                
-                
-                {/* <Text style={{color: '#98A9B9', fontWeight:'bold', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                DOKUMEN / FILE PENDUKUNG    
-                </Text>
-                <TouchableOpacity onPress={handleDocumentPick} style={styles.inputDoc}>
-                    <Text style={fileName ? styles.textSelected : styles.placeholder}>
-                    {fileName || '📎 Pilih Dokumen'}
-                    </Text>
-                </TouchableOpacity> */}
-
-                <TouchableOpacity style={styles.addbatas} onPress={handleSubmit}>
-                    <Text style={styles.addbatasx}>
-                        SIMPAN
-                    </Text>
+                {/* TOMBOL SIMPAN */}
+                <TouchableOpacity style={localStyles.submitButton} onPress={handleSubmit}>
+                    <Text style={localStyles.submitButtonText}>SIMPAN USULAN</Text>
                 </TouchableOpacity>
 
-
-
-                    
-                {/* 
-                
-                // UPLOAD DOKUMEN
-
-                <Text style={styles.label}>Upload Dokumen</Text>
-                <TouchableOpacity onPress={handleDocumentPick} style={styles.input}>
-                    <Text style={fileName ? styles.textSelected : styles.placeholder}>
-                    {fileName || 'Pilih Dokumen'}
-                    </Text>
-                </TouchableOpacity>
-                <Button title="Submit" onPress={() => alert(`File: ${fileName}`)} /> 
-                
-                // UPLOAD DOKUMEN */}
-
-
-
-           </ScrollView>
+            </ScrollView>
            </ImageBackground>
 
            </View>
@@ -778,6 +723,119 @@ const AddUsulan = ({navigation}) => {
 };
 
 
+
+const localStyles = StyleSheet.create({
+    card: {
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 15,
+        marginHorizontal: 15,
+        marginTop: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#208DC0',
+        marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        paddingBottom: 8,
+    },
+    inputLabel: {
+        color: '#666',
+        fontWeight: '600',
+        fontSize: 12,
+        marginBottom: 5,
+        marginTop: 10,
+    },
+    inputModern: {
+        height: 45,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        color: '#333',
+        backgroundColor: '#fafafa',
+        fontSize: 14,
+    },
+    pickerContainer: {
+        height: 45,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        backgroundColor: '#fafafa',
+        justifyContent: 'center',
+    },
+    pickerElement: {
+        color: '#333',
+    },
+    methodContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 5,
+    },
+    methodButton: {
+        flex: 1,
+        height: 45,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 5,
+        elevation: 2,
+    },
+    methodButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 13,
+    },
+    statusLokasi: {
+        marginTop: 15,
+        backgroundColor: '#E8F5E9',
+        padding: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    statusLokasiText: {
+        color: '#2E7D32',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    docButton: {
+        height: 45,
+        borderWidth: 1,
+        borderColor: '#208DC0',
+        borderStyle: 'dashed',
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F0F8FF',
+    },
+    docButtonText: {
+        color: '#208DC0',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    submitButton: {
+        backgroundColor: '#208DC0',
+        marginHorizontal: 15,
+        marginTop: 25,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 4,
+    },
+    submitButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    }
+});
 
 //make this component available to the app
 export default AddUsulan;
