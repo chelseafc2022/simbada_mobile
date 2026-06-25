@@ -12,8 +12,111 @@ import { Assets } from '@react-navigation/elements';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LIB from '../library/riswan'
 import { useDispatch } from 'react-redux';
-// import { Provider } from 'react-redux';
+import { Provider } from 'react-redux';
+import { StyleSheet as RNStyleSheet } from 'react-native';
 
+const loginStyles = RNStyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 40,
+    justifyContent: 'center',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  logo: {
+    width: '80%',
+    height: 150,
+    borderRadius: 30,
+  },
+  headerText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subHeaderText: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+  },
+  input: {
+    flex: 1,
+    color: '#0F172A',
+    fontSize: 14,
+  },
+  loginBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  copyright: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 50,
+  }
+});
 
 // create a component
 const Login = ({navigation}) => {
@@ -273,125 +376,92 @@ const checkToken = async () => {
 
 
     return (
-
-        <View style={{flex:1}}>
-
-            <View style={styles.body}>
-
-           
-
-            <ImageBackground
-        source={require('../assets/img/bg.png')}
-        style={{height:'100%'}}
-        resizeMode="cover"
-      >
-        
-      <ScrollView>
-        
-        <FastImage 
-            style={styles.gbrlogin}
-            source={require('../assets/img/logo.jpeg')}
-            resizeMode={FastImage.resizeMode.contain}
-        />
-
-        <View style={{marginTop : 20}}>
-            <Text style={{fontWeight : 'bold', color : '#208DC0', textAlign : 'center', fontSize: 26}}>
-                Selamat Datang !
-            </Text>
-        </View>
-
-        {
-              LOADING === 'true' &&
-              (
-
-                  <View style={{flex:1}}>
-                      <View style={{justifyContent:'center', alignItems:'center'}}>
-                          <FastImage
-                              style={{ width: 100, height: 100, opacity: 0.5 }}
-                              source={require('../assets/img/loading.gif')}
-                              resizeMode={FastImage.resizeMode.contain}
-                          />
-                      </View>
-                  </View>
-              ) 
-          }
-
-
-        {
-            LOADING === 'false' && 
-
-            (
-              <View>
-        <View style={{marginTop : 10}}>
-
-        {
-              ErrorStatus == true && (
-                  <View style={{marginBottom:10 ,color:'white', backgroundColor:'#E4555A', borderRadius:50, alignItems:'center', justifyContent:'center' }}>
-                      <Text style={{paddingHorizontal:20, paddingVertical:5, color:'white', fontSize:10, fontWeight:'bold'}}>
-                      {ErrorMessage}
-                      </Text>
-                  </View>
-
-              )
-          }
-            
-            <Text style={{color: 'black', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                            Username    
-            </Text>
-            <TextInput
-                style={styles.inputLogin}
-                placeholderTextColor="#aaa" // Warna teks placeholder
-                placeholder='Masukan Username'
-                onChangeText={text => constchangeInput(text, 'username')}
-                value={form.username}
+      <View style={{ flex: 1 }}>
+        <ImageBackground
+          source={require('../assets/img/bg.png')}
+          style={{ height: '100%' }}
+          resizeMode="cover"
+        >
+          <ScrollView contentContainerStyle={loginStyles.scrollContent} showsVerticalScrollIndicator={false}>
+          
+          <View style={loginStyles.logoContainer}>
+            <FastImage 
+              style={loginStyles.logo}
+              source={require('../assets/img/logo.jpeg')}
+              resizeMode={FastImage.resizeMode.contain}
             />
-        </View>
-        <View style={{marginTop : 10}}>
-            
-            <Text style={{color: 'black', fontSize:12, height: 'auto', width:'90%', marginTop:10, alignSelf:'center'}}>
-                            Password    
-            </Text>
-            <View style={{ width: '90%', alignSelf: 'center', justifyContent: 'center' }}>
-                <TextInput
-                    style={[styles.inputLogin, { width: '100%', alignSelf: 'auto', paddingRight: 50 }]}
-                    placeholderTextColor="#aaa" // Warna teks placeholder
-                    placeholder='Masukan Password'
+          </View>
+
+          <View>
+            <Text style={loginStyles.headerText}>Selamat Datang!</Text>
+            <Text style={loginStyles.subHeaderText}>Masuk untuk melanjutkan ke SIMBADA</Text>
+          </View>
+
+          {LOADING === 'true' && (
+            <View style={{ justifyContent: 'center', alignItems: 'center', marginTop: 20 }}>
+              <FastImage
+                style={{ width: 80, height: 80, opacity: 0.5 }}
+                source={require('../assets/img/loading.gif')}
+                resizeMode={FastImage.resizeMode.contain}
+              />
+            </View>
+          )}
+
+          {LOADING === 'false' && (
+            <View style={loginStyles.formContainer}>
+              {ErrorStatus === true && (
+                <View style={loginStyles.errorBox}>
+                  <Text style={loginStyles.errorText}>{ErrorMessage}</Text>
+                </View>
+              )}
+              
+              <View style={loginStyles.inputGroup}>
+                <Text style={loginStyles.label}>Username</Text>
+                <View style={loginStyles.inputWrapper}>
+                  <TextInput
+                    style={loginStyles.input}
+                    placeholderTextColor="#94A3B8"
+                    placeholder="Masukkan Username"
+                    onChangeText={text => constchangeInput(text, 'username')}
+                    value={form.username}
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              <View style={loginStyles.inputGroup}>
+                <Text style={loginStyles.label}>Password</Text>
+                <View style={loginStyles.inputWrapper}>
+                  <TextInput
+                    style={loginStyles.input}
+                    placeholderTextColor="#94A3B8"
+                    placeholder="Masukkan Password"
                     secureTextEntry={!showPassword}
                     onChangeText={text => constchangeInput(text, 'password')}
                     value={form.password}
-                />
-                <TouchableOpacity 
+                  />
+                  <TouchableOpacity 
                     onPress={() => setShowPassword(!showPassword)} 
-                    style={{position: 'absolute', right: 15, height: '100%', justifyContent: 'center'}}
-                >
-                    <Icon name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#aaa" />
-                </TouchableOpacity>
+                    style={{ padding: 5 }}
+                  >
+                    <Icon name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={22} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <TouchableOpacity style={loginStyles.loginBtn} onPress={login}>
+                <Text style={loginStyles.loginBtnText}>Masuk</Text>
+              </TouchableOpacity>
             </View>
-        </View>
+          )}
 
-        <View>
-        <TouchableOpacity style={styles.addbatas} onPress={login}> 
-                    <Text style={styles.addbatasx}>
-                        Login
-                    </Text>
-                </TouchableOpacity>
-        </View>
+          <Text style={loginStyles.copyright}>
+            Copyright: Bagian Pemerintahan, Kab. Konawe Selatan
+          </Text>
 
-        <Text style={{color: '#aaa', fontSize:12, height: 'auto', width:'100%', marginTop:10, textAlign:'center'}}>
-                            Copyright: Bagian Pemerintahan, Kab. Konawe Selatan    
-        </Text>
-        </View>
-      )
-      
-      }
-
-        
-      </ScrollView>
-      </ImageBackground>
+        </ScrollView>
+        </ImageBackground>
       </View>
-
-      </View>
-
     );
 
   };
