@@ -329,7 +329,9 @@ const MetodeText = ({navigation, route}) => {
                     />
                 </TouchableOpacity>
                 <View style={styles.top2}>
-                    <Text style={styles.headerTitle}>Metode Text</Text>
+                    <Text style={styles.headerTitle}>Metode Polygon</Text>
+                </View>
+                <View style={styles.top3}>
                 </View>
             </View>
 
