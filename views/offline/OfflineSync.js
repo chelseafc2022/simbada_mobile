@@ -14,7 +14,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
   Alert, ActivityIndicator, ImageBackground, RefreshControl,
+  Modal, ScrollView
 } from 'react-native';
+import MapView, { Polygon, Polyline, Marker } from 'react-native-maps';
 import FastImage from 'react-native-fast-image';
 import { useSelector, useDispatch } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +34,8 @@ const OfflineSync = ({ navigation }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   // Load data saat screen focus
   useFocusEffect(
@@ -133,6 +137,14 @@ const OfflineSync = ({ navigation }) => {
   };
 
   /**
+   * Lihat detail offline
+   */
+  const handleViewDetails = (item) => {
+    setSelectedItem(item);
+    setModalVisible(true);
+  };
+
+  /**
    * Refresh handler
    */
   const onRefresh = async () => {
@@ -199,6 +211,13 @@ const OfflineSync = ({ navigation }) => {
           </View>
 
           <View style={styles.itemActions}>
+            <TouchableOpacity
+              style={styles.detailItemButton}
+              onPress={() => handleViewDetails(item)}
+            >
+              <Text style={styles.detailItemButtonText}>👁</Text>
+            </TouchableOpacity>
+
             {(item.status === 'pending' || item.status === 'failed') && (
               <TouchableOpacity
                 style={styles.syncItemButton}
@@ -321,6 +340,79 @@ const OfflineSync = ({ navigation }) => {
           }
         />
       </ImageBackground>
+
+      {/* Modal Detail Usulan */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Detail Usulan Offline</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 5 }}>
+                <Text style={styles.modalCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 15, paddingBottom: 30 }}>
+              {selectedItem && (() => {
+                const d = selectedItem.data;
+                const coords = Array.isArray(d?.lokasi) ? d.lokasi : [];
+                return (
+                  <View style={{ paddingBottom: 30 }}>
+                    <Text style={styles.detailLabel}>Nama Pemohon: <Text style={styles.detailValue}>{d?.nama || '-'}</Text></Text>
+                    <Text style={styles.detailLabel}>NIK: <Text style={styles.detailValue}>{d?.nik || '-'}</Text></Text>
+                    {d?.nama_kec && d.nama_kec !== '-' && <Text style={styles.detailLabel}>Kecamatan: <Text style={styles.detailValue}>{d.nama_kec}</Text></Text>}
+                    <Text style={styles.detailLabel}>Desa: <Text style={styles.detailValue}>{d?.nama_des_kel || '-'}</Text></Text>
+                    <Text style={styles.detailLabel}>RT/RW: <Text style={styles.detailValue}>{d?.rwrt || '-'}</Text></Text>
+                    <Text style={styles.detailLabel}>Alamat: <Text style={styles.detailValue}>{d?.alamat || '-'}</Text></Text>
+                    
+                    <Text style={[styles.detailLabel, { marginTop: 15 }]}>
+                      Jumlah Titik Koordinat: <Text style={styles.detailValue}>{coords.length}</Text>
+                    </Text>
+
+                    {coords.length > 0 && (
+                      <View style={styles.mapPreviewContainer}>
+                        <MapView
+                          style={{ flex: 1 }}
+                          provider="google"
+                          initialRegion={{
+                            latitude: coords[0].latitude,
+                            longitude: coords[0].longitude,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                          }}
+                        >
+                          {(!d.tipe || d.tipe === 'polygon') && coords.length >= 3 && (
+                            <Polygon
+                              coordinates={coords}
+                              strokeColor="#EF4444"
+                              fillColor="rgba(239, 68, 68, 0.2)"
+                              strokeWidth={2}
+                            />
+                          )}
+                          {d.tipe === 'polyline' && coords.length >= 2 && (
+                            <Polyline
+                              coordinates={coords}
+                              strokeColor="#3B82F6"
+                              strokeWidth={3}
+                            />
+                          )}
+                          {coords.map((c, i) => (
+                            <Marker key={i} coordinate={c} />
+                          ))}
+                        </MapView>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -470,6 +562,13 @@ const styles = StyleSheet.create({
   itemActions: {
     flexDirection: 'row',
   },
+  detailItemButton: {
+    padding: 5,
+    marginRight: 5,
+  },
+  detailItemButtonText: {
+    fontSize: 16,
+  },
   syncItemButton: {
     padding: 5,
   },
@@ -501,6 +600,56 @@ const styles = StyleSheet.create({
     color: '#98A9B9',
     marginTop: 5,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  modalContent: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#F8FAFC',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  modalCloseBtn: {
+    fontSize: 20,
+    color: '#64748B',
+    fontWeight: 'bold',
+  },
+  detailLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '600',
+  },
+  mapPreviewContainer: {
+    height: 300,
+    marginTop: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
 });
 
