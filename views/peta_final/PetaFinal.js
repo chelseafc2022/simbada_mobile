@@ -3,7 +3,7 @@ import React, { useState, useEffect,useCallback } from 'react';
 import styles from '../assets/style'
 import { View, Text, TouchableOpacity, ScrollView , TextInput,StyleSheet, Alert, ActivityIndicator, ImageBackground, Switch } from 'react-native';
 import FastImage from "react-native-fast-image";
-import MapView, { Polygon } from 'react-native-maps';
+import MapView, { Polygon, Marker } from 'react-native-maps';
 import TabBar from '../components/TabBar'
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
@@ -28,7 +28,23 @@ const PetaFinal = ({navigation}) => {
         const [filteredPolygonData, setFilteredPolygonData] = useState([]);  // Polygon hasil filter
         const [kecamatanPolygonData, setKecamatanPolygonData] = useState([]);
         const [desaPolygonData, setDesaPolygonData] = useState([]);  // Polygon desa
-        const [userStatus, setUserStatus] = useState(PROFILE.profile?.status || "1");
+        const [userStatus, setUserStatus] = useState(PROFILE?.profile?.status || "1");
+        const id_kecamatan_user = PROFILE?.profile?.id_kecamatan || '';
+        const id_desa_user = PROFILE?.profile?.id_desa || '';
+
+        const getCenterPoint = (coordinates) => {
+          if (!coordinates || coordinates.length === 0) return null;
+          let latSum = 0;
+          let lngSum = 0;
+          coordinates.forEach(coord => {
+            latSum += coord.latitude;
+            lngSum += coord.longitude;
+          });
+          return {
+            latitude: latSum / coordinates.length,
+            longitude: lngSum / coordinates.length
+          };
+        };
 
         const [showPetaDasar, setShowPetaDasar] = useState(false);
         const [initialPetaDasarData, setInitialPetaDasarData] = useState([]);
@@ -67,6 +83,17 @@ const PetaFinal = ({navigation}) => {
         // }
 
         useEffect(() => {
+            const statusInt = parseInt(userStatus);
+            if (statusInt === 2 || statusInt === 3) {
+              if (id_kecamatan_user) {
+                setSelectedKecamatan(id_kecamatan_user);
+                fetchPolygonDataKecamatan(id_kecamatan_user);
+              } else {
+                setIsLoading(false);
+              }
+              return;
+            }
+
             const fetchAllPolygonData = async () => {
               setIsLoading(true);
               try {
@@ -248,14 +275,9 @@ const PetaFinal = ({navigation}) => {
 
                     // **5. Filter polygon desa di frontend**
                     const filterPolygonByDesa = (desaId) => {
-                        // Format `desaId` menjadi xx.xx.xx.xxxx
-                        const formattedDesaId = desaId.split('.').map(part => part.padStart(2, '0')).join('.');
-                      
-                        console.log("Formatted Desa ID yang dipilih:", formattedDesaId);  // Debug log untuk memeriksa ID desa yang sudah diformat
-                      
                         // Filter polygon berdasarkan desa yang dipilih
-                        const filteredPolygons = kecamatanPolygonData.filter((polygon) => polygon.kode_desa === formattedDesaId);
-                        const filteredDasar = kecamatanPetaDasarData.filter((polygon) => polygon.kode_desa === formattedDesaId);
+                        const filteredPolygons = kecamatanPolygonData.filter((polygon) => polygon.kode_desa === desaId || desaId.endsWith(`.${polygon.kode_desa}`));
+                        const filteredDasar = kecamatanPetaDasarData.filter((polygon) => polygon.kode_desa === desaId || desaId.endsWith(`.${polygon.kode_desa}`));
                       
                         if (filteredPolygons.length > 0) {
                           setDesaPolygonData(filteredPolygons);  // Set polygon desa ke state
@@ -307,7 +329,7 @@ const PetaFinal = ({navigation}) => {
                 >
 
               
-        {parseInt(userStatus) !== 1 && parseInt(userStatus) !== 3 ? (
+        {parseInt(userStatus) !== 1 && parseInt(userStatus) !== 2 && parseInt(userStatus) !== 3 ? (
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <FastImage 
                   style={{ width: 100, height: 100, marginBottom: 20, marginTop:20 }}
@@ -318,7 +340,7 @@ const PetaFinal = ({navigation}) => {
                   ⚠️ Akses Ditolak
               </Text>
               <Text style={{ color: '#721c24', fontSize: 16, textAlign: 'center', marginTop: 10, paddingHorizontal: 20 }}>
-                  Halaman ini hanya bisa diakses oleh Administrator dan Admin Kecamatan.
+                  Anda tidak memiliki akses ke halaman ini.
               </Text>
           </View>
             ):(
@@ -352,15 +374,35 @@ const PetaFinal = ({navigation}) => {
                         zIndex={1}
                         />
                     ))}
-                    {(selectedDesa ? desaPolygonData : (selectedKecamatan ? kecamatanPolygonData : initialPolygonData)).map((polygon, index) => (
-                        <Polygon
-                        key={`final-${index}`}
-                        coordinates={polygon.coordinates}
-                        strokeColor="blue"
-                        fillColor="rgba(0,0,255,0.5)"
-                        zIndex={2}
-                        />
-                    ))}
+                    {(selectedDesa ? desaPolygonData : (selectedKecamatan ? kecamatanPolygonData : initialPolygonData)).map((polygon, index) => {
+                        const isUserVillage = parseInt(userStatus) === 2 && id_desa_user && (polygon.kode_desa === id_desa_user || id_desa_user.endsWith(`.${polygon.kode_desa}`));
+                        return (
+                          <Polygon
+                          key={`final-${index}`}
+                          coordinates={polygon.coordinates}
+                          strokeColor={isUserVillage ? "red" : "blue"}
+                          fillColor={isUserVillage ? "rgba(255,0,0,0.4)" : "rgba(0,0,255,0.5)"}
+                          zIndex={isUserVillage ? 3 : 2}
+                          />
+                        );
+                    })}
+
+                    {parseInt(userStatus) === 2 && id_desa_user && (selectedDesa ? desaPolygonData : (selectedKecamatan ? kecamatanPolygonData : initialPolygonData))
+                      .filter(p => p.kode_desa === id_desa_user || id_desa_user.endsWith(`.${p.kode_desa}`))
+                      .map((polygon, index) => {
+                        const center = getCenterPoint(polygon.coordinates);
+                        if (!center) return null;
+                        return (
+                          <Marker 
+                            key={`pin-${index}`}
+                            coordinate={center}
+                            title="Desa Anda"
+                            description="Ini adalah lokasi desa Anda"
+                            pinColor="red"
+                          />
+                        );
+                      })
+                    }
                 </MapView>
 
             </View> 
@@ -399,15 +441,22 @@ const PetaFinal = ({navigation}) => {
                 marginTop: 10,
                 marginLeft: 20,
                 paddingHorizontal: 10,
-                backgroundColor: '#F0F4F8',  // Background yang soft
+                backgroundColor: '#F0F4F8',
                 borderWidth: 1,
                 borderColor: '#208DC0',
                 borderRadius: 10,}}
+            selectedValue={selectedKecamatan}
             onValueChange={itemValue => {
                 setSelectedKecamatan(itemValue);
                 setSelectedDesa('');
-                fetchPolygonDataKecamatan(itemValue);
+                if (itemValue) {
+                  fetchPolygonDataKecamatan(itemValue);
+                } else {
+                  setKecamatanPolygonData([]);
+                  setKecamatanPetaDasarData([]);
+                }
               }}
+            enabled={parseInt(userStatus) !== 2 && parseInt(userStatus) !== 3}
             >
                 <Picker.Item label="-- PILIH KECAMATAN --" value="" />
                 {kecamatanList.map(item => (
@@ -419,30 +468,53 @@ const PetaFinal = ({navigation}) => {
                 Pilih Desa
             </Text> */}
            
-          <Picker
-          style={{height: 50,
-            color: '#208DC0', 
-            width: '90%',
-            marginTop: 10,
-            marginLeft: 20,
-            paddingHorizontal: 10,
-            backgroundColor: '#F0F4F8',  // Background yang soft
-            borderWidth: 1,
-            borderColor: '#208DC0',
-            borderRadius: 10,}}
-          selectedValue={selectedDesa}
-          onValueChange={itemValue => {
-            setSelectedDesa(itemValue);
-            filterPolygonByDesa(itemValue);
-          }}
-          enabled={selectedKecamatan !== ''}
-          >
-            <Picker.Item label="-- PILIH DESA --" value="" />
-            {desaList.map(item => (
-              <Picker.Item key={item.id} label={item.name} value={item.id} />
-            ))}
-          </Picker>
-         
+            {parseInt(userStatus) !== 2 && (
+              <Picker
+              style={{height: 50,
+                color: '#208DC0', 
+                width: '90%',
+                marginTop: 10,
+                marginLeft: 20,
+                paddingHorizontal: 10,
+                backgroundColor: '#F0F4F8',  // Background yang soft
+                borderWidth: 1,
+                borderColor: '#208DC0',
+                borderRadius: 10,}}
+              selectedValue={selectedDesa}
+              onValueChange={itemValue => {
+                setSelectedDesa(itemValue);
+                filterPolygonByDesa(itemValue);
+              }}
+              enabled={selectedKecamatan !== ''}
+              >
+                <Picker.Item label="-- PILIH DESA --" value="" />
+                {desaList.map(item => (
+                  <Picker.Item key={item.id} label={item.name} value={item.id} />
+                ))}
+              </Picker>
+            )}
+          
+          {parseInt(userStatus) !== 2 && selectedDesa !== '' && (
+            <TouchableOpacity 
+              style={{
+                backgroundColor: '#EF4444', 
+                padding: 10, 
+                borderRadius: 10, 
+                alignSelf: 'center',
+                marginTop: 15,
+                width: '90%',
+                alignItems: 'center'
+              }}
+              onPress={() => {
+                setSelectedDesa('');
+                setDesaPolygonData([]);
+                setDesaPetaDasarData([]);
+              }}
+            >
+              <Text style={{color: 'white', fontWeight: 'bold'}}>Tampilkan Semua (Reset)</Text>
+            </TouchableOpacity>
+          )}
+
         </View>
         </>
 )}
