@@ -133,8 +133,8 @@ const AddUsulan = ({navigation}) => {
             await AsyncStorage.setItem('CACHE_KECAMATAN', JSON.stringify(data));
     
             // Ambil status user dan id_kecamatan user
-            const userStatus = PROFILE.profile?.status || "1";
-            const userKecamatanId = PROFILE.profile?.id_kecamatan;
+            const userStatus = PROFILE?.profile?.status || "1";
+            const userKecamatanId = PROFILE?.profile?.id_kecamatan;
     
             // Filter kecamatan hanya untuk user status 2
             const filteredKecamatan = userStatus === "2"
@@ -161,8 +161,8 @@ const AddUsulan = ({navigation}) => {
                 const cached = await AsyncStorage.getItem('CACHE_KECAMATAN');
                 if (cached) {
                     const data = JSON.parse(cached);
-                    const userStatus = PROFILE.profile?.status || "1";
-                    const userKecamatanId = PROFILE.profile?.id_kecamatan;
+                    const userStatus = PROFILE?.profile?.status || "1";
+                    const userKecamatanId = PROFILE?.profile?.id_kecamatan;
                     
                     const filteredKecamatan = userStatus === "2"
                         ? data.filter(item => {
