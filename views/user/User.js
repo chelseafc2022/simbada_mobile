@@ -51,8 +51,28 @@ const userStatus = dummyStatus;
 
     const fetchUserProfile = async () => {
         try {
-            setIsLoading(true);
             const token = await AsyncStorage.getItem('TOKEN');
+            const cacheKey = `@profile_cache_${PROFILE?.id}`;
+
+            // Cek Cache Lokal (Stale-While-Revalidate)
+            if (!selectedUser && userInfo.length === 0) {
+                try {
+                    const cachedStr = await AsyncStorage.getItem(cacheKey);
+                    if (cachedStr) {
+                        const cachedResult = JSON.parse(cachedStr);
+                        if (PROFILE?.profile?.status === 1) {
+                            setSelectedUser(cachedResult[0]?.data1[0] || null);
+                        } else {
+                            setUserInfo(cachedResult[0]?.data1 || []);
+                        }
+                        setIsLoading(false); // Data cache ada, matikan loading spinner
+                    } else {
+                        setIsLoading(true); // Cache kosong, set loading
+                    }
+                } catch (e) {
+                    setIsLoading(true);
+                }
+            }
 
             const response = await fetch(URL.URL_PENGGUNA + "view", {
                 method: 'POST',
@@ -71,7 +91,6 @@ const userStatus = dummyStatus;
             });
 
             const result = await response.json();
-            console.log('Response JSON:', result);
 
             if (response.ok && Array.isArray(result) && result.length > 0) {
                 if (PROFILE?.profile?.status === 1) {
@@ -80,6 +99,8 @@ const userStatus = dummyStatus;
                 } else {
                     setUserInfo(result[0]?.data1 || []);
                 }
+                // Simpan hasil terbaru ke memori
+                await AsyncStorage.setItem(cacheKey, JSON.stringify(result));
             } else {
                 console.error('Error fetching user info: Data kosong atau struktur tidak sesuai.');
                 setSelectedUser(null);
