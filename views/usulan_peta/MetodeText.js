@@ -63,6 +63,13 @@ const MetodeText = ({navigation, route}) => {
   });
     // Membuat ref untuk MapView agar kita bisa memanggil metode animateToRegion
     const mapViewRef = useRef(null);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
 
 
@@ -111,29 +118,29 @@ const MetodeText = ({navigation, route}) => {
                 Geolocation.getCurrentPosition(
                     (position) => {
                         const { latitude, longitude } = position.coords;
-                        // console.log(`✅ Lokasi diperoleh (High Accuracy: ${highAcc}):`, { latitude, longitude });
-                        setCurrentLocation({ latitude, longitude });
-                        setRegion({
-                            latitude,
-                            longitude,
-                            latitudeDelta: 0.0922,
-                            longitudeDelta: 0.0421,
-                        });
-                        mapViewRef.current?.animateToRegion({
-                            latitude,
-                            longitude,
-                            latitudeDelta: 0.0922,
-                            longitudeDelta: 0.0421,
-                        }, 1000);
-                        if (callback) {
-                            // console.log("✅ Memanggil callback dengan lokasi terbaru.");
-                            callback({ latitude, longitude });
+                        if (isMounted.current) {
+                            setCurrentLocation({ latitude, longitude });
+                            setRegion({
+                                latitude,
+                                longitude,
+                                latitudeDelta: 0.0922,
+                                longitudeDelta: 0.0421,
+                            });
+                            mapViewRef.current?.animateToRegion({
+                                latitude,
+                                longitude,
+                                latitudeDelta: 0.0922,
+                                longitudeDelta: 0.0421,
+                            }, 1000);
+                            if (callback) {
+                                callback({ latitude, longitude });
+                            }
                         }
                     },
                     (error) => {
+                        if (!isMounted.current) return;
                         console.warn(`Error GPS (High Acc: ${highAcc}):`, error.message);
                         if (highAcc) {
-                            // console.log("Mencoba ulang dengan akurasi rendah...");
                             getPos(false); // Coba lagi dengan akurasi rendah (menggunakan jaringan)
                         } else {
                             Alert.alert('Perhatian', 'Gagal mendapatkan lokasi. Pastikan GPS aktif dan Anda berada di area terbuka tanpa halangan (langit terlihat). Di mode offline, GPS murni butuh waktu lebih lama untuk mengunci.');
@@ -154,8 +161,8 @@ const MetodeText = ({navigation, route}) => {
         const getPos = (highAcc) => {
             Geolocation.getCurrentPosition(
                 (position) => {
+                    if (!isMounted.current) return;
                     const { latitude, longitude } = position.coords;
-                    // console.log(`Menambahkan lokasi baru (High Acc: ${highAcc}):`, { latitude, longitude });
                     setLokasi((prevLokasi) => [
                         ...prevLokasi,
                         { lat: latitude.toString(), lng: longitude.toString() }
@@ -168,8 +175,8 @@ const MetodeText = ({navigation, route}) => {
                     setIsLoading(false); // Selesai loading
                 },
                 (error) => {
+                    if (!isMounted.current) return;
                     if (highAcc) {
-                        // console.log("Timeout saat menambah lokasi, mencoba dengan akurasi rendah...");
                         getPos(false); // Fallback ke akurasi rendah
                     } else {
                         Alert.alert('Perhatian', 'Gagal mengambil koordinat. Pastikan GPS aktif.');
@@ -236,9 +243,8 @@ const MetodeText = ({navigation, route}) => {
         const loadDataFromAsyncStorage = async () => {
             try {
                 const savedData = await AsyncStorage.getItem('lokasiData');
-                if (savedData !== null) {
+                if (savedData !== null && isMounted.current) {
                     const parsedData = JSON.parse(savedData);
-                    // console.log("Data diambil dari AsyncStorage:", parsedData); // Debug: Cek data yang dimuat
                     setLokasi(parsedData.lokasi || []);
                     setPolygonCoords(parsedData.polygonCoords || []); // Perbarui polygonCoords
                 }
