@@ -326,6 +326,7 @@ const Home = ({ navigation }) => {
 
 
   const getKecamatan = async () => {
+    if (!TOKEN) return;
     // setIsLoading(true); // Aktifkan indikator loading
     try {
       const response = await fetch(URL.URL_KECAMATAN + "kecamatan_all", {
@@ -524,6 +525,7 @@ const Home = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1 }}>
+      <ImageBackground source={require('../assets/img/bgbg.jpg')} style={{ flex: 1 }} resizeMode="cover">
       {/* HEADER ORIGINAL */}
       <View style={styles.top}>
         <View>
@@ -553,7 +555,7 @@ const Home = ({ navigation }) => {
         </View>
       </View>
 
-      <View style={[styles.body, { backgroundColor: '#F1F5F9' }]}>
+      <View style={[styles.body, { backgroundColor: 'transparent' }]}>
         <ScrollView style={{ flex: 1, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
           {/* === OFFLINE BANNER === */}
@@ -735,7 +737,7 @@ const Home = ({ navigation }) => {
 
       <TabBar />
 
-
+      </ImageBackground>
     </View>
   );
 };
