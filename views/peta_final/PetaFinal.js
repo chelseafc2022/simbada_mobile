@@ -146,6 +146,7 @@ const PetaFinal = ({navigation}) => {
              // Fetch kecamatan
              useEffect(() => {
                 const fetchKecamatan = async () => {
+                  if (!TOKEN) return;
                   try {
                     const response = await fetch(URL.URL_PETA_FINAL + 'kecamatan', {
                       method: 'POST',
