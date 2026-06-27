@@ -168,6 +168,7 @@ const PetaDasar = ({ navigation }) => {
   // **2. Fetch kecamatan**
   useEffect(() => {
     const fetchKecamatan = async () => {
+      if (!TOKEN) return;
       try {
         const response = await fetch(URL.URL_KECAMATAN + "kecamatan_all", {
           method: 'GET',
