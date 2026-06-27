@@ -13,7 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LIB from '../library/riswan'
 import { useDispatch } from 'react-redux';
 import { Provider } from 'react-redux';
-import { StyleSheet as RNStyleSheet } from 'react-native';
+import { StyleSheet as RNStyleSheet, PermissionsAndroid, Platform } from 'react-native';
+import messaging from '@react-native-firebase/messaging';
 
 const loginStyles = RNStyleSheet.create({
   container: {
@@ -262,7 +263,7 @@ const Login = ({navigation}) => {
 
 
           // appSettings.setString("profile", JSON.stringify(res_data.profile));
-          saveFcmToken();
+          saveFcmToken(res_data.token, res_data.profile.id);
           navigation.navigate('Home')
           // console.log('Token adalah : '+TOKEN)
 
@@ -332,28 +333,48 @@ const checkToken = async () => {
 };
 
 
-  const saveFcmToken = async () =>{
+  const saveFcmToken = async (currentToken, userId) => {
+      try {
+          let enabled = false;
 
-      await LIB.GetStorage();
-      var fcmToken = await AsyncStorage.getItem('fcmToken')
-      SET_FCM_TOKEN(fcmToken)
+          // Untuk Android 13+ kita butuh PermissionsAndroid
+          if (Platform.OS === 'android' && Platform.Version >= 33) {
+              const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+              enabled = granted === PermissionsAndroid.RESULTS.GRANTED;
+          } else {
+              const authStatus = await messaging().requestPermission();
+              enabled = authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+                        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+          }
 
-      fetch(URL.URL_UpdateToken + "add", {
-          method: "POST",
-          headers: {
-              "content-type": "application/json",
-              authorization: "kikensbatara " + TOKEN
-          },
-          body: JSON.stringify({
-              token_fcm : FCM_TOKEN,
-          })
-      })
-          .then(res => res.json())
-          .then(res_data => {
-              // console.log(res_data)
+          if (enabled || (Platform.OS === 'android' && Platform.Version < 33)) {
+              const fcmToken = await messaging().getToken();
+              console.log("FCM Token didapat:", fcmToken);
 
-      });
-
+              fetch(URL.URL_PENGGUNA + "update-fcm", {
+                  method: "POST",
+                  headers: {
+                      "content-type": "application/json",
+                      authorization: "kikensbatara " + currentToken
+                  },
+                  body: JSON.stringify({
+                      id: userId,
+                      fcm_token : fcmToken,
+                  })
+              })
+              .then(res => res.json())
+              .then(res_data => {
+                  console.log("FCM tersimpan ke DB:", res_data);
+              })
+              .catch(err => {
+                  console.error("Gagal mengirim FCM ke DB:", err);
+              });
+          } else {
+              console.log("User tidak mengizinkan notifikasi.");
+          }
+      } catch (error) {
+          console.error("Error pada proses FCM Token:", error);
+      }
   }
 
   const storeAccount = async()=>{
