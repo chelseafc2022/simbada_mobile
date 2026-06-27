@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Linking, ImageBackground } from 'react-native';
 import FastImage from "react-native-fast-image";
 import TabBar from '../components/TabBar';
 import { useSelector, useDispatch } from 'react-redux';
@@ -162,8 +162,9 @@ const userStatus = dummyStatus;
         }
     };
     return (
-        <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
-            <ScrollView style={styles.body}>
+        <View style={{ flex: 1 }}>
+            <ImageBackground source={require('../assets/img/bgbg.jpg')} style={{ flex: 1 }} resizeMode="cover">
+            <ScrollView style={[styles.body, { backgroundColor: 'transparent' }]}>
                 <View style={styles.navTop}>
                     {/* Tombol Back */}
                     <TouchableOpacity style={styles.top1} onPress={() => navigation.goBack()}>
@@ -292,6 +293,7 @@ const userStatus = dummyStatus;
                 </View>
             </ScrollView>
             <TabBar />
+            </ImageBackground>
         </View>
     );
 };
