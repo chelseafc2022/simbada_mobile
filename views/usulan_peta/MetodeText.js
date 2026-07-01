@@ -9,13 +9,17 @@ import MapView, { Marker, Polygon, Circle, Polyline } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Komponen Kartu yang dioptimasi agar tidak re-render massal
-const CoordinateCard = React.memo(({ find, index, updateLokasi, localStyles }) => {
+const CoordinateCard = React.memo(({ find, index, updateLokasi, takePhotoForPoint, localStyles }) => {
     return (
         <View style={localStyles.card}>
             <View style={localStyles.cardHeader}>
                 <Text style={localStyles.cardTitle}>📌 Titik {index + 1}</Text>
-                {find.photo_uri && (
+                {find.photo_uri ? (
                     <Text style={{fontSize: 11, color: '#4CAF50'}}>📸</Text>
+                ) : (
+                    <TouchableOpacity onPress={() => takePhotoForPoint(index)} style={{backgroundColor: '#FF9800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4}}>
+                        <Text style={{fontSize: 10, color: '#fff', fontWeight: 'bold'}}>📷 Ambil Foto</Text>
+                    </TouchableOpacity>
                 )}
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -74,6 +78,19 @@ const MetodeText = ({navigation, route}) => {
 
 
     const sendBackLokasi = () => {
+        // Validasi Wajib Foto
+        if (lokasi.length === 0) {
+            Alert.alert('Perhatian', 'Belum ada koordinat lokasi yang ditambahkan.');
+            return;
+        }
+
+        for (let i = 0; i < lokasi.length; i++) {
+            if (!lokasi[i].photo_uri) {
+                Alert.alert('Perhatian', `Titik ${i + 1} belum memiliki lampiran foto. Harap ambil foto untuk setiap titik sebelum menyimpan.`);
+                return;
+            }
+        }
+
         if (route.params?.onLokasiUpdate) {
             // console.log("Mengirim lokasi kembali:", lokasi); // Debug: Cek data yang dikirim
             route.params.onLokasiUpdate(lokasi); // Kirim lokasi yang diperbarui ke AddUsulan
@@ -208,6 +225,18 @@ const MetodeText = ({navigation, route}) => {
                     ...prevCoords,
                     { latitude, longitude }
                 ]);
+            }
+        });
+    };
+
+    const takePhotoForPoint = (index) => {
+        navigation.navigate('GeoTagCamera', {
+            onPhotoTaken: (photoData) => {
+                setLokasi((prevLokasi) => {
+                    const updatedLokasi = [...prevLokasi];
+                    updatedLokasi[index].photo_uri = photoData.uri;
+                    return updatedLokasi;
+                });
             }
         });
     };
@@ -439,6 +468,7 @@ const MetodeText = ({navigation, route}) => {
                             find={item} 
                             index={index} 
                             updateLokasi={updateLokasi} 
+                            takePhotoForPoint={takePhotoForPoint}
                             localStyles={localStyles} 
                         />
                     )}
