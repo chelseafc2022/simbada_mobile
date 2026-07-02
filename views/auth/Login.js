@@ -177,17 +177,12 @@ const Login = ({navigation}) => {
     }
 
     const login = async () => {
-    // console.log(URL.LOGIN_URL)
     SET_LOADING('true')
     SET_CHECK_LOAD(true);
     SET_ERROR_STATUS(false);
     SET_ERROR_MESSAGE('')
     saveDataToken('TOKEN', '')
     saveDataToken('PROFILE', '')
-
-
-    // console.log(form)
-      // console.log(URL.LOGIN_URL)
 
       NetInfo.fetch().then(state => {
         if (!state.isConnected) {
@@ -213,17 +208,13 @@ const Login = ({navigation}) => {
             })
         })
     .then((response)=>{
-          // SET_LOADING(false)
         SET_LOADING('false')
-        // console.log(response)
         if (response.ok) {
               SET_CHECK_LOAD(false);
-              // console.log("sudah betul")
               return response.json();
               SET_LOADING('false')
           } 
           return response.json().then(error => {
-              // console.log("sudah salah")
               SET_CHECK_LOAD(false)
               throw new Error(error.message);
               SET_LOADING('false')
@@ -231,9 +222,6 @@ const Login = ({navigation}) => {
       })
 
       .then(async (res_data) => {
-          // console.log(res_data)
-
-          // console.log(res_data)
           await saveDataToken('TOKEN', res_data.token)
           await saveDataToken('PROFILE', JSON.stringify(res_data.profile))
           await AsyncStorage.setItem('LAST_LOGIN', Date.now().toString()); /// coba implementasi login
