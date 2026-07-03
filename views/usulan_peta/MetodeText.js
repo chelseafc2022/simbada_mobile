@@ -92,7 +92,6 @@ const MetodeText = ({navigation, route}) => {
         }
 
         if (route.params?.onLokasiUpdate) {
-            // console.log("Mengirim lokasi kembali:", lokasi); // Debug: Cek data yang dikirim
             route.params.onLokasiUpdate(lokasi); // Kirim lokasi yang diperbarui ke AddUsulan
         }
         navigation.goBack(); // Kembali ke AddUsulan
@@ -115,7 +114,6 @@ const MetodeText = ({navigation, route}) => {
               }
           );
           if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-              // console.log("You can access the location");
               return true;
           } else {
               console.log("Location permission denied");
