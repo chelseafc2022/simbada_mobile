@@ -376,8 +376,6 @@ const Home = ({ navigation }) => {
   const getDesaByKecamatan = async () => {
     if (!selectedKecamatan) return;
 
-    console.log("Mengambil data desa untuk kecamatan:", selectedKecamatan); // Debugging
-
     try {
       const response = await fetch(URL.URL_KECAMATAN + "petadasar", {
         method: "POST",
@@ -389,7 +387,6 @@ const Home = ({ navigation }) => {
       });
 
       const result = await response.json();
-      console.log("Response dari API desa:", result); // Debugging
 
       if (Array.isArray(result) && result.length > 0) {
         const processedDesa = result.map(item => {
