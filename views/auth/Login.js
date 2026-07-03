@@ -238,17 +238,6 @@ const Login = ({navigation}) => {
           saveUserNamePassword();
 
           const profile = JSON.parse(await AsyncStorage.getItem('PROFILE'));
-            // console.log('Status User:', profile.status_user);  // Debugging status user
-
-            // Navigasi ke halaman sesuai status user
-            if (profile.status_user === 1) {
-                // console.log('User adalah Administrator');
-            } else if (profile.status_user === 4) {
-                // console.log('User adalah Operator Desa');
-            } else {
-                // console.log('Status user tidak diketahui');
-            }
-
 
           // appSettings.setString("profile", JSON.stringify(res_data.profile));
           saveFcmToken(res_data.token, res_data.profile.id);
@@ -257,8 +246,6 @@ const Login = ({navigation}) => {
 
       })
       .catch(error => {
-          // console.log('PESAN GAGAL :')
-          // console.log(error.message)
           SET_LOADING('false')
           SET_ERROR_MESSAGE(error.message)
           SET_ERROR_STATUS(true);
