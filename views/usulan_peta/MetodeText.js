@@ -207,7 +207,6 @@ const MetodeText = ({navigation, route}) => {
     const addLokasiDenganFoto = () => {
         navigation.navigate('GeoTagCamera', {
             onPhotoTaken: (photoData) => {
-                // console.log('Photo taken for polygon:', photoData);
                 const { latitude, longitude } = photoData.metadata;
                 
                 // Add the new point with the photo data
@@ -246,7 +245,6 @@ const MetodeText = ({navigation, route}) => {
                     polygonCoords, // Simpan polygonCoords juga
                 };
                 await AsyncStorage.setItem('lokasiData', JSON.stringify(dataToSave));
-                // console.log("Data disimpan di AsyncStorage:", dataToSave); // Debug: Cek data yang disimpan
             } catch (error) {
                 console.error('Error menyimpan data:', error);
             }
@@ -262,7 +260,6 @@ const MetodeText = ({navigation, route}) => {
         useEffect(() => {
             const loadData = async () => {
                 await loadDataFromAsyncStorage(); // Muat data dari AsyncStorage
-                // console.log("Lokasi yang dipulihkan setelah pemuatan:", lokasi); // Debug: Cek data yang dimuat
             };
             loadData();
         }, []);
@@ -311,9 +308,7 @@ const MetodeText = ({navigation, route}) => {
 
 
     const centerToUserLocation = () => {
-        // console.log("📍 Mencoba mendapatkan lokasi terkini dan memusatkan map...");
         getUserLocation((newLocation) => {
-            // console.log('📍 Memusatkan map ke lokasi pengguna terbaru:', newLocation);
             mapViewRef.current?.animateToRegion({
                 latitude: newLocation.latitude,
                 longitude: newLocation.longitude,
@@ -325,11 +320,9 @@ const MetodeText = ({navigation, route}) => {
 
 
         useEffect(() => {
-        // console.log("Checking and fetching user location...");
         getUserLocation((newLocation) => {
             // Jika belum ada titik sama sekali, otomatis tambahkan Titik 1
             if (!lokasiAwal || lokasiAwal.length === 0) {
-                // console.log("🆕 Otomatis menambahkan Titik 1:", newLocation);
                 setLokasi([{
                     lat: newLocation.latitude.toString(),
                     lng: newLocation.longitude.toString(),
