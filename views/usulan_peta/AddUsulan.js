@@ -83,9 +83,6 @@ const AddUsulan = ({navigation}) => {
       )
 
       useEffect(() => {
-        // console.log('Token:', TOKEN);
-        // console.log('Endpoint:', URL.URL_KECAMATAN + 'desa');
-        
         // Cek apakah user adalah Operator Desa (bukan admin)
         const userStatus = PROFILE?.profile?.status?.toString();
         if (userStatus && userStatus !== '1') {
@@ -112,8 +109,6 @@ const AddUsulan = ({navigation}) => {
     
       const getKecamatan = async () => {
         try {
-            // console.log('Fetching kecamatan from:', URL.URL_KECAMATAN + 'kecamatan');
-    
             const response = await fetch(URL.URL_KECAMATAN + 'kecamatan', {
                 method: 'POST',
                 headers: {
@@ -127,7 +122,6 @@ const AddUsulan = ({navigation}) => {
             }
     
             const data = await response.json();
-            // console.log('Kecamatan Data:', data);
     
             // Simpan ke cache untuk offline
             await AsyncStorage.setItem('CACHE_KECAMATAN', JSON.stringify(data));
