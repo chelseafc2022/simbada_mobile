@@ -53,10 +53,7 @@ const PetaFinal = ({navigation}) => {
 
         useFocusEffect(
           useCallback(() => {
-            console.log("📥 PetaFinal dibuka");
-        
             return () => {
-              console.log("🧹 Cleanup PetaFinal");
               setSelectedKecamatan('');
               setSelectedDesa('');
               setDesaPolygonData([]);
@@ -156,7 +153,6 @@ const PetaFinal = ({navigation}) => {
                       },
                     });
                     const data = await response.json();
-                    // console.log('List Kecamatan:', data);  // Debug log
               
                     if (Array.isArray(data)) {
                       setKecamatanList(

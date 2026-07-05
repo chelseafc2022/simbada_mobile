@@ -67,10 +67,7 @@ const PetaDasar = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      console.log("📥 PetaDasar dibuka");
-
       return () => {
-        console.log("🧹 Cleanup PetaDasar");
         setInitialPolygonData([]);
         setFilteredPolygonData([]);
         setKecamatanPolygonData([]);
