@@ -40,6 +40,19 @@ import GeoTagCamera from "./views/geotagging/GeoTagCamera";
 import OfflineSync from "./views/offline/OfflineSync";
 import NotificationList from "./views/notification/NotificationList";
 
+// === Modul PRD: Pemetaan Offline ===
+import TrackRecorder from "./views/track_recorder/TrackRecorder";
+import TrackHistory from "./views/track_recorder/TrackHistory";
+import NavigasiProjected from "./views/navigasi/NavigasiProjected";
+import NavigasiPlacemark from "./views/navigasi/NavigasiPlacemark";
+import NavigasiRuteManual from "./views/navigasi/NavigasiRuteManual";
+import PlacemarkList from "./views/placemark/PlacemarkList";
+import PlacemarkForm from "./views/placemark/PlacemarkForm";
+import PlacemarkMap from "./views/placemark/PlacemarkMap";
+import MapImporter from "./views/peta_offline/MapImporter";
+import MapViewer from "./views/peta_offline/MapViewer";
+import EksporData from "./views/ekspor/EksporData";
+
 // === Services ===
 import OfflineManager from "./views/library/OfflineManager";
 import NotificationService from "./views/library/NotificationService";
@@ -104,11 +117,32 @@ const AppContent = () => {
         {/* User */}
         <Stack.Screen name="User" component={User} />
 
-        {/* === Modul Baru === */}
+        {/* === Modul Baru (Legacy) === */}
         <Stack.Screen name="NavigasiKoordinat" component={NavigasiKoordinat} />
         <Stack.Screen name="GeoTagCamera" component={GeoTagCamera} />
         <Stack.Screen name="OfflineSync" component={OfflineSync} />
         <Stack.Screen name="NotificationList" component={NotificationList} />
+
+        {/* === Modul PRD: Track Recorder === */}
+        <Stack.Screen name="TrackRecorder" component={TrackRecorder} />
+        <Stack.Screen name="TrackHistory" component={TrackHistory} />
+
+        {/* === Modul PRD: Navigasi === */}
+        <Stack.Screen name="NavigasiProjected" component={NavigasiProjected} />
+        <Stack.Screen name="NavigasiPlacemark" component={NavigasiPlacemark} />
+        <Stack.Screen name="NavigasiRuteManual" component={NavigasiRuteManual} />
+
+        {/* === Modul PRD: Placemark === */}
+        <Stack.Screen name="PlacemarkList" component={PlacemarkList} />
+        <Stack.Screen name="PlacemarkForm" component={PlacemarkForm} />
+        <Stack.Screen name="PlacemarkMap" component={PlacemarkMap} />
+
+        {/* === Modul PRD: Peta Offline === */}
+        <Stack.Screen name="MapImporter" component={MapImporter} />
+        <Stack.Screen name="MapViewer" component={MapViewer} />
+
+        {/* === Modul PRD: Ekspor Data === */}
+        <Stack.Screen name="EksporData" component={EksporData} />
       </Stack.Navigator>
     </NavigationContainer>
   );

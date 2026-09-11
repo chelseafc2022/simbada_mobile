@@ -598,6 +598,36 @@ const Home = ({ navigation }) => {
                 <Text style={homeStyles.shortcutLabel}>Sinkron Offline</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Baris 2: Modul Pemetaan Lapangan */}
+            <View style={homeStyles.shortcutRow}>
+              <TouchableOpacity style={[homeStyles.shortcutCard, { borderColor: '#EF4444', borderWidth: 1 }]}
+                onPress={() => Route('TrackRecorder')}>
+                <Text style={{ fontSize: 28 }}>🔴</Text>
+                <Text style={homeStyles.shortcutLabel}>Track Recorder</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[homeStyles.shortcutCard, { borderColor: '#208DC0', borderWidth: 1 }]}
+                onPress={() => Route('PlacemarkList')}>
+                <Text style={{ fontSize: 28 }}>📍</Text>
+                <Text style={homeStyles.shortcutLabel}>Placemark</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Baris 3: Peta Offline & Ekspor */}
+            <View style={homeStyles.shortcutRow}>
+              <TouchableOpacity style={[homeStyles.shortcutCard, { borderColor: '#22C55E', borderWidth: 1 }]}
+                onPress={() => Route('MapImporter')}>
+                <Text style={{ fontSize: 28 }}>🗺</Text>
+                <Text style={homeStyles.shortcutLabel}>Peta Offline</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[homeStyles.shortcutCard, { borderColor: '#A855F7', borderWidth: 1 }]}
+                onPress={() => Route('EksporData')}>
+                <Text style={{ fontSize: 28 }}>📤</Text>
+                <Text style={homeStyles.shortcutLabel}>Ekspor Data</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Bagian Info Peta Dasar & Peta Final */}

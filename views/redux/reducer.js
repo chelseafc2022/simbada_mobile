@@ -1,7 +1,6 @@
 
-import { buildTREFromConfig } from "react-native-render-html"
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 var URL = 'https://server-simbada.konaweselatankab.go.id/'; 
 var URLX = 'https://server-simbada.konaweselatankab.go.id/'; 
@@ -11,7 +10,8 @@ var URLX = 'https://server-simbada.konaweselatankab.go.id/';
 
 
 const initialState = {
-    VERSI_APP : '0.0.4',
+    VERSI_APP : '0.0.5',
+
     URL: {
         URL_APP: URL,
         URL_APPX: URLX,
@@ -32,12 +32,26 @@ const initialState = {
     TOKEN   : '',
     PROFILE: null,
 
-    // === State baru untuk modul upgrade ===
-    IS_ONLINE: true,            // Status koneksi internet
-    OFFLINE_QUEUE_COUNT: 0,     // Jumlah item di antrian offline
-    NOTIFICATION_COUNT: 0,      // Jumlah notifikasi belum dibaca
-    
+    // === State upgrade modul offline ===
+    IS_ONLINE: true,
+    OFFLINE_QUEUE_COUNT: 0,
+    NOTIFICATION_COUNT: 0,
+
+    // === Modul 1: Peta Offline ===
+    ACTIVE_MAP: null,           // Metadata peta aktif { id, nama, path, bounds, format }
+
+    // === Modul 2: Telemetri GPS ===
+    GPS_STATUS: 'idle',         // 'idle' | 'acquiring' | 'active' | 'error'
+    CURRENT_POSITION: null,     // { lat, lon, alt, speed, accH, accV, heading }
+
+    // === Modul 3: Track Recorder ===
+    TRACK_STATUS: 'idle',       // 'idle' | 'recording' | 'paused'
+    TRACK_METRICS: null,        // { distance, avgSpeed, maxSpeed, duration }
+
+    // === Modul 5: Placemark ===
+    PLACEMARK_COUNT: 0,         // Jumlah placemark tersimpan (untuk badge)
 }
+
 
 // state = initialState artinya jika state belumpunya nilai maka setup awalnya initialState,,, jadi boleh juga di tulis begini (state, action)
 const reducer = (state = initialState, action = {}) => {
@@ -55,10 +69,27 @@ const reducer = (state = initialState, action = {}) => {
       return { ...state, OFFLINE_QUEUE_COUNT: action.payload };
     case 'SET_NOTIFICATION_COUNT':
       return { ...state, NOTIFICATION_COUNT: action.payload };
+    // === Modul 1: Peta Offline ===
+    case 'SET_ACTIVE_MAP':
+      return { ...state, ACTIVE_MAP: action.payload };
+    // === Modul 2: Telemetri GPS ===
+    case 'SET_GPS_STATUS':
+      return { ...state, GPS_STATUS: action.payload };
+    case 'UPDATE_POSITION':
+      return { ...state, CURRENT_POSITION: action.payload };
+    // === Modul 3: Track Recorder ===
+    case 'SET_TRACK_STATUS':
+      return { ...state, TRACK_STATUS: action.payload };
+    case 'UPDATE_TRACK_METRICS':
+      return { ...state, TRACK_METRICS: action.payload };
+    // === Modul 5: Placemark ===
+    case 'SET_PLACEMARK_COUNT':
+      return { ...state, PLACEMARK_COUNT: action.payload };
     default:
       return state;
   }
 };
+
 
 // Simpan lokasi ke AsyncStorage
 const saveLocations = async (locations) => {

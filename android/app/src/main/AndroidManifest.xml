@@ -12,6 +12,15 @@ package="com.simbadakonselv2">
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
+    <!-- Background Service & Wake Lock -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Media Permissions Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
     <!-- Notification Permissions (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -47,6 +56,11 @@ package="com.simbadakonselv2">
         </intent-filter>
       </activity>
 
+      <!-- Foreground Service untuk Track Recorder -->
+      <service
+        android:name=".TrackForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="location" />
 
       <!-- ===DEBUG=== -->
        <meta-data

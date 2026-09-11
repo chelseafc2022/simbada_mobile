@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body, #map { width:100%; height:100%; }
+  #status { position:absolute; top:8px; left:8px; z-index:1000;
+    background:rgba(0,0,0,0.7); color:#fff; padding:6px 12px;
+    border-radius:20px; font-size:12px; font-family:monospace; }
+  #pos-marker { width:16px; height:16px; background:#208DC0;
+    border:3px solid #fff; border-radius:50%; box-shadow:0 0 8px rgba(32,141,192,0.8); }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+</head>
+<body>
+<div id="status">Menunggu peta...</div>
+<div id="map"></div>
+
+<script>
+var map = L.map('map', { zoomControl:true, attributionControl:false });
+var imageOverlay = null;
+var posMarker = null;
+var boundsData = null;
+
+// Listener dari React Native
+document.addEventListener('message', handleRNMessage);
+window.addEventListener('message', handleRNMessage);
+
+function handleRNMessage(e) {
+  try {
+    var msg = JSON.parse(e.data);
+    if (msg.type === 'LOAD_GEOTIFF') loadGeoTIFF(msg.base64, msg.name);
+    if (msg.type === 'UPDATE_POSITION') updatePosition(msg.lat, msg.lon);
+    if (msg.type === 'FLY_TO') map.setView([msg.lat, msg.lon], msg.zoom || 15);
+  } catch(err) { console.error('Msg parse error:', err); }
+}
+
+function setStatus(txt) {
+  document.getElementById('status').innerText = txt;
+}
+
+async function loadGeoTIFF(base64, name) {
+  try {
+    setStatus('Memproses GeoTIFF...');
+    var binary = atob(base64);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    var tiff = await GeoTIFF.fromArrayBuffer(bytes.buffer);
+    var image = await tiff.getImage();
+    var bbox = image.getBoundingBox();  // [minLon, minLat, maxLon, maxLat]
+    boundsData = { minLon:bbox[0], minLat:bbox[1], maxLon:bbox[2], maxLat:bbox[3] };
+
+    var width = image.getWidth(), height = image.getHeight();
+    var rasters = await image.readRasters({ interleave:true });
+
+    // Render ke canvas
+    var canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    var ctx = canvas.getContext('2d');
+    var imgData = ctx.createImageData(width, height);
+    var spp = rasters.length / (width * height);
+    for (var px = 0; px < width * height; px++) {
+      var base = px * spp;
+      imgData.data[px * 4]     = spp >= 3 ? rasters[base]   : rasters[base];
+      imgData.data[px * 4 + 1] = spp >= 3 ? rasters[base+1] : rasters[base];
+      imgData.data[px * 4 + 2] = spp >= 3 ? rasters[base+2] : rasters[base];
+      imgData.data[px * 4 + 3] = spp === 4 ? rasters[base+3] : 255;
+    }
+    ctx.putImageData(imgData, 0, 0);
+    var dataUrl = canvas.toDataURL('image/png');
+
+    var leafBounds = [[boundsData.minLat, boundsData.minLon], [boundsData.maxLat, boundsData.maxLon]];
+    if (imageOverlay) imageOverlay.remove();
+    imageOverlay = L.imageOverlay(dataUrl, leafBounds).addTo(map);
+    map.fitBounds(leafBounds);
+    setStatus('Peta: ' + (name || 'Aktif'));
+
+    // Kirim bounds ke React Native
+    var msg = JSON.stringify({ type:'BOUNDS_EXTRACTED', bounds: boundsData });
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+  } catch(err) {
+    setStatus('Error: ' + err.message);
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(
+      JSON.stringify({ type:'LOAD_ERROR', message: err.message })
+    );
+  }
+}
+
+function updatePosition(lat, lon) {
+  if (posMarker) posMarker.remove();
+  posMarker = L.marker([lat, lon], {
+    icon: L.divIcon({ className:'', html:'<div id="pos-marker"></div>', iconSize:[16,16], iconAnchor:[8,8] })
+  }).addTo(map);
+}
+
+// Fallback: tampilkan OpenStreetMap jika belum ada GeoTIFF
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'', maxZoom:19, opacity:0.3,
+}).addTo(map);
+
+map.setView([-4.2, 122.35], 10);
+setStatus('Siap — Import peta GeoTIFF dari menu');
+</script>
+</body>
+</html>
