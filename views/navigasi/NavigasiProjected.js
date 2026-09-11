@@ -193,7 +193,7 @@ const NavigasiProjected = ({ navigation }) => {
         {/* Kompas */}
         {target && currentPos && (
           <View style={styles.card}>
-            <CompassView heading={heading} bearing={targetBearing} distance={distToTarget ?? parseFloat(jarak) || 0} />
+            <CompassView heading={heading} bearing={targetBearing} distance={distToTarget ?? (parseFloat(jarak) || 0)} />
           </View>
         )}
 
