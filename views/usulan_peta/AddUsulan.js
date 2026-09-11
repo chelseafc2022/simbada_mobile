@@ -291,38 +291,76 @@ const AddUsulan = ({navigation}) => {
 
       const handleFileUpload = async () => {
         try {
-            // Membatasi ke PDF dan gambar saja
+            // Membatasi hanya Gambar, PDF, Word (.doc, .docx), dan Excel (.xls, .xlsx)
             const result = await DocumentPicker.pick({
-                type: [DocumentPicker.types.images, DocumentPicker.types.pdf], // Hanya PDF dan gambar
+                type: [
+                    DocumentPicker.types.images,
+                    DocumentPicker.types.pdf,
+                    DocumentPicker.types.doc,
+                    DocumentPicker.types.docx,
+                    DocumentPicker.types.xls,
+                    DocumentPicker.types.xlsx,
+                ],
             });
     
-            // Jika berhasil
-            console.log('File yang dipilih:', result);
-            console.log('Form saat ini:', {
-                ...form,
-                file: result[0],
-            });
-            SET_FORM((prevForm) => ({
-                ...prevForm,
-                file: result[0], // Simpan file di form
-            }));
-            console.log('File yang dipilih:', result);
-            setFileName(result[0].name); // Menyimpan nama file
+            if (result && result.length > 0) {
+                const pickedFile = result[0];
+                const allowedExtensions = /\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx)$/i;
+                if (pickedFile.name && !allowedExtensions.test(pickedFile.name)) {
+                    Alert.alert(
+                        'Format Berkas Tidak Didukung',
+                        'Hanya berkas Gambar (JPG, PNG), PDF, Word (.doc, .docx), atau Excel (.xls, .xlsx) yang diperbolehkan.'
+                    );
+                    return;
+                }
+
+                SET_FORM((prevForm) => ({
+                    ...prevForm,
+                    file: pickedFile,
+                }));
+                setFileName(pickedFile.name);
+            }
         } catch (err) {
-            // Jika pengguna membatalkan pemilihan file
             if (DocumentPicker.isCancel(err)) {
                 console.log('Pemilihan file dibatalkan oleh pengguna.');
             } else {
                 console.error('Error uploading file:', err);
+                Alert.alert('Error', 'Gagal memilih berkas: ' + (err.message || 'Terjadi kesalahan'));
             }
         }
     };
 
+    const handleRemoveFile = () => {
+        SET_FORM((prevForm) => ({
+            ...prevForm,
+            file: null,
+        }));
+        setFileName(null);
+    };
+
     const handleSubmit = async () => {
         try {
-            // Validasi input
+            // Validasi input identitas & wilayah wajib
             if (!form.nik || !form.nama || !form.alamat || !form.kecamatan_id || !form.des_kel_id) {
-                Alert.alert('Validation Error', 'Please fill all required fields.');
+                Alert.alert('Data Belum Lengkap', 'Harap isi semua kolom identitas dan wilayah yang diperlukan.');
+                return;
+            }
+
+            // Validasi titik lokasi wajib
+            if (!form.lokasi || form.lokasi.length === 0) {
+                Alert.alert(
+                    'Titik Pemetaan Belum Ada',
+                    'Silakan lakukan pemetaan titik koordinat (Polygon atau Polyline) terlebih dahulu.'
+                );
+                return;
+            }
+
+            // Validasi berkas dokumen wajib (Wajib Gambar, PDF, Word, atau Excel)
+            if (!form.file) {
+                Alert.alert(
+                    'Berkas Pengajuan Wajib Diunggah',
+                    'Silakan unggah dokumen pendukung (Gambar, PDF, Word, atau Excel) terlebih dahulu sebelum mengajukan.'
+                );
                 return;
             }
 
@@ -392,7 +430,23 @@ const AddUsulan = ({navigation}) => {
             formData.append("catatan", form.catatan);
             formData.append("no_telp", form.no_telp);
             formData.append("status_pengajuan", form.status_pengajuan || 1); // Default ke status 1
-            formData.append("file", form.file); // Pastikan file adalah objek hasil DocumentPicker
+            if (form.file) {
+                formData.append("file", form.file); // Pastikan file adalah objek hasil DocumentPicker
+            }
+
+            // Tambahkan file foto patok untuk setiap titik koordinat ke FormData
+            if (Array.isArray(form.lokasi)) {
+                form.lokasi.forEach((item, index) => {
+                    if (item.photo_uri) {
+                        formData.append(`foto_patok_${index}`, {
+                            uri: item.photo_uri,
+                            type: 'image/jpeg',
+                            name: `patok_${index}_${Date.now()}.jpg`,
+                        });
+                    }
+                });
+            }
+
             formData.append("lokasi", JSON.stringify(form.lokasi)); // Konversi lokasi menjadi string JSON
             formData.append("marker", JSON.stringify(calculateCentroid(form.lokasi))); // Hitung centroid dan tambahkan ke form
             formData.append("tipe", form.tipe || "polygon"); // ✅ WAJIB PASTIKAN
@@ -692,10 +746,37 @@ const AddUsulan = ({navigation}) => {
                         </View>
                     )}
 
-                    <Text style={[localStyles.inputLabel, { marginTop: 15 }]}>Dokumen / File Pendukung</Text>
-                    <TouchableOpacity onPress={handleFileUpload} style={localStyles.docButton}>
-                        <Text style={localStyles.docButtonText}>{fileName || '📎 Pilih Dokumen'}</Text>
-                    </TouchableOpacity>
+                    <Text style={[localStyles.inputLabel, { marginTop: 15 }]}>
+                        Dokumen Pendukung <Text style={{ color: '#D32F2F', fontWeight: 'bold' }}>* (Wajib)</Text>
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>
+                        Format yang didukung: Gambar (JPG, PNG), PDF, Word (.doc, .docx), atau Excel (.xls, .xlsx)
+                    </Text>
+
+                    {form.file ? (
+                        <View style={localStyles.fileUploadedContainer}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                                <Text style={{ fontSize: 24, marginRight: 8 }}>
+                                    {fileName && (
+                                        fileName.toLowerCase().endsWith('.pdf') ? '📄' : 
+                                        (fileName.toLowerCase().endsWith('.doc') || fileName.toLowerCase().endsWith('.docx')) ? '📝' : 
+                                        (fileName.toLowerCase().endsWith('.xls') || fileName.toLowerCase().endsWith('.xlsx')) ? '📊' : '🖼️'
+                                    )}
+                                </Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={localStyles.fileNameText} numberOfLines={1}>{fileName}</Text>
+                                    <Text style={{ fontSize: 11, color: '#2E7D32', fontWeight: '600' }}>✓ Berkas siap diunggah</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={handleRemoveFile} style={localStyles.removeFileButton}>
+                                <Text style={localStyles.removeFileText}>Ganti</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <TouchableOpacity onPress={handleFileUpload} style={localStyles.docButton}>
+                            <Text style={localStyles.docButtonText}>📎 Pilih Dokumen (Gambar, PDF, Word, Excel)</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* TOMBOL SIMPAN */}
@@ -813,6 +894,35 @@ const localStyles = StyleSheet.create({
         color: '#208DC0',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    fileUploadedContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#E8F5E9',
+        borderWidth: 1,
+        borderColor: '#A5D6A7',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    fileNameText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#1B5E20',
+    },
+    removeFileButton: {
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A5D6A7',
+    },
+    removeFileText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#2E7D32',
     },
     submitButton: {
         backgroundColor: '#208DC0',

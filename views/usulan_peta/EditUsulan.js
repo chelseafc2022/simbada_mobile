@@ -31,10 +31,28 @@ const EditUsulan = ({ route, navigation }) => {
     const handleFileUpload = async () => {
         try {
             const result = await DocumentPicker.pick({
-                type: [DocumentPicker.types.images, DocumentPicker.types.pdf],
+                type: [
+                    DocumentPicker.types.images,
+                    DocumentPicker.types.pdf,
+                    DocumentPicker.types.doc,
+                    DocumentPicker.types.docx,
+                    DocumentPicker.types.xls,
+                    DocumentPicker.types.xlsx,
+                ],
             });
-            setForm(prevForm => ({ ...prevForm, file: result[0] }));
-            setFileName(result[0].name); // Menyimpan nama file
+            if (result && result.length > 0) {
+                const pickedFile = result[0];
+                const allowedExtensions = /\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx)$/i;
+                if (pickedFile.name && !allowedExtensions.test(pickedFile.name)) {
+                    Alert.alert(
+                        'Format Berkas Tidak Didukung',
+                        'Hanya berkas Gambar (JPG, PNG), PDF, Word (.doc, .docx), atau Excel (.xls, .xlsx) yang diperbolehkan.'
+                    );
+                    return;
+                }
+                setForm(prevForm => ({ ...prevForm, file: pickedFile }));
+                setFileName(pickedFile.name);
+            }
         } catch (err) {
             if (!DocumentPicker.isCancel(err)) {
                 console.error('Error picking file:', err);

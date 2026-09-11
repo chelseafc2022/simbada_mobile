@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import styles from '../assets/style'
-import { View, Text, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Image, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Image, FlatList, Modal } from 'react-native';
 import FastImage from "react-native-fast-image";
 import TabBar from '../components/TabBar'
 import Geolocation from '@react-native-community/geolocation'; 
@@ -9,20 +9,70 @@ import MapView, { Marker, Polygon, Circle, Polyline } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Komponen Kartu yang dioptimasi agar tidak re-render massal
-const CoordinateCard = React.memo(({ find, index, updateLokasi, takePhotoForPoint, localStyles }) => {
+const CoordinateCard = React.memo(({ find, index, updateLokasi, takePhotoForPoint, previewPhoto, localStyles }) => {
     return (
         <View style={localStyles.card}>
             <View style={localStyles.cardHeader}>
-                <Text style={localStyles.cardTitle}>📌 Titik {index + 1}</Text>
-                {find.photo_uri ? (
-                    <Text style={{fontSize: 11, color: '#4CAF50'}}>📸</Text>
-                ) : (
-                    <TouchableOpacity onPress={() => takePhotoForPoint(index)} style={{backgroundColor: '#FF9800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4}}>
-                        <Text style={{fontSize: 10, color: '#fff', fontWeight: 'bold'}}>📷 Ambil Foto</Text>
-                    </TouchableOpacity>
-                )}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={localStyles.cardTitle}>📌 Titik {index + 1}</Text>
+                    {find.photo_uri ? (
+                        <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
+                            <Text style={{ fontSize: 10, color: '#2E7D32', fontWeight: 'bold' }}>✓ Ada Foto</Text>
+                        </View>
+                    ) : (
+                        <View style={{ backgroundColor: '#FFF3E0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
+                            <Text style={{ fontSize: 10, color: '#E65100', fontWeight: 'bold' }}>⚠️ Wajib Foto</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Tombol Aksi Foto di Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {find.photo_uri ? (
+                        <View style={{ flexDirection: 'row' }}>
+                            <TouchableOpacity 
+                                onPress={() => previewPhoto(find.photo_uri, index + 1)} 
+                                style={{ backgroundColor: '#0288D1', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginRight: 6, flexDirection: 'row', alignItems: 'center' }}
+                            >
+                                <Text style={{ fontSize: 10, color: '#fff', fontWeight: 'bold' }}>👁️ Lihat</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => takePhotoForPoint(index)} 
+                                style={{ backgroundColor: '#FF9800', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}
+                            >
+                                <Text style={{ fontSize: 10, color: '#fff', fontWeight: 'bold' }}>🔄 Ambil Ulang</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <TouchableOpacity 
+                            onPress={() => takePhotoForPoint(index)} 
+                            style={{ backgroundColor: '#FF9800', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}
+                        >
+                            <Text style={{ fontSize: 10, color: '#fff', fontWeight: 'bold' }}>📷 Ambil Foto</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+
+            {/* Thumbnail Preview di dalam card jika ada foto */}
+            {find.photo_uri && (
+                <TouchableOpacity 
+                    onPress={() => previewPhoto(find.photo_uri, index + 1)}
+                    style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F9FF', padding: 6, borderRadius: 6, marginVertical: 6, borderWidth: 1, borderColor: '#BAE6FD' }}
+                >
+                    <Image 
+                        source={{ uri: find.photo_uri }} 
+                        style={{ width: 46, height: 46, borderRadius: 4, backgroundColor: '#E2E8F0' }} 
+                    />
+                    <View style={{ marginLeft: 10, flex: 1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#0369A1' }}>Foto Patok Tersimpan</Text>
+                        <Text style={{ fontSize: 9, color: '#0284C7' }}>Ketuk untuk melihat foto penuh</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, marginRight: 4 }}>🔍</Text>
+                </TouchableOpacity>
+            )}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
                 <View style={{ width: '48%' }}>
                     <Text style={localStyles.label}>Lat</Text>
                     <TextInput
@@ -59,6 +109,16 @@ const MetodeText = ({navigation, route}) => {
     const [isMapReady, setIsMapReady] = useState(false); // Fix marker rendering
     const [currentLocation, setCurrentLocation] = useState(null); // State untuk lokasi terkini
     const [userLocation, setUserLocation] = useState(null);
+    const [previewModalVisible, setPreviewModalVisible] = useState(false);
+    const [previewImageUri, setPreviewImageUri] = useState(null);
+    const [previewPointIndex, setPreviewPointIndex] = useState(null);
+
+    const handlePreviewPhoto = (uri, pointIndex) => {
+        setPreviewImageUri(uri);
+        setPreviewPointIndex(pointIndex);
+        setPreviewModalVisible(true);
+    };
+
     const [region, setRegion] = useState({
       latitude: -4.3332916, 
       longitude: 122.2788887,
@@ -238,7 +298,10 @@ const MetodeText = ({navigation, route}) => {
         });
     };
 
+        const isLoaded = useRef(false);
+
         const saveDataToAsyncStorage = async () => {
+            if (!isLoaded.current) return;
             try {
                 const dataToSave = {
                     lokasi,
@@ -250,18 +313,27 @@ const MetodeText = ({navigation, route}) => {
             }
         };
 
-
-
+        useEffect(() => {
+            if (isLoaded.current) {
+                saveDataToAsyncStorage(); // Simpan data ke AsyncStorage setiap kali lokasi berubah
+            }
+        }, [lokasi, polygonCoords]);
 
         useEffect(() => {
-            saveDataToAsyncStorage(); // Simpan data ke AsyncStorage setiap kali lokasi berubah
-        }, [lokasi]);
-
-        useEffect(() => {
-            const loadData = async () => {
-                await loadDataFromAsyncStorage(); // Muat data dari AsyncStorage
+            const initData = async () => {
+                if (lokasiAwal && lokasiAwal.length > 0) {
+                    setLokasi(lokasiAwal);
+                    setPolygonCoords(lokasiAwal.map(p => ({
+                        latitude: parseFloat(p.lat) || 0,
+                        longitude: parseFloat(p.lng) || 0
+                    })));
+                    isLoaded.current = true;
+                } else {
+                    await loadDataFromAsyncStorage();
+                    isLoaded.current = true;
+                }
             };
-            loadData();
+            initData();
         }, []);
 
         const loadDataFromAsyncStorage = async () => {
@@ -269,8 +341,10 @@ const MetodeText = ({navigation, route}) => {
                 const savedData = await AsyncStorage.getItem('lokasiData');
                 if (savedData !== null && isMounted.current) {
                     const parsedData = JSON.parse(savedData);
-                    setLokasi(parsedData.lokasi || []);
-                    setPolygonCoords(parsedData.polygonCoords || []); // Perbarui polygonCoords
+                    if (parsedData.lokasi && parsedData.lokasi.length > 0) {
+                        setLokasi(parsedData.lokasi);
+                        setPolygonCoords(parsedData.polygonCoords || []);
+                    }
                 }
             } catch (error) {
                 console.error('Error mengambil data dari AsyncStorage:', error);
@@ -460,6 +534,7 @@ const MetodeText = ({navigation, route}) => {
                             index={index} 
                             updateLokasi={updateLokasi} 
                             takePhotoForPoint={takePhotoForPoint}
+                            previewPhoto={handlePreviewPhoto}
                             localStyles={localStyles} 
                         />
                     )}
@@ -473,6 +548,52 @@ const MetodeText = ({navigation, route}) => {
                     <Text style={localStyles.submitBtnText}>💾 Simpan & Kirim Lokasi</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Modal Preview Foto Penuh & Ambil Ulang */}
+            <Modal
+                visible={previewModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setPreviewModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                    {/* Header Modal */}
+                    <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 }}>
+                        <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>
+                            📷 Foto Patok Titik {previewPointIndex}
+                        </Text>
+                        <TouchableOpacity 
+                            onPress={() => setPreviewModalVisible(false)}
+                            style={{ backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 }}
+                        >
+                            <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>✕ Tutup</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Gambar Full Preview */}
+                    {previewImageUri ? (
+                        <Image
+                            source={{ uri: previewImageUri }}
+                            style={{ width: '100%', height: '70%', borderRadius: 8, backgroundColor: '#1e293b' }}
+                            resizeMode="contain"
+                        />
+                    ) : null}
+
+                    {/* Tombol Ambil Ulang Foto di dalam Modal */}
+                    <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                const idx = (previewPointIndex || 1) - 1;
+                                setPreviewModalVisible(false);
+                                takePhotoForPoint(idx);
+                            }}
+                            style={{ backgroundColor: '#FF9800', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', elevation: 4 }}
+                        >
+                            <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: 'bold' }}>🔄 Ambil Ulang Foto</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             <TabBar />
         </View>

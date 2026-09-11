@@ -191,10 +191,18 @@ const Login = ({navigation}) => {
             SET_ERROR_STATUS(true);
             SET_ERROR_MESSAGE('No internet connection. Please check your network and try again.');
             Alert.alert('Connection Failed', 'No internet connection. Please check your network and try again.');
-
             return;
         }
 
+        if (!form.username || !form.password) {
+            SET_LOADING('false');
+            SET_CHECK_LOAD(false);
+            SET_ERROR_STATUS(true);
+            SET_ERROR_MESSAGE('Silakan masukkan username dan password.');
+            return;
+        }
+
+    console.log("LOGIN ATTEMPT URL:", URL?.LOGIN_URL, "form:", form);
     fetch(URL.LOGIN_URL, {
         method: "POST",
         headers: {
@@ -208,6 +216,7 @@ const Login = ({navigation}) => {
             })
         })
     .then((response)=>{
+        console.log("LOGIN RESPONSE STATUS:", response.status, response.ok);
         SET_LOADING('false')
         if (response.ok) {
               SET_CHECK_LOAD(false);
@@ -222,6 +231,7 @@ const Login = ({navigation}) => {
       })
 
       .then(async (res_data) => {
+          console.log("LOGIN SUCCESS:", res_data);
           await saveDataToken('TOKEN', res_data.token)
           await saveDataToken('PROFILE', JSON.stringify(res_data.profile))
           await AsyncStorage.setItem('LAST_LOGIN', Date.now().toString()); /// coba implementasi login
@@ -246,6 +256,7 @@ const Login = ({navigation}) => {
 
       })
       .catch(error => {
+          console.log("LOGIN CATCH ERROR FULL:", error, error.name, error.message, error.cause);
           SET_LOADING('false')
           SET_ERROR_MESSAGE(error.message)
           SET_ERROR_STATUS(true);
@@ -357,11 +368,14 @@ const checkToken = async () => {
       await LIB.GetStorage();
       checkToken();
 
-      // await LIB.GetStorage();
       const storeUsername = await AsyncStorage.getItem('USERNAME')
       const storePassword = await AsyncStorage.getItem('PASSWORD')
-      constchangeInput(storeUsername, 'username')
-      constchangeInput(storePassword, 'password')
+      if (storeUsername) {
+          constchangeInput(storeUsername, 'username')
+      }
+      if (storePassword) {
+          constchangeInput(storePassword, 'password')
+      }
   }
 
      
@@ -419,7 +433,7 @@ const checkToken = async () => {
                     placeholderTextColor="#94A3B8"
                     placeholder="Masukkan Username"
                     onChangeText={text => constchangeInput(text, 'username')}
-                    value={form.username}
+                    value={form.username || ''}
                     autoCapitalize="none"
                   />
                 </View>
@@ -434,7 +448,7 @@ const checkToken = async () => {
                     placeholder="Masukkan Password"
                     secureTextEntry={!showPassword}
                     onChangeText={text => constchangeInput(text, 'password')}
-                    value={form.password}
+                    value={form.password || ''}
                   />
                   <TouchableOpacity 
                     onPress={() => setShowPassword(!showPassword)} 
