@@ -12,7 +12,7 @@ import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
-import { v4 as uuidv4 } from 'uuid';
+import { uuidv4 } from '../library/uuid';
 import LinearGradient from 'react-native-linear-gradient';
 import moment from 'moment';
 

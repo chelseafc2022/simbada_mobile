@@ -150,7 +150,7 @@ const PlacemarkForm = ({ navigation, route }) => {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 60 }}>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.back}>‹ Batal</Text>
