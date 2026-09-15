@@ -1,61 +1,230 @@
-// import pustaka
+// views/home/Home.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
   StatusBar,
-  StyleSheet as RNStyleSheet,
+  StyleSheet,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
-import MapView, { Polygon } from 'react-native-maps';
 import { useSelector } from 'react-redux';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
-import TabBar from '../components/TabBar';
-import LinearGradient from 'react-native-linear-gradient';
+import Geolocation from '@react-native-community/geolocation';
 import * as turf from '@turf/turf';
 
-// Komponen Utama Home
+// Modular Home V2 Components (Modern Government GIS + Field Survey)
+import HomeHeader from './components/HomeHeader';
+import ConnectionStatus from './components/ConnectionStatus';
+import SearchBar from './components/SearchBar';
+import MapPreview from './components/MapPreview';
+import RegionSummary from './components/RegionSummary';
+import PrimarySurveyAction from './components/PrimarySurveyAction';
+import QuickActions from './components/QuickActions';
+import SyncStatus from './components/SyncStatus';
+import RecentActivity from './components/RecentActivity';
+import TabBar from '../components/TabBar';
+
+/**
+ * HOME SIMBADA MOBILE V2
+ * Sistem Informasi Batas Desa — Kabupaten Konawe Selatan
+ * Filosofi: MAP-FIRST | ACTION-FIRST | OFFLINE-FIRST | MOBILE-FIRST
+ */
 const Home = ({ navigation }) => {
-  const Route = (routex) => {
-    navigation.navigate(routex);
+  const Route = (routeName) => {
+    navigation.navigate(routeName);
   };
 
-  const [selectedKecamatan, setSelectedKecamatan] = useState('');
-  const [kecamatan, setKecamatan] = useState([]);
-  const [petadasar, setPetadasar] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Redux Store State
   const URL = useSelector((state) => state.URL);
   const TOKEN = useSelector((state) => state.TOKEN);
-  const PROFILE = useSelector((state) => state.PROFILE);
   const IS_ONLINE = useSelector((state) => state.IS_ONLINE);
   const NOTIFICATION_COUNT = useSelector((state) => state.NOTIFICATION_COUNT);
   const OFFLINE_QUEUE_COUNT = useSelector((state) => state.OFFLINE_QUEUE_COUNT);
   const isFocused = useIsFocused();
-  const [DATA_FINAL, SET_DATA_FINAL] = useState(0);
-  const [isPolygonLoading, setIsPolygonLoading] = useState(false);
+
+  // Local GIS & Region State
+  const [selectedKecamatan, setSelectedKecamatan] = useState('');
+  const [kecamatan, setKecamatan] = useState([]);
+  const [petadasar, setPetadasar] = useState([]);
   const [desa, setDesa] = useState([]);
+  const [DATA_FINAL, SET_DATA_FINAL] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPolygonLoading, setIsPolygonLoading] = useState(false);
+
+  // GPS Sensor & Telemetri State
+  const [isGpsActive, setIsGpsActive] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const watchIdRef = useRef(null);
   const mapRef = useRef(null);
 
+  // Cleanup on screen blur
   useFocusEffect(
     useCallback(() => {
       return () => {
-        setDesa([]);
-        setPetadasar([]);
-        SET_DATA_FINAL(0);
-        setSelectedKecamatan('');
+        // preserve selected state if user returns, but stop active watchers if needed
       };
     }, [])
   );
 
+  // ================================================================
+  // 1. GPS & LOCATION TRACKING
+  // ================================================================
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Izin Akses Lokasi GPS',
+            message:
+              'SIMBADA memerlukan akses GPS untuk pemetaan posisi di lapangan dan survei batas desa.',
+            buttonNeutral: 'Nanti',
+            buttonNegative: 'Tolak',
+            buttonPositive: 'Izinkan',
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const startGpsTracking = async () => {
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      setIsGpsActive(false);
+      return;
+    }
+
+    Geolocation.getCurrentPosition(
+      (pos) => {
+        setIsGpsActive(true);
+        setUserLocation({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (error) => {
+        console.log('GPS error:', error.message);
+        setIsGpsActive(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+
+    if (watchIdRef.current !== null) {
+      Geolocation.clearWatch(watchIdRef.current);
+    }
+
+    watchIdRef.current = Geolocation.watchPosition(
+      (pos) => {
+        setIsGpsActive(true);
+        setUserLocation({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (error) => {
+        console.log('GPS watch error:', error.message);
+        setIsGpsActive(false);
+      },
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 5,
+        interval: 5000,
+        fastestInterval: 2000,
+      }
+    );
+  };
+
+  useEffect(() => {
+    if (isFocused) {
+      startGpsTracking();
+    }
+    return () => {
+      if (watchIdRef.current !== null) {
+        Geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [isFocused]);
+
+  // Center Map to User GPS Location
+  const handleCenterLocation = () => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        800
+      );
+    } else {
+      Geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          };
+          setUserLocation(loc);
+          setIsGpsActive(true);
+          if (mapRef.current) {
+            mapRef.current.animateToRegion(
+              {
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+              },
+              800
+            );
+          }
+        },
+        () => {
+          Alert.alert(
+            'GPS Belum Aktif',
+            'Pastikan GPS perangkat Anda telah diaktifkan untuk melihat lokasi saat ini.'
+          );
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (mapRef.current && mapRef.current.getCamera) {
+      mapRef.current.getCamera().then((camera) => {
+        if (camera && camera.zoom) {
+          mapRef.current.animateCamera({ zoom: camera.zoom + 1 });
+        }
+      });
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapRef.current && mapRef.current.getCamera) {
+      mapRef.current.getCamera().then((camera) => {
+        if (camera && camera.zoom) {
+          mapRef.current.animateCamera({ zoom: Math.max(camera.zoom - 1, 1) });
+        }
+      });
+    }
+  };
+
+  // ================================================================
+  // 2. DATA CALCULATION & API INTEGRATION
+  // ================================================================
   const calculateArea = (coordinates) => {
     if (!coordinates || coordinates.length < 3) return 0;
-
     try {
       const geoJSONCoordinates = coordinates
         .map((coord) => {
@@ -77,6 +246,7 @@ const Home = ({ navigation }) => {
     }
   };
 
+  // Fetch Kecamatan List
   const getKecamatan = async () => {
     if (!TOKEN) return;
     try {
@@ -108,16 +278,38 @@ const Home = ({ navigation }) => {
       }
       setKecamatan(tampung);
     } catch (error) {
-      Alert.alert('Error', 'Gagal mengambil data kecamatan');
-      console.error(error);
+      console.error('Gagal mengambil data kecamatan:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Fetch Peta Final (Data Disahkan)
+  const getPetafinal = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(URL.URL_HOME + 'peta_final', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `kikensbatara ${TOKEN}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data && data.data && data.data[0]) {
+        SET_DATA_FINAL(data.data[0].jumlah_peta_final);
+      }
+    } catch (error) {
+      console.error('Error fetching peta final:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch Desa by Selected Kecamatan
   const getDesaByKecamatan = async () => {
     if (!selectedKecamatan) return;
-
     try {
       const response = await fetch(URL.URL_KECAMATAN + 'petadasar', {
         method: 'POST',
@@ -129,7 +321,6 @@ const Home = ({ navigation }) => {
       });
 
       const result = await response.json();
-
       if (Array.isArray(result) && result.length > 0) {
         const processedDesa = result.map((item) => {
           let area = '0';
@@ -147,44 +338,12 @@ const Home = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    if (selectedKecamatan) {
-      getDesaByKecamatan();
-      getPetadasar();
-    }
-  }, [selectedKecamatan]);
-
-  const getPetafinal = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(URL.URL_HOME + 'peta_final', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `kikensbatara ${TOKEN}`,
-        },
-      });
-
-      const result = await response.json();
-      if (result && result[0]) {
-        SET_DATA_FINAL(result[0]);
-      }
-    } catch (error) {
-      console.error('Fetch Error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Fetch Polygons for Map
   const getPetadasar = async () => {
-    if (!selectedKecamatan) {
-      setIsPolygonLoading(false);
-      return;
-    }
-    setIsPolygonLoading(true);
-    setPetadasar([]);
+    if (!selectedKecamatan) return;
     try {
-      const response = await fetch(`${URL.URL_HOME}petadasar`, {
+      setIsPolygonLoading(true);
+      const response = await fetch(URL.URL_KECAMATAN + 'petadasar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,816 +353,222 @@ const Home = ({ navigation }) => {
       });
 
       const data = await response.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
-
-      setPetadasar(
-        data.map((polygon) => ({
+      if (Array.isArray(data)) {
+        const formattedPolygons = data.map((polygon) => ({
           ...polygon,
           lokasi: {
             ...polygon.lokasi,
-            coordinat: polygon.lokasi?.coordinat
-              ? polygon.lokasi.coordinat.map(({ lat, lng }) => ({
-                  latitude: parseFloat(lat),
-                  longitude: parseFloat(lng),
-                }))
+            coordinat: Array.isArray(polygon.lokasi?.coordinat)
+              ? polygon.lokasi.coordinat
+                  .filter(
+                    (c) =>
+                      c &&
+                      c.lat != null &&
+                      c.lng != null &&
+                      !isNaN(parseFloat(c.lat)) &&
+                      !isNaN(parseFloat(c.lng))
+                  )
+                  .map((c) => ({
+                    latitude: parseFloat(c.lat),
+                    longitude: parseFloat(c.lng),
+                  }))
               : [],
           },
-        }))
-      );
+        }));
+        setPetadasar(formattedPolygons);
+        if (formattedPolygons.length > 0) {
+          fitAllPolygons(formattedPolygons);
+        }
+      }
     } catch (error) {
-      Alert.alert('Error', 'Gagal mengambil data peta dasar');
+      Alert.alert('Error', 'Gagal memuat koordinat polygon');
       console.error(error);
     } finally {
       setIsPolygonLoading(false);
     }
   };
 
+  const fitAllPolygons = (polygons) => {
+    if (!polygons || polygons.length === 0 || !mapRef.current) return;
+
+    let minLat = 90;
+    let maxLat = -90;
+    let minLng = 180;
+    let maxLng = -180;
+    let hasValidCoordinates = false;
+
+    polygons.forEach((polygon) => {
+      if (Array.isArray(polygon.lokasi?.coordinat)) {
+        polygon.lokasi.coordinat.forEach((coord) => {
+          const lat =
+            coord.latitude != null ? coord.latitude : parseFloat(coord.lat);
+          const lng =
+            coord.longitude != null ? coord.longitude : parseFloat(coord.lng);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
+            minLng = Math.min(minLng, lng);
+            maxLng = Math.max(maxLng, lng);
+            hasValidCoordinates = true;
+          }
+        });
+      }
+    });
+
+    if (hasValidCoordinates) {
+      const midLat = (minLat + maxLat) / 2;
+      const midLng = (minLng + maxLng) / 2;
+      const deltaLat = Math.max((maxLat - minLat) * 1.3, 0.05);
+      const deltaLng = Math.max((maxLng - minLng) * 1.3, 0.05);
+
+      mapRef.current.animateToRegion(
+        {
+          latitude: midLat,
+          longitude: midLng,
+          latitudeDelta: deltaLat,
+          longitudeDelta: deltaLng,
+        },
+        1000
+      );
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      await Promise.all([getPetafinal(), getKecamatan(), getPetadasar()]);
-    };
-    fetchData();
+    if (selectedKecamatan) {
+      getDesaByKecamatan();
+      getPetadasar();
+    }
+  }, [selectedKecamatan]);
+
+  useEffect(() => {
+    if (isFocused) {
+      getKecamatan();
+      getPetafinal();
+    }
   }, [isFocused]);
 
-  useEffect(() => {
-    if (petadasar.length > 0 && mapRef.current) {
-      const allCoords = [];
-      petadasar.forEach((polygon) => {
-        if (polygon.lokasi?.coordinat) {
-          allCoords.push(...polygon.lokasi.coordinat);
-        }
-      });
-      if (allCoords.length > 0) {
-        setTimeout(() => {
-          mapRef.current?.fitToCoordinates(allCoords, {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-            animated: true,
-          });
-        }, 500);
-      }
-    }
-  }, [petadasar]);
+  // Selected Kecamatan Name
+  const currentKecamatanObj = kecamatan.find(
+    (k) => k.kecamatan_id === selectedKecamatan
+  );
+  const currentKecamatanName = currentKecamatanObj
+    ? currentKecamatanObj.nama_kecamatan
+    : '';
 
   return (
-    <View style={ui.screenContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0C4A6E" />
+    <View style={styles.screenContainer}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* ======================================================== */}
-      {/* 1. HEADER APPBAR — LinearGradient #0C4A6E -> #0284C7     */}
-      {/* ======================================================== */}
-      <LinearGradient
-        colors={['#0C4A6E', '#0284C7']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={ui.appBar}
-      >
-        <View style={ui.appBarTitleContainer}>
-          <Text style={ui.appBarTitle}>SIMBADA</Text>
-          <Text style={ui.appBarSubtitle}>Sistem Informasi Batas Desa</Text>
-        </View>
+      {/* 1. HEADER (Compact Modern Government GIS) */}
+      <HomeHeader
+        notificationCount={NOTIFICATION_COUNT}
+        onNotificationPress={() => Route('NotificationList')}
+        onProfilePress={() => Route('User')}
+      />
 
-        <View style={ui.appBarActions}>
-          {/* Lonceng Notifikasi */}
-          <TouchableOpacity
-            onPress={() => Route('NotificationList')}
-            style={ui.actionIconBtn}
-            activeOpacity={0.8}
-          >
-            <Text style={{ fontSize: 20 }}>🔔</Text>
-            {NOTIFICATION_COUNT > 0 && (
-              <View style={ui.notifBadge}>
-                <Text style={ui.notifBadgeText}>
-                  {NOTIFICATION_COUNT > 9 ? '9+' : NOTIFICATION_COUNT}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+      {/* 2. CONNECTION & GPS STATUS INDICATOR */}
+      <ConnectionStatus isOnline={IS_ONLINE} isGpsActive={isGpsActive} />
 
-          {/* Shortcut Peta Final */}
-          <TouchableOpacity
-            onPress={() => Route('PetaFinal')}
-            style={ui.actionIconBtn}
-            activeOpacity={0.8}
-          >
-            <FastImage
-              style={{ width: 22, height: 22 }}
-              source={require('../assets/img/gis_pirate-map.png')}
-              resizeMode={FastImage.resizeMode.contain}
-              tintColor="#FFFFFF"
-            />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
-      {/* ======================================================== */}
-      {/* KONTEN UTAMA SCROLLVIEW                                   */}
-      {/* ======================================================== */}
+      {/* MAIN VERTICAL SCROLL CONTENT */}
       <ScrollView
-        style={ui.scrollView}
-        contentContainerStyle={ui.scrollContent}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ======================================================== */}
-        {/* A. BANNER MODE OFFLINE                                   */}
-        {/* ======================================================== */}
-        {IS_ONLINE === false && (
-          <LinearGradient
-            colors={['#D97706', '#B45309']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={ui.offlineBanner}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={ui.offlineIcon}>📴</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={ui.offlineTitle}>Mode Offline — Fitur Terbatas</Text>
-                {OFFLINE_QUEUE_COUNT > 0 ? (
-                  <TouchableOpacity
-                    onPress={() => Route('OfflineSync')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={ui.offlineSyncLink}>
-                      📤 {OFFLINE_QUEUE_COUNT} data usulan menunggu sinkronisasi →
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={ui.offlineSubtitle}>
-                    Koneksi internet tidak terdeteksi
-                  </Text>
-                )}
-              </View>
-            </View>
-          </LinearGradient>
-        )}
+        {/* 3. SEARCH BAR (Kecamatan, Desa, Wilayah) */}
+        <SearchBar
+          kecamatanList={kecamatan}
+          selectedKecamatan={selectedKecamatan}
+          onSelectKecamatan={(id) => setSelectedKecamatan(id)}
+        />
 
-        {/* ======================================================== */}
-        {/* B. PANEL AKSES CEPAT (6 SHORTCUT, 3x2 GRID)              */}
-        {/* ======================================================== */}
-        <View style={ui.cardContainer}>
-          <View style={ui.cardHeaderRow}>
-            <Text style={ui.sectionTitle}>⚡ AKSES CEPAT</Text>
-            <View style={ui.pillTag}>
-              <Text style={ui.pillTagText}>Fitur Lapangan</Text>
-            </View>
-          </View>
+        {/* 4. MAP PREVIEW (Dominan di Atas — Map-First) */}
+        <MapPreview
+          mapRef={mapRef}
+          polygons={petadasar}
+          isLoading={isPolygonLoading}
+          selectedKecamatanName={currentKecamatanName}
+          userLocation={userLocation}
+          onCenterLocation={handleCenterLocation}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onSelectKecamatanPress={() => {}}
+          onDetailPolygonPress={(poly) => {
+            // Arahkan ke rincian Peta Dasar / Usulan
+            Route('PetaDasar');
+          }}
+        />
 
-          {/* Baris 1: Navigasi Koordinat & Sinkron Offline */}
-          <View style={ui.shortcutRow}>
-            <TouchableOpacity
-              style={[ui.shortcutCard, { borderColor: '#BAE6FD' }]}
-              onPress={() => Route('NavigasiKoordinat')}
-              activeOpacity={0.85}
-            >
-              <View style={[ui.shortcutIconCircle, { backgroundColor: '#E0F2FE' }]}>
-                <FastImage
-                  style={ui.shortcutIcon}
-                  source={require('../assets/img/map.png')}
-                  resizeMode={FastImage.resizeMode.contain}
-                  tintColor="#0284C7"
-                />
-              </View>
-              <Text style={ui.shortcutText}>Navigasi Koordinat</Text>
-            </TouchableOpacity>
+        {/* 5. DATA WILAYAH SUMMARY (4 Metrik Kompak) */}
+        <RegionSummary
+          desaCount={351}
+          polygonCount={351}
+          verifiedCount={DATA_FINAL || 0}
+          kecamatanCount={kecamatan.length || 25}
+          isLoading={isLoading}
+        />
 
-            <TouchableOpacity
-              style={[ui.shortcutCard, { borderColor: '#FED7AA' }]}
-              onPress={() => Route('OfflineSync')}
-              activeOpacity={0.85}
-            >
-              <View style={[ui.shortcutIconCircle, { backgroundColor: '#FEF3C7' }]}>
-                <FastImage
-                  style={ui.shortcutIcon}
-                  source={require('../assets/img/upload.png')}
-                  resizeMode={FastImage.resizeMode.contain}
-                  tintColor="#D97706"
-                />
-                {OFFLINE_QUEUE_COUNT > 0 && (
-                  <View style={ui.shortcutBadge}>
-                    <Text style={ui.shortcutBadgeText}>
-                      {OFFLINE_QUEUE_COUNT > 9 ? '9+' : OFFLINE_QUEUE_COUNT}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text style={ui.shortcutText}>Sinkron Offline</Text>
-            </TouchableOpacity>
-          </View>
+        {/* 6. PRIMARY SURVEY ACTION (Mulai Survei — Action-First) */}
+        <PrimarySurveyAction onPress={() => Route('TrackRecorder')} />
 
-          {/* Baris 2: Track Recorder & Placemark */}
-          <View style={ui.shortcutRow}>
-            <TouchableOpacity
-              style={[ui.shortcutCard, { borderColor: '#FECACA' }]}
-              onPress={() => Route('TrackRecorder')}
-              activeOpacity={0.85}
-            >
-              <View style={[ui.shortcutIconCircle, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={{ fontSize: 20 }}>🔴</Text>
-              </View>
-              <Text style={ui.shortcutText}>Track Recorder</Text>
-            </TouchableOpacity>
+        {/* 7. QUICK ACTIONS (2x2 Grid Aksi Lapangan) */}
+        <QuickActions
+          onTrackingGpsPress={() => Route('TrackRecorder')}
+          onNavigasiPress={() => Route('NavigasiKoordinat')}
+          onTambahTitikPress={() => Route('PlacemarkList')}
+          onPetaOfflinePress={() => Route('MapImporter')}
+        />
 
-            <TouchableOpacity
-              style={[ui.shortcutCard, { borderColor: '#BAE6FD' }]}
-              onPress={() => Route('PlacemarkList')}
-              activeOpacity={0.85}
-            >
-              <View style={[ui.shortcutIconCircle, { backgroundColor: '#E0F2FE' }]}>
-                <Text style={{ fontSize: 20 }}>📍</Text>
-              </View>
-              <Text style={ui.shortcutText}>Placemark</Text>
-            </TouchableOpacity>
-          </View>
+        {/* 8. STATUS DATA & SINKRONISASI (Offline-First) */}
+        <SyncStatus
+          isOnline={IS_ONLINE}
+          queueCount={OFFLINE_QUEUE_COUNT}
+          lastSyncTime="15 September 2026, 16:30"
+          onSyncPress={() => Route('OfflineSync')}
+        />
 
-          {/* Baris 3: Peta Offline & Ekspor Data */}
-          <View style={ui.shortcutRow}>
-            <TouchableOpacity
-              style={[ui.shortcutCard, { borderColor: '#A7F3D0' }]}
-              onPress={() => Route('MapImporter')}
-              activeOpacity={0.85}
-            >
-              <View style={[ui.shortcutIconCircle, { backgroundColor: '#D1FAE5' }]}>
-                <Text style={{ fontSize: 20 }}>🗺</Text>
-              </View>
-              <Text style={ui.shortcutText}>Peta Offline</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[ui.shortcutCard, { borderColor: '#DDD6FE' }]}
-              onPress={() => Route('EksporData')}
-              activeOpacity={0.85}
-            >
-              <View style={[ui.shortcutIconCircle, { backgroundColor: '#EDE9FE' }]}>
-                <Text style={{ fontSize: 20 }}>📤</Text>
-              </View>
-              <Text style={ui.shortcutText}>Ekspor Data</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ======================================================== */}
-        {/* C. STATISTIK PETA (2 KARTU SEJAJAR)                      */}
-        {/* ======================================================== */}
-        <View style={ui.statsRow}>
-          {/* Kartu PETA DASAR */}
-          <View style={ui.statCard}>
-            <View style={ui.statCardTop}>
-              <View style={[ui.statIconBox, { backgroundColor: '#E0F2FE' }]}>
-                <FastImage
-                  style={{ width: 22, height: 22 }}
-                  source={require('../assets/img/tanah.png')}
-                  resizeMode={FastImage.resizeMode.contain}
-                  tintColor="#0284C7"
-                />
-              </View>
-              <View style={[ui.statBadge, { backgroundColor: '#E0F2FE' }]}>
-                <Text style={[ui.statBadgeText, { color: '#0369A1' }]}>Resmi</Text>
-              </View>
-            </View>
-            <Text style={ui.statLabel}>PETA DASAR</Text>
-            <Text style={[ui.statValue, { color: '#0C4A6E' }]}>351</Text>
-            <Text style={ui.statCaption}>Desa / Kelurahan</Text>
-          </View>
-
-          {/* Kartu PETA FINAL */}
-          <View style={ui.statCard}>
-            <View style={ui.statCardTop}>
-              <View style={[ui.statIconBox, { backgroundColor: '#DCFCE7' }]}>
-                <FastImage
-                  style={{ width: 22, height: 22 }}
-                  source={require('../assets/img/gis_pirate-map.png')}
-                  resizeMode={FastImage.resizeMode.contain}
-                  tintColor="#059669"
-                />
-              </View>
-              <View style={[ui.statBadge, { backgroundColor: '#DCFCE7' }]}>
-                <Text style={[ui.statBadgeText, { color: '#15803D' }]}>Sah</Text>
-              </View>
-            </View>
-            <Text style={ui.statLabel}>PETA FINAL</Text>
-            <Text style={[ui.statValue, { color: '#059669' }]}>
-              {DATA_FINAL || 0}
-            </Text>
-            <Text style={ui.statCaption}>Batas Disahkan</Text>
-          </View>
-        </View>
-
-        {/* ======================================================== */}
-        {/* D. PETA INTERAKTIF MINI (MAPVIEW)                        */}
-        {/* ======================================================== */}
-        <View style={ui.mapCard}>
-          <View style={ui.mapHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={[ui.statIconBox, { backgroundColor: '#E0F2FE', width: 32, height: 32, marginRight: 10 }]}>
-                <FastImage
-                  style={{ width: 18, height: 18 }}
-                  source={require('../assets/img/map.png')}
-                  resizeMode={FastImage.resizeMode.contain}
-                  tintColor="#0284C7"
-                />
-              </View>
-              <Text style={ui.mapTitle}>MAP PETA DASAR</Text>
-            </View>
-            <View style={[ui.statBadge, { backgroundColor: '#F1F5F9' }]}>
-              <Text style={[ui.statBadgeText, { color: '#475569' }]}>
-                {selectedKecamatan ? `${petadasar.length} Polygon` : 'Konawe Selatan'}
-              </Text>
-            </View>
-          </View>
-
-          {isPolygonLoading ? (
-            <View style={ui.mapLoading}>
-              <ActivityIndicator size="large" color="#0284C7" />
-              <Text style={ui.mapLoadingText}>Memuat Koordinat Wilayah...</Text>
-            </View>
-          ) : (
-            <View style={ui.mapBox}>
-              <MapView
-                ref={mapRef}
-                style={{ flex: 1 }}
-                provider="google"
-                initialRegion={{
-                  latitude: -4.234658,
-                  longitude: 122.353003,
-                  latitudeDelta: 1.0,
-                  longitudeDelta: 1.0,
-                }}
-              >
-                {petadasar?.map(
-                  (polygon, index) =>
-                    polygon.lokasi?.coordinat && (
-                      <Polygon
-                        key={index}
-                        coordinates={polygon.lokasi.coordinat}
-                        strokeColor="#DC2626"
-                        fillColor="rgba(220, 38, 38, 0.25)"
-                        strokeWidth={2}
-                        tappable
-                      />
-                    )
-                )}
-              </MapView>
-            </View>
-          )}
-        </View>
-
-        {/* ======================================================== */}
-        {/* E. TABEL DATA DESA PER KECAMATAN                         */}
-        {/* ======================================================== */}
-        <View style={ui.cardContainer}>
-          <Text style={ui.sectionTitle}>DATA DESA PER KECAMATAN</Text>
-          <Text style={ui.sectionSubtitle}>
-            Pilih kecamatan untuk memuat batas administrasi dan rincian desa
-          </Text>
-
-          {/* Dropdown Picker Kecamatan */}
-          <View style={ui.pickerWrapper}>
-            <Picker
-              selectedValue={selectedKecamatan}
-              onValueChange={(itemValue) => {
-                setSelectedKecamatan(itemValue);
-              }}
-              style={{ height: 50, color: '#1E293B' }}
-              dropdownIconColor="#0284C7"
-            >
-              <Picker.Item label="-- Pilih Kecamatan --" value="" color="#94A3B8" />
-              {kecamatan.map((data) => (
-                <Picker.Item
-                  key={data.kecamatan_id}
-                  label={data.nama_kecamatan}
-                  value={data.kecamatan_id}
-                  color="#0F172A"
-                />
-              ))}
-            </Picker>
-          </View>
-
-          {/* Tabel Rincian Desa */}
-          <View style={ui.tableContainer}>
-            <View style={ui.tableHeader}>
-              <Text style={[ui.tableHeaderText, { flex: 0.15, textAlign: 'center' }]}>No</Text>
-              <Text style={[ui.tableHeaderText, { flex: 0.55, paddingLeft: 8 }]}>Nama Desa</Text>
-              <Text style={[ui.tableHeaderText, { flex: 0.3, textAlign: 'right', paddingRight: 8 }]}>Luas</Text>
-            </View>
-
-            {desa.length > 0 ? (
-              desa.map((item, index) => (
-                <View
-                  key={index}
-                  style={[
-                    ui.tableRow,
-                    { backgroundColor: index % 2 === 0 ? '#FFFFFF' : '#F8FAFC' },
-                    index === desa.length - 1 && { borderBottomWidth: 0 },
-                  ]}
-                >
-                  <Text style={[ui.tableCell, { flex: 0.15, textAlign: 'center', color: '#64748B' }]}>
-                    {index + 1}
-                  </Text>
-                  <Text style={[ui.tableCell, { flex: 0.55, fontWeight: '600', color: '#0F172A', paddingLeft: 8 }]}>
-                    {item?.lokasi?.nama_desa ? String(item.lokasi.nama_desa) : 'Tidak Diketahui'}
-                  </Text>
-                  <Text style={[ui.tableCell, { flex: 0.3, textAlign: 'right', paddingRight: 8, color: '#0C4A6E', fontWeight: '500' }]}>
-                    {item.calculatedArea ? String(item.calculatedArea) : '0'} km²
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <View style={ui.tableEmpty}>
-                <Text style={ui.tableEmptyText}>
-                  {selectedKecamatan
-                    ? 'Tidak ada data desa untuk kecamatan ini'
-                    : 'Silakan pilih kecamatan di atas untuk menampilkan daftar desa'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
+        {/* 9. AKTIVITAS TERBARU (Timeline Ringkas) */}
+        <RecentActivity
+          activities={[
+            {
+              id: '1',
+              title: 'Survei titik batas Desa Ranomeeto',
+              time: 'Hari ini, 09:14',
+              dotColor: '#087FC1',
+            },
+            {
+              id: '2',
+              title: 'Polygon Desa Ambaipua disahkan',
+              time: 'Kemarin, 15:20',
+              dotColor: '#16A36A',
+            },
+            {
+              id: '3',
+              title: 'Sinkronisasi 3 berkas usulan batas selesai',
+              time: '13 Sep 2026, 11:45',
+              dotColor: '#F59E0B',
+            },
+          ]}
+          onViewAllPress={() => Route('Monitoring')}
+        />
       </ScrollView>
 
-      {/* Navigasi Bawah */}
+      {/* 10. FIXED BOTTOM NAVIGATION */}
       <TabBar />
     </View>
   );
 };
 
-// ================================================================
-// DESIGN SYSTEM STYLING — Geo-Sapphire & Emerald Field
-// ================================================================
-const ui = RNStyleSheet.create({
+const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#F0F9FF', // Token: --color-bg-primary
+    backgroundColor: '#F5F7FA', // Background utama bersih
   },
-
-  // APPBAR
-  appBar: {
-    paddingTop: 45,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    elevation: 8,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-  },
-  appBarTitleContainer: {
-    flex: 1,
-  },
-  appBarTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  appBarSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#E0F2FE',
-    marginTop: 2,
-  },
-  appBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionIconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 10,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  notifBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-
-  // SCROLLVIEW
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 25,
-  },
-
-  // OFFLINE BANNER
-  offlineBanner: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    elevation: 4,
-    shadowColor: '#B45309',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-  },
-  offlineIcon: {
-    fontSize: 22,
-    marginRight: 10,
-  },
-  offlineTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  offlineSubtitle: {
-    fontSize: 11,
-    color: '#FEF3C7',
-    marginTop: 2,
-  },
-  offlineSyncLink: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FEF3C7',
-    marginTop: 3,
-    textDecorationLine: 'underline',
-  },
-
-  // CARD BASE
-  cardContainer: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    elevation: 3,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0C4A6E',
-    letterSpacing: 0.5,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 3,
-    marginBottom: 14,
-  },
-  pillTag: {
-    backgroundColor: '#F0F9FF',
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  pillTagText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0284C7',
-  },
-
-  // SHORTCUTS
-  shortcutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  shortcutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    width: '48.5%',
-    borderWidth: 1.2,
-  },
-  shortcutIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-    position: 'relative',
-  },
-  shortcutIcon: {
-    width: 20,
-    height: 20,
-  },
-  shortcutText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1E293B',
-    flex: 1,
-    lineHeight: 16,
-  },
-  shortcutBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    zIndex: 5,
-  },
-  shortcutBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-
-  // STATS CARDS
-  statsRow: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 16,
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: '#FFFFFF',
-    width: '48.5%',
-    borderRadius: 20,
-    padding: 16,
-    elevation: 3,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  statCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  statBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 0.5,
-    marginTop: 12,
-  },
-  statValue: {
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  statCaption: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-
-  // MINI MAP CARD
-  mapCard: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    elevation: 4,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-  mapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#F8FAFC',
-  },
-  mapTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0C4A6E',
-    letterSpacing: 0.5,
-  },
-  mapBox: {
-    height: 250,
-    width: '100%',
-  },
-  mapLoading: {
-    height: 250,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  mapLoadingText: {
-    color: '#64748B',
-    fontWeight: '700',
-    fontSize: 13,
-    marginTop: 10,
-  },
-
-  // PICKER & TABLE
-  pickerWrapper: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#BAE6FD',
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  tableContainer: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#0284C7', // Token: --color-primary
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-  },
-  tableHeaderText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  tableCell: {
-    fontSize: 13,
-  },
-  tableEmpty: {
-    padding: 24,
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  tableEmptyText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 18,
+    paddingBottom: 24, // Ruang agar konten terbawah tidak tertutup TabBar
   },
 });
 

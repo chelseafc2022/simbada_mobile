@@ -342,10 +342,15 @@ const Monitoring = ({ navigation }) => {
                     <View style={styles.cardTopRow}>
                       <View style={{ flex: 1, paddingRight: 8 }}>
                         <Text style={styles.cardVillageTitle} numberOfLines={1}>
-                          {item.nama_des_kel || 'Desa Tanpa Nama'}
+                          {item.nama_des_kel && item.nama_des_kel !== 'undefined'
+                            ? item.nama_des_kel
+                            : 'Batas Tanpa Nama'}
                         </Text>
                         <Text style={styles.cardDistrictSub}>
-                          📍 Kecamatan {item.nama_kecamatan || '-'}
+                          📍 Kecamatan{' '}
+                          {item.nama_kecamatan && item.nama_kecamatan !== 'undefined'
+                            ? item.nama_kecamatan
+                            : '-'}
                         </Text>
                       </View>
                       {renderStatusBadge(item.status_pengajuan)}
