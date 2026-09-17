@@ -12,6 +12,8 @@ import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import OfflineManager from '../library/OfflineManager';
+import { parseGeoFileFromUri, downsampleCoordinates } from '../library/GeoFileParser';
+import TrackDB from '../library/TrackDB';
 
 import { Assets } from '@react-navigation/elements';
 
@@ -26,6 +28,7 @@ const AddUsulan = ({navigation}) => {
     const [desa, setDesa] = useState([]);
     const [loading, setLoading] = useState(false);
     const [fileName, setFileName] = useState(null); // State untuk menyimpan nama file
+    const [geoFileName, setGeoFileName] = useState(null); // State untuk nama file geospasial KML/GPX
     const [isOnline, setIsOnline] = useState(true); // Status koneksi
     // const { lokasi, setLokasi } = useContext(LokasiContext);
     
@@ -336,6 +339,127 @@ const AddUsulan = ({navigation}) => {
             file: null,
         }));
         setFileName(null);
+    };
+
+    const handleGeoFileUpload = () => {
+        Alert.alert(
+            'Unggah Data Geospasial',
+            'Pilih metode untuk mengimpor titik koordinat poligon batas:',
+            [
+                {
+                    text: '📁 Unggah Berkas KML / GPX / KMZ',
+                    onPress: () => pickGeoFile(),
+                },
+                {
+                    text: '🛤 Ambil dari Riwayat Survei GPS',
+                    onPress: () => pickFromTrackHistory(),
+                },
+                { text: 'Batal', style: 'cancel' },
+            ]
+        );
+    };
+
+    const pickGeoFile = async () => {
+        try {
+            const result = await DocumentPicker.pickSingle({
+                type: [DocumentPicker.types.allFiles],
+            });
+
+            if (!result?.uri) return;
+
+            const fname = result.name || '';
+            const lower = fname.toLowerCase();
+            const validExts = ['.kml', '.kmz', '.gpx', '.geojson', '.json', '.xml'];
+            const isValid = validExts.some(ext => lower.endsWith(ext));
+
+            if (!isValid) {
+                Alert.alert(
+                    'Format Berkas Tidak Didukung',
+                    'Hanya berkas berformat .kml, .kmz, .gpx, atau .geojson yang didukung untuk data spasial.'
+                );
+                return;
+            }
+
+            setLoading(true);
+            const parsed = await parseGeoFileFromUri(result.uri, fname);
+            setLoading(false);
+
+            if (!parsed.success) {
+                Alert.alert('Gagal Mengurai Berkas', parsed.error || 'Tidak ditemukan koordinat yang valid.');
+                return;
+            }
+
+            SET_FORM((prevForm) => ({
+                ...prevForm,
+                lokasi: parsed.points,
+                tipe: 'polygon',
+            }));
+            setGeoFileName(fname);
+
+            Alert.alert(
+                '✅ Berhasil Mengimpor File',
+                `Berhasil mengekstrak ${parsed.points.length} titik koordinat (${parsed.format}) dari berkas "${fname}".`
+            );
+        } catch (err) {
+            setLoading(false);
+            if (!DocumentPicker.isCancel(err)) {
+                Alert.alert('Error', 'Gagal memilih berkas: ' + (err.message || 'Terjadi kesalahan'));
+            }
+        }
+    };
+
+    const pickFromTrackHistory = async () => {
+        try {
+            const tracks = await TrackDB.getAllTracks();
+            if (!tracks || tracks.length === 0) {
+                Alert.alert(
+                    'Belum Ada Riwayat Survei',
+                    'Belum ada rekaman jejak GPS yang tersimpan di perangkat ini. Silakan gunakan menu "Mulai Survei" di beranda terlebih dahulu.'
+                );
+                return;
+            }
+
+            const options = tracks.slice(0, 5).map((tr) => ({
+                text: `${tr.label} (${tr.waypoints?.length || 0} ttk)`,
+                onPress: () => {
+                    if (!tr.waypoints || tr.waypoints.length < 3) {
+                        Alert.alert('Data Kurang', 'Trek ini memiliki kurang dari 3 titik koordinat untuk membentuk poligon.');
+                        return;
+                    }
+
+                    const rawPoints = tr.waypoints.map((w) => ({
+                        lat: parseFloat(w.lat).toFixed(7),
+                        lng: parseFloat(w.lon).toFixed(7),
+                        photo_uri: null,
+                        photo_file: null,
+                    }));
+
+                    const sampled = downsampleCoordinates(rawPoints);
+
+                    SET_FORM((prevForm) => ({
+                        ...prevForm,
+                        lokasi: sampled,
+                        tipe: 'polygon',
+                    }));
+                    setGeoFileName(tr.label);
+
+                    Alert.alert(
+                        '✅ Rekaman Survei Dimuat',
+                        `Berhasil memuat ${sampled.length} titik koordinat dari survei "${tr.label}".`
+                    );
+                },
+            }));
+
+            options.push({ text: 'Batal', style: 'cancel' });
+
+            Alert.alert(
+                'Pilih Rekaman Survei GPS',
+                'Pilih jejak survei yang ingin dijadikan poligon batas usulan:',
+                options
+            );
+        } catch (err) {
+            Alert.alert('Error', 'Gagal mengambil riwayat survei: ' + err.message);
+        }
     };
 
     const handleSubmit = async () => {
@@ -737,12 +861,47 @@ const AddUsulan = ({navigation}) => {
                         </TouchableOpacity>
                     </View>
 
+                    {/* Tombol Unggah File KML / GPX */}
+                    <TouchableOpacity 
+                        style={localStyles.uploadGeoButton}
+                        onPress={handleGeoFileUpload}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={localStyles.uploadGeoIcon}>📁</Text>
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={localStyles.uploadGeoTitle}>UNGGAH KML / GPX / KMZ</Text>
+                            <Text style={localStyles.uploadGeoSub}>Impor titik poligon dari berkas GIS atau hasil survei</Text>
+                        </View>
+                        <Text style={localStyles.uploadGeoChevron}>›</Text>
+                    </TouchableOpacity>
+
                     {/* Indikator Status Lokasi */}
                     {form.lokasi && form.lokasi.length > 0 && (
                         <View style={localStyles.statusLokasi}>
                             <Text style={localStyles.statusLokasiText}>
                                 ✅ Tersimpan {form.lokasi.length} titik koordinat ({form.tipe === 'polygon' ? 'Polygon' : 'Polyline'})
                             </Text>
+                            {geoFileName ? (
+                                <Text style={{ fontSize: 11, color: '#1B5E20', marginTop: 2, fontWeight: '600' }}>
+                                    📁 Sumber: {geoFileName}
+                                </Text>
+                            ) : null}
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('MetodeText', { 
+                                    lokasiAwal: form.lokasi || [],
+                                    onLokasiUpdate: (updatedLokasi) => {
+                                        SET_FORM((prevForm) => ({
+                                            ...prevForm,
+                                            lokasi: updatedLokasi,
+                                            tipe: 'polygon'
+                                        }));
+                                    }
+                                })}
+                                style={{ marginTop: 8, backgroundColor: '#208DC0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>👁️ Tinjau / Tambah Foto Patok di Peta</Text>
+                            </TouchableOpacity>
                         </View>
                     )}
 
@@ -867,6 +1026,38 @@ const localStyles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 13,
+    },
+    uploadGeoButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F3FF',
+        borderWidth: 1.5,
+        borderColor: '#7C3AED',
+        borderStyle: 'dashed',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginTop: 10,
+    },
+    uploadGeoIcon: {
+        fontSize: 22,
+    },
+    uploadGeoTitle: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#6D28D9',
+        letterSpacing: 0.3,
+    },
+    uploadGeoSub: {
+        fontSize: 10,
+        color: '#64748B',
+        marginTop: 1,
+    },
+    uploadGeoChevron: {
+        fontSize: 20,
+        color: '#7C3AED',
+        fontWeight: 'bold',
+        marginLeft: 6,
     },
     statusLokasi: {
         marginTop: 15,

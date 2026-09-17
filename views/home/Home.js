@@ -12,7 +12,6 @@ import {
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import Geolocation from '@react-native-community/geolocation';
-import * as turf from '@turf/turf';
 
 // Modular Home V2 Components (Modern Government GIS + Field Survey)
 import HomeHeader from './components/HomeHeader';
@@ -24,6 +23,9 @@ import PrimarySurveyAction from './components/PrimarySurveyAction';
 import QuickActions from './components/QuickActions';
 import SyncStatus from './components/SyncStatus';
 import RecentActivity from './components/RecentActivity';
+import DetailDesaModal, {
+  calculatePolygonArea,
+} from './components/DetailDesaModal';
 import TabBar from '../components/TabBar';
 
 /**
@@ -52,6 +54,8 @@ const Home = ({ navigation }) => {
   const [DATA_FINAL, SET_DATA_FINAL] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isPolygonLoading, setIsPolygonLoading] = useState(false);
+  const [activePolygon, setActivePolygon] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // GPS Sensor & Telemetri State
   const [isGpsActive, setIsGpsActive] = useState(false);
@@ -223,28 +227,6 @@ const Home = ({ navigation }) => {
   // ================================================================
   // 2. DATA CALCULATION & API INTEGRATION
   // ================================================================
-  const calculateArea = (coordinates) => {
-    if (!coordinates || coordinates.length < 3) return 0;
-    try {
-      const geoJSONCoordinates = coordinates
-        .map((coord) => {
-          if (coord.lat && coord.lng) {
-            return [coord.lng, coord.lat];
-          }
-          return null;
-        })
-        .filter((coord) => coord !== null);
-
-      if (geoJSONCoordinates.length < 3) return 0;
-
-      const polygon = turf.polygon([geoJSONCoordinates]);
-      const area = turf.area(polygon) / 1e6;
-      return area.toFixed(2);
-    } catch (error) {
-      console.error('Error calculating area:', error);
-      return 0;
-    }
-  };
 
   // Fetch Kecamatan List
   const getKecamatan = async () => {
@@ -325,7 +307,7 @@ const Home = ({ navigation }) => {
         const processedDesa = result.map((item) => {
           let area = '0';
           if (item?.lokasi?.coordinat) {
-            area = calculateArea(item.lokasi.coordinat);
+            area = calculatePolygonArea(item.lokasi.coordinat);
           }
           return { ...item, calculatedArea: area };
         });
@@ -455,6 +437,24 @@ const Home = ({ navigation }) => {
     ? currentKecamatanObj.nama_kecamatan
     : '';
 
+  const handleFocusDesa = (desaItem) => {
+    setActivePolygon(desaItem);
+    const coords =
+      desaItem?.lokasi?.coordinat ||
+      desaItem?.coordinates ||
+      (Array.isArray(desaItem) ? desaItem : null);
+
+    if (coords && coords.length > 0 && mapRef.current) {
+      fitAllPolygons([
+        {
+          lokasi: {
+            coordinat: coords,
+          },
+        },
+      ]);
+    }
+  };
+
   return (
     <View style={styles.screenContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -479,7 +479,10 @@ const Home = ({ navigation }) => {
         <SearchBar
           kecamatanList={kecamatan}
           selectedKecamatan={selectedKecamatan}
-          onSelectKecamatan={(id) => setSelectedKecamatan(id)}
+          onSelectKecamatan={(id) => {
+            setSelectedKecamatan(id);
+            setActivePolygon(null);
+          }}
         />
 
         {/* 4. MAP PREVIEW (Dominan di Atas — Map-First) */}
@@ -489,13 +492,17 @@ const Home = ({ navigation }) => {
           isLoading={isPolygonLoading}
           selectedKecamatanName={currentKecamatanName}
           userLocation={userLocation}
+          activePolygon={activePolygon}
+          onActivePolygonChange={setActivePolygon}
           onCenterLocation={handleCenterLocation}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onSelectKecamatanPress={() => {}}
           onDetailPolygonPress={(poly) => {
-            // Arahkan ke rincian Peta Dasar / Usulan
-            Route('PetaDasar');
+            if (poly) {
+              setActivePolygon(poly?.lokasi ? poly : null);
+            }
+            setShowDetailModal(true);
           }}
         />
 
@@ -555,6 +562,16 @@ const Home = ({ navigation }) => {
 
       {/* 10. FIXED BOTTOM NAVIGATION */}
       <TabBar />
+
+      {/* 11. DETAIL DESA MODAL (Tabel Data Desa Per Kecamatan Lengkap Pop-Up) */}
+      <DetailDesaModal
+        visible={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        kecamatanName={currentKecamatanName}
+        desaList={desa}
+        activeDesa={activePolygon}
+        onSelectDesa={handleFocusDesa}
+      />
     </View>
   );
 };

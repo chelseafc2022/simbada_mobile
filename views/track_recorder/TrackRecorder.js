@@ -15,7 +15,7 @@ import Geolocation from '@react-native-community/geolocation';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import moment from 'moment';
-import LinearGradient from 'react-native-linear-gradient';
+import FastImage from 'react-native-fast-image';
 import TelemetriPanel from '../telemetri/TelemetriPanel';
 import TrackDB from '../library/TrackDB';
 
@@ -249,17 +249,52 @@ const TrackRecorder = ({ navigation }) => {
     longitudeDelta: 0.01,
   } : null;
 
+  const handleBack = () => {
+    if (status === 'recording' || status === 'paused') {
+      Alert.alert(
+        'Perekaman Masih Berjalan',
+        'Perekaman trek sedang aktif. Hentikan perekaman dan keluar?',
+        [
+          { text: 'Tetap di Sini', style: 'cancel' },
+          {
+            text: 'Hentikan & Keluar',
+            style: 'destructive',
+            onPress: () => {
+              stopRecording();
+            },
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40 }}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
-        <Text style={styles.title}>Track Recorder</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('TrackHistory')}>
+    <View style={styles.container}>
+      {/* Header — Mengikuti style NavigasiKoordinat */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <FastImage
+            style={{ width: 20, height: 20 }}
+            source={require('../assets/img/chevron-left.png')}
+            resizeMode={FastImage.resizeMode.contain}
+          />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle} numberOfLines={1}>🛰️ Survei Lapangan</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.headerRight}
+          onPress={() => navigation.navigate('TrackHistory')}
+        >
           <Text style={styles.historyLink}>Riwayat ›</Text>
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
 
-      {/* Panel Telemetri */}
-      <TelemetriPanel showBoundsAlert compact={status !== 'idle'} />
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Panel Telemetri */}
+        <TelemetriPanel showBoundsAlert compact={status !== 'idle'} />
 
       {/* Metrik */}
       <View style={styles.metricsRow}>
@@ -323,17 +358,29 @@ const TrackRecorder = ({ navigation }) => {
           </Text>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   header: {
-    paddingTop: 50, paddingBottom: 16, paddingHorizontal: 20,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    flexDirection: 'row',
+    padding: 15,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  backButton: { flex: 1, justifyContent: 'center' },
+  headerCenter: { flex: 3, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0' },
+  headerRight: { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
   historyLink: { color: '#208DC0', fontSize: 14, fontWeight: '700' },
   metricsRow: { flexDirection: 'row', flexWrap: 'wrap', padding: 8 },
   metricCard: {

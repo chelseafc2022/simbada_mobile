@@ -28,6 +28,8 @@ const MapPreview = ({
   isLoading = false,
   selectedKecamatanName = '',
   userLocation = null,
+  activePolygon: propActivePolygon,
+  onActivePolygonChange,
   onCenterLocation,
   onZoomIn,
   onZoomOut,
@@ -35,11 +37,19 @@ const MapPreview = ({
   onDetailPolygonPress,
 }) => {
   const [mapType, setMapType] = useState('hybrid'); // 'hybrid' | 'standard' | 'terrain'
-  const [activePolygon, setActivePolygon] = useState(null);
   const [showLayerModal, setShowLayerModal] = useState(false);
+  const [internalActivePolygon, setInternalActivePolygon] = useState(null);
+  const activePolygon =
+    propActivePolygon !== undefined
+      ? propActivePolygon
+      : internalActivePolygon;
 
   const handlePolygonPress = (polygon) => {
-    setActivePolygon(polygon);
+    if (onActivePolygonChange) {
+      onActivePolygonChange(polygon);
+    } else {
+      setInternalActivePolygon(polygon);
+    }
   };
 
   // Hitung titik pusat poligon untuk callout marker tag
@@ -276,11 +286,6 @@ const MapPreview = ({
           }}
           activeOpacity={0.88}
         >
-          <FastImage
-            source={require('../../assets/img/card2.jpeg')}
-            style={styles.bottomCardThumbnail}
-            resizeMode={FastImage.resizeMode.cover}
-          />
           <View style={styles.bottomCardContent}>
             <Text style={styles.bottomCardTitle} numberOfLines={1}>
               {bottomCardTitle}
@@ -625,7 +630,8 @@ const styles = StyleSheet.create({
     left: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    padding: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 15,
