@@ -61,6 +61,7 @@ const PlacemarkItem = React.memo(({ item, onPress, onLongPress, isPublicItem }) 
 ));
 
 const PlacemarkList = ({ navigation }) => {
+  const dispatch = useDispatch();
   const token = useSelector((state) => state.TOKEN);
   const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
   const profile = useSelector((state) => state.PROFILE);
