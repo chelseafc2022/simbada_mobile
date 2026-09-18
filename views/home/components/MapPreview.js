@@ -52,19 +52,47 @@ const MapPreview = ({
     }
   };
 
+  // Helper validasi koordinat numerik aman
+  const isValidCoord = (coord) => {
+    return (
+      coord != null &&
+      typeof coord === 'object' &&
+      typeof coord.latitude === 'number' &&
+      typeof coord.longitude === 'number' &&
+      isFinite(coord.latitude) &&
+      isFinite(coord.longitude) &&
+      !isNaN(coord.latitude) &&
+      !isNaN(coord.longitude)
+    );
+  };
+
   // Hitung titik pusat poligon untuk callout marker tag
   const getCentroid = (coords) => {
-    if (!coords || coords.length === 0) return null;
+    if (!coords || !Array.isArray(coords) || coords.length === 0) return null;
     let sumLat = 0;
     let sumLng = 0;
+    let validCount = 0;
+
     coords.forEach((c) => {
-      sumLat += c.latitude;
-      sumLng += c.longitude;
+      if (!c) return;
+      const lat =
+        c.latitude != null ? parseFloat(c.latitude) : parseFloat(c.lat);
+      const lng =
+        c.longitude != null ? parseFloat(c.longitude) : parseFloat(c.lng);
+
+      if (isFinite(lat) && isFinite(lng) && !isNaN(lat) && !isNaN(lng)) {
+        sumLat += lat;
+        sumLng += lng;
+        validCount++;
+      }
     });
-    return {
-      latitude: sumLat / coords.length,
-      longitude: sumLng / coords.length,
+
+    if (validCount === 0) return null;
+    const center = {
+      latitude: sumLat / validCount,
+      longitude: sumLng / validCount,
     };
+    return isValidCoord(center) ? center : null;
   };
 
   // Cari koordinat callout: jika ada polygon aktif, gunakan polygon aktif;
@@ -72,12 +100,14 @@ const MapPreview = ({
   // jika tidak ada, gunakan koordinat Ranomeeto Konawe Selatan
   const targetPolygon =
     activePolygon || (polygons.length > 0 ? polygons[0] : null);
-  const calloutCoord = targetPolygon?.lokasi?.coordinat
+  const rawCalloutCoord = targetPolygon?.lokasi?.coordinat
     ? getCentroid(targetPolygon.lokasi.coordinat)
     : userLocation || {
         latitude: -4.032,
         longitude: 122.455,
       };
+
+  const calloutCoord = isValidCoord(rawCalloutCoord) ? rawCalloutCoord : null;
 
   const calloutLabel =
     activePolygon?.lokasi?.nama_desa ||
@@ -120,15 +150,41 @@ const MapPreview = ({
           >
             {/* Poligon Batas Wilayah Desa / Kecamatan */}
             {polygons?.map((polygon, index) => {
-              const coords = polygon.lokasi?.coordinat;
-              if (!coords || coords.length < 3) return null;
+              const rawCoords = polygon?.lokasi?.coordinat;
+              if (!Array.isArray(rawCoords) || rawCoords.length < 3) return null;
+
+              const coords = rawCoords
+                .map((c) => {
+                  if (!c) return null;
+                  const lat =
+                    c.latitude != null ? parseFloat(c.latitude) : parseFloat(c.lat);
+                  const lng =
+                    c.longitude != null ? parseFloat(c.longitude) : parseFloat(c.lng);
+                  if (
+                    isFinite(lat) &&
+                    isFinite(lng) &&
+                    !isNaN(lat) &&
+                    !isNaN(lng)
+                  ) {
+                    return { latitude: lat, longitude: lng };
+                  }
+                  return null;
+                })
+                .filter(Boolean);
+
+              if (coords.length < 3) return null;
+
               const isSelected =
                 activePolygon &&
-                activePolygon.des_kel_id === polygon.des_kel_id;
+                ((activePolygon.des_kel_id &&
+                  activePolygon.des_kel_id === polygon.des_kel_id) ||
+                  (activePolygon.lokasi?.nama_desa &&
+                    activePolygon.lokasi?.nama_desa ===
+                      polygon.lokasi?.nama_desa));
 
               return (
                 <Polygon
-                  key={`poly-${index}-${polygon.des_kel_id || index}`}
+                  key={`poly-${polygon.des_kel_id || index}-${isSelected ? 'sel' : 'unsel'}`}
                   coordinates={coords}
                   strokeColor={isSelected ? '#00E5FF' : '#FBBF24'} // Highlight Cyan atau Garis Batas Emas/Kuning
                   fillColor={
@@ -144,14 +200,18 @@ const MapPreview = ({
             })}
 
             {/* Marker Lokasi Pengguna (GPS) */}
-            {userLocation && (
+            {isValidCoord(userLocation) && (
               <>
                 <Circle
                   center={{
                     latitude: userLocation.latitude,
                     longitude: userLocation.longitude,
                   }}
-                  radius={userLocation.accuracy || 30}
+                  radius={
+                    isFinite(userLocation.accuracy) && userLocation.accuracy > 0
+                      ? userLocation.accuracy
+                      : 30
+                  }
                   fillColor="rgba(8, 127, 193, 0.2)"
                   strokeColor="rgba(8, 127, 193, 0.6)"
                   strokeWidth={1}

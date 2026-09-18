@@ -19,6 +19,7 @@ import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import FastImage from 'react-native-fast-image';
 import { useSelector } from 'react-redux';
 import CompassView from './CompassView';
+import NavigasiService from '../library/NavigasiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -94,9 +95,15 @@ const NavigasiKoordinat = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [trackHistory, setTrackHistory] = useState([]);
 
+  // Basemap Layer State: 'hybrid' | 'satellite' | 'standard' | 'terrain'
+  const [mapType, setMapType] = useState('hybrid');
+  const [showLayerModal, setShowLayerModal] = useState(false);
+
   // Map picker state
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapPickerCoord, setMapPickerCoord] = useState(null);
+  const [pickerMode, setPickerMode] = useState('target'); // 'target' | 'user'
+  const initialUserPosRef = useRef(null);
   const [initialRegion, setInitialRegion] = useState({
     latitude: -4.234658,
     longitude: 122.353003,
@@ -110,11 +117,174 @@ const NavigasiKoordinat = ({ navigation }) => {
   const watchIdRef = useRef(null);
   const headingSubRef = useRef(null);
   const mapRef = useRef(null);
+  const previewMapRef = useRef(null);
+  const pickerMapRef = useRef(null);
 
-  // Cleanup saat unmount
+  // Helper validasi koordinat numerik aman
+  const isValidCoord = (coord) => {
+    return (
+      coord != null &&
+      typeof coord === 'object' &&
+      typeof coord.latitude === 'number' &&
+      typeof coord.longitude === 'number' &&
+      isFinite(coord.latitude) &&
+      isFinite(coord.longitude) &&
+      !isNaN(coord.latitude) &&
+      !isNaN(coord.longitude)
+    );
+  };
+
+  const parsedTargetLat = parseFloat(targetLat);
+  const parsedTargetLng = parseFloat(targetLng);
+  const hasValidTarget =
+    !isNaN(parsedTargetLat) &&
+    !isNaN(parsedTargetLng) &&
+    isFinite(parsedTargetLat) &&
+    isFinite(parsedTargetLng) &&
+    parsedTargetLat >= -90 &&
+    parsedTargetLat <= 90 &&
+    parsedTargetLng >= -180 &&
+    parsedTargetLng <= 180;
+
+  const targetCoord = hasValidTarget
+    ? { latitude: parsedTargetLat, longitude: parsedTargetLng }
+    : null;
+
+  // Zoom & Camera Controls
+  const handleZoomIn = (targetRef) => {
+    const r = targetRef?.current;
+    if (r?.getCamera) {
+      r.getCamera().then((camera) => {
+        if (camera && camera.zoom != null) {
+          r.animateCamera({ zoom: camera.zoom + 1 });
+        }
+      });
+    }
+  };
+
+  const handleZoomOut = (targetRef) => {
+    const r = targetRef?.current;
+    if (r?.getCamera) {
+      r.getCamera().then((camera) => {
+        if (camera && camera.zoom != null) {
+          r.animateCamera({ zoom: Math.max(camera.zoom - 1, 1) });
+        }
+      });
+    }
+  };
+
+  const handleResetCompass = (targetRef) => {
+    const r = targetRef?.current;
+    if (r?.animateCamera) {
+      r.animateCamera({ heading: 0, pitch: 0 });
+    }
+  };
+
+  const handleCenterPreviewMap = () => {
+    if (!previewMapRef.current) return;
+    if (targetCoord && currentPos && isValidCoord(currentPos)) {
+      const minLat = Math.min(targetCoord.latitude, currentPos.latitude);
+      const maxLat = Math.max(targetCoord.latitude, currentPos.latitude);
+      const minLng = Math.min(targetCoord.longitude, currentPos.longitude);
+      const maxLng = Math.max(targetCoord.longitude, currentPos.longitude);
+      const midLat = (minLat + maxLat) / 2;
+      const midLng = (minLng + maxLng) / 2;
+      const deltaLat = Math.max((maxLat - minLat) * 1.4, 0.02);
+      const deltaLng = Math.max((maxLng - minLng) * 1.4, 0.02);
+
+      previewMapRef.current.animateToRegion(
+        {
+          latitude: midLat,
+          longitude: midLng,
+          latitudeDelta: deltaLat,
+          longitudeDelta: deltaLng,
+        },
+        800
+      );
+    } else if (targetCoord) {
+      previewMapRef.current.animateToRegion(
+        {
+          latitude: targetCoord.latitude,
+          longitude: targetCoord.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        800
+      );
+    } else if (currentPos && isValidCoord(currentPos)) {
+      previewMapRef.current.animateToRegion(
+        {
+          latitude: currentPos.latitude,
+          longitude: currentPos.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        800
+      );
+    }
+  };
+
+  // Animate preview map to target when coordinate changes
   useEffect(() => {
+    if (targetCoord && previewMapRef.current) {
+      handleCenterPreviewMap();
+    }
+  }, [targetLat, targetLng]);
+
+  // Sinkronisasi dengan background NavigasiService
+  useEffect(() => {
+    // 1. Cek apakah ada navigasi yang sudah aktif di background saat halaman dibuka
+    const active = NavigasiService.getState();
+    if (active.isNavigating && active.targetLat && active.targetLng) {
+      setTargetLat(active.targetLat.toFixed(6));
+      setTargetLng(active.targetLng.toFixed(6));
+      setTargetName(active.targetName || '');
+      if (active.currentPos && isValidCoord(active.currentPos)) {
+        setCurrentPos(active.currentPos);
+      }
+      if (active.gpsAccuracy) setGpsAccuracy(active.gpsAccuracy);
+      setDistance(active.distance || 0);
+      setBearing(active.bearing || 0);
+      setHeading(active.heading || 0);
+      setTrackHistory(active.trackHistory || []);
+      setIsTracking(true);
+      setViewMode('compass');
+    }
+
+    // 2. Subscribe ke update real-time dari background service
+    const unsubscribe = NavigasiService.addListener((state) => {
+      if (state.isNavigating) {
+        setIsTracking((prev) => (!prev ? true : prev));
+        if (state.currentPos && isValidCoord(state.currentPos)) {
+          setCurrentPos((prev) => {
+            if (
+              !prev ||
+              prev.latitude !== state.currentPos.latitude ||
+              prev.longitude !== state.currentPos.longitude
+            ) {
+              return state.currentPos;
+            }
+            return prev;
+          });
+        }
+        if (state.gpsAccuracy) {
+          setGpsAccuracy((prev) => (prev !== state.gpsAccuracy ? state.gpsAccuracy : prev));
+        }
+        setDistance((prev) => (Math.abs((prev || 0) - (state.distance || 0)) > 0.5 ? state.distance || 0 : prev));
+        setBearing((prev) => (Math.abs((prev || 0) - (state.bearing || 0)) > 0.5 ? state.bearing || 0 : prev));
+        setHeading((prev) => (Math.abs((prev || 0) - (state.heading || 0)) > 1 ? state.heading || 0 : prev));
+        if (state.trackHistory && state.trackHistory.length > 0) {
+          setTrackHistory((prev) => (prev.length !== state.trackHistory.length ? state.trackHistory : prev));
+        }
+      } else {
+        setIsTracking((prev) => (prev ? false : prev));
+      }
+    });
+
     return () => {
-      stopTracking();
+      // PENTING: Saat keluar / unmount / pindah page, JANGAN hentikan navigasi!
+      // Navigasi tetap aktif di background/foreground service
+      unsubscribe();
     };
   }, []);
 
@@ -137,22 +307,22 @@ const NavigasiKoordinat = ({ navigation }) => {
     );
   }, []);
 
-  // Hitung jarak & bearing setiap kali posisi atau target berubah
+  // Hitung jarak & bearing setiap kali posisi atau target berubah saat mode input
   useEffect(() => {
-    if (currentPos && targetLat && targetLng) {
+    if (!isTracking && currentPos && targetLat && targetLng) {
       const lat2 = parseFloat(targetLat);
       const lng2 = parseFloat(targetLng);
       if (!isNaN(lat2) && !isNaN(lng2)) {
         const dist = calculateDistance(currentPos.latitude, currentPos.longitude, lat2, lng2);
         const bear = calculateBearing(currentPos.latitude, currentPos.longitude, lat2, lng2);
-        setDistance(dist);
-        setBearing(bear);
+        setDistance((prev) => (Math.abs((prev || 0) - dist) > 0.5 ? dist : prev));
+        setBearing((prev) => (Math.abs((prev || 0) - bear) > 0.5 ? bear : prev));
       }
     }
-  }, [currentPos, targetLat, targetLng]);
+  }, [isTracking, currentPos?.latitude, currentPos?.longitude, targetLat, targetLng]);
 
-  /** ====== FUNGSI 4: Live GPS Tracking ====== */
-  const startTracking = () => {
+  /** ====== FUNGSI 4: Live GPS Tracking (Berjalan di Latar Belakang) ====== */
+  const startTracking = async () => {
     const lat = parseFloat(targetLat);
     const lng = parseFloat(targetLng);
 
@@ -165,12 +335,75 @@ const NavigasiKoordinat = ({ navigation }) => {
       return;
     }
 
-    setIsTracking(true);
     setIsLoading(true);
-    setTrackHistory([]);
+    setIsTracking(true);
     setViewMode('compass');
 
-    // Posisi awal
+    const success = await NavigasiService.startNavigation({
+      targetLat: lat,
+      targetLng: lng,
+      targetName: targetName || `Titik Peta (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+      currentPos,
+    });
+
+    setIsLoading(false);
+    if (!success) {
+      Alert.alert('Error', 'Gagal memulai navigasi latar belakang.');
+      setIsTracking(false);
+      setViewMode('input');
+    }
+  };
+
+  /** Stop GPS tracking */
+  const stopTracking = async () => {
+    await NavigasiService.stopNavigation();
+    setIsTracking(false);
+  };
+
+  /** ====== FUNGSI 1: Pilih Target dari Peta ====== */
+  const openMapPicker = () => {
+    initialUserPosRef.current = currentPos ? { ...currentPos } : null;
+    // Jika target sudah ditentukan, posisikan awal di target
+    if (targetCoord && isValidCoord(targetCoord)) {
+      setInitialRegion({
+        latitude: targetCoord.latitude,
+        longitude: targetCoord.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+      setMapPickerCoord({ ...targetCoord });
+    } else if (currentPos && isValidCoord(currentPos)) {
+      setInitialRegion({
+        latitude: currentPos.latitude,
+        longitude: currentPos.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+      setMapPickerCoord(null);
+    } else {
+      setMapPickerCoord(null);
+    }
+    setPickerMode('target');
+    setShowMapPicker(true);
+  };
+
+  const cancelMapPick = () => {
+    if (initialUserPosRef.current) {
+      setCurrentPos(initialUserPosRef.current);
+    }
+    setShowMapPicker(false);
+  };
+
+  const confirmMapPick = () => {
+    if (mapPickerCoord && isValidCoord(mapPickerCoord)) {
+      setTargetLat(mapPickerCoord.latitude.toFixed(6));
+      setTargetLng(mapPickerCoord.longitude.toFixed(6));
+      setTargetName(`Titik Peta (${mapPickerCoord.latitude.toFixed(4)}, ${mapPickerCoord.longitude.toFixed(4)})`);
+    }
+    setShowMapPicker(false);
+  };
+
+  const resetGpsToSensor = () => {
     Geolocation.getCurrentPosition(
       (position) => {
         const pos = {
@@ -179,96 +412,23 @@ const NavigasiKoordinat = ({ navigation }) => {
         };
         setCurrentPos(pos);
         setGpsAccuracy(position.coords.accuracy);
-        setTrackHistory([pos]);
-        setIsLoading(false);
-      },
-      (error) => {
-        Alert.alert('GPS Error', 'Gagal mendapatkan posisi GPS: ' + error.message);
-        setIsLoading(false);
-        setIsTracking(false);
-        setViewMode('input');
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-
-    // Watch posisi real-time
-    watchIdRef.current = Geolocation.watchPosition(
-      (position) => {
-        const pos = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        setCurrentPos(pos);
-        setGpsAccuracy(position.coords.accuracy);
-        setTrackHistory(prev => [...prev, pos]);
-
-        // Gunakan heading dari GPS jika tersedia
-        if (position.coords.heading != null && position.coords.heading >= 0) {
-          setHeading(position.coords.heading);
+        if (pickerMapRef.current) {
+          pickerMapRef.current.animateToRegion(
+            {
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              latitudeDelta: 0.015,
+              longitudeDelta: 0.015,
+            },
+            500
+          );
         }
       },
       (error) => {
-        console.warn('[NavigasiKoordinat] Watch error:', error);
+        Alert.alert('Info GPS', 'Gagal memperbarui posisi GPS: ' + error.message);
       },
-      {
-        enableHighAccuracy: true,
-        distanceFilter: 2,
-        interval: 1000,
-        fastestInterval: 500,
-      }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
-
-    // Compass heading dari magnetometer (fallback)
-    try {
-      const { magnetometer } = require('react-native-sensors');
-      const subscription = magnetometer.subscribe(({ x, y }) => {
-        let angle = Math.atan2(y, x) * (180 / Math.PI);
-        angle = (angle + 360) % 360;
-        setHeading(angle);
-      });
-      headingSubRef.current = subscription;
-    } catch (e) {
-      console.log('[NavigasiKoordinat] Magnetometer fallback not available');
-    }
-  };
-
-  /** Stop GPS tracking */
-  const stopTracking = () => {
-    if (watchIdRef.current !== null) {
-      Geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    if (headingSubRef.current) {
-      if (typeof headingSubRef.current.unsubscribe === 'function') {
-        headingSubRef.current.unsubscribe();
-      }
-      headingSubRef.current = null;
-    }
-    setIsTracking(false);
-  };
-
-  /** ====== FUNGSI 1: Pilih Target dari Peta ====== */
-  const openMapPicker = () => {
-    // Gunakan posisi saat ini sebagai center map jika tersedia
-    if (currentPos) {
-      setInitialRegion({
-        latitude: currentPos.latitude,
-        longitude: currentPos.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
-    }
-    setMapPickerCoord(null);
-    setShowMapPicker(true);
-  };
-
-  const confirmMapPick = () => {
-    if (mapPickerCoord) {
-      setTargetLat(mapPickerCoord.latitude.toFixed(6));
-      setTargetLng(mapPickerCoord.longitude.toFixed(6));
-      setTargetName(`Titik Peta (${mapPickerCoord.latitude.toFixed(4)}, ${mapPickerCoord.longitude.toFixed(4)})`);
-    }
-    setShowMapPicker(false);
   };
 
   /** Lihat posisi saat ini */
@@ -292,8 +452,21 @@ const NavigasiKoordinat = ({ navigation }) => {
 
   /** Kembali ke tampilan input */
   const backToInput = () => {
-    stopTracking();
-    setViewMode('input');
+    Alert.alert(
+      'Hentikan Navigasi',
+      'Apakah Anda ingin menghentikan sesi navigasi ini?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Ya, Hentikan',
+          style: 'destructive',
+          onPress: async () => {
+            await stopTracking();
+            setViewMode('input');
+          },
+        },
+      ]
+    );
   };
 
   /** Pindah ke tampilan peta tracking */
@@ -306,10 +479,13 @@ const NavigasiKoordinat = ({ navigation }) => {
     <View style={{ flex: 1, backgroundColor: '#F0F4F8' }}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity style={s.backButton} onPress={() => {
-          stopTracking();
-          navigation.goBack();
-        }}>
+        <TouchableOpacity
+          style={s.backButton}
+          onPress={() => {
+            // Navigasi tetap aktif di latar belakang saat kembali
+            navigation.goBack();
+          }}
+        >
           <FastImage
             style={{ width: 20, height: 20 }}
             source={require('../assets/img/chevron-left.png')}
@@ -318,6 +494,12 @@ const NavigasiKoordinat = ({ navigation }) => {
         </TouchableOpacity>
         <View style={s.headerCenter}>
           <Text style={s.headerTitle}>🧭 Navigasi Koordinat</Text>
+          {isTracking && (
+            <View style={s.bgTrackingStatusPill}>
+              <View style={s.greenDotLive} />
+              <Text style={s.bgTrackingStatusText}>LATAR BELAKANG AKTIF</Text>
+            </View>
+          )}
         </View>
         {isTracking && (
           <TouchableOpacity onPress={backToInput} style={s.headerRight}>
@@ -329,18 +511,235 @@ const NavigasiKoordinat = ({ navigation }) => {
 
       {/* ============ VIEW: INPUT MODE ============ */}
       {viewMode === 'input' && (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Section: Pilih Target */}
-          <View style={s.card}>
-            <Text style={s.cardTitle}>🎯 Pilih Lokasi Target</Text>
-            <Text style={s.cardSubtitle}>Pilih dari peta atau masukkan koordinat manual</Text>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {/* 1. MAP PREVIEW GIS (Sesuai Desain Modern Government GIS Home V2) */}
+          <View style={s.mapWrapper}>
+            <View style={s.mapContainer}>
+              <MapView
+                ref={previewMapRef}
+                style={s.mapCanvas}
+                provider="google"
+                mapType={mapType}
+                initialRegion={
+                  targetCoord
+                    ? {
+                        latitude: targetCoord.latitude,
+                        longitude: targetCoord.longitude,
+                        latitudeDelta: 0.03,
+                        longitudeDelta: 0.03,
+                      }
+                    : currentPos && isValidCoord(currentPos)
+                    ? {
+                        latitude: currentPos.latitude,
+                        longitude: currentPos.longitude,
+                        latitudeDelta: 0.03,
+                        longitudeDelta: 0.03,
+                      }
+                    : initialRegion
+                }
+                showsCompass={false}
+                toolbarEnabled={false}
+                onPress={(e) => {
+                  const coord = e.nativeEvent.coordinate;
+                  if (isValidCoord(coord)) {
+                    setTargetLat(coord.latitude.toFixed(6));
+                    setTargetLng(coord.longitude.toFixed(6));
+                    setTargetName(
+                      `Titik Peta (${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)})`
+                    );
+                  }
+                }}
+              >
+                {/* Posisi Target Marker dengan Callout Pin */}
+                {targetCoord && (
+                  <Marker
+                    coordinate={targetCoord}
+                    anchor={{ x: 0.2, y: 0.5 }}
+                    tracksViewChanges={false}
+                    draggable={true}
+                    onDragEnd={(e) => {
+                      const coord = e.nativeEvent.coordinate;
+                      if (isValidCoord(coord)) {
+                        setTargetLat(coord.latitude.toFixed(6));
+                        setTargetLng(coord.longitude.toFixed(6));
+                        setTargetName(
+                          `Titik Peta (${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)})`
+                        );
+                      }
+                    }}
+                  >
+                    <View style={s.markerWithCalloutRow}>
+                      <View style={s.glowTargetCircle}>
+                        <View style={s.glowTargetDot} />
+                      </View>
+                      <View style={s.darkCalloutPill}>
+                        <View style={s.darkCalloutArrow} />
+                        <Text style={s.darkCalloutText} numberOfLines={1}>
+                          {targetName || `${targetLat}, ${targetLng}`}
+                        </Text>
+                      </View>
+                    </View>
+                  </Marker>
+                )}
 
-            {/* Tombol Pilih dari Peta */}
+                {/* Posisi Pengguna GPS */}
+                {currentPos && isValidCoord(currentPos) && (
+                  <>
+                    <Circle
+                      center={currentPos}
+                      radius={
+                        gpsAccuracy && isFinite(gpsAccuracy) && gpsAccuracy > 0
+                          ? gpsAccuracy
+                          : 25
+                      }
+                      fillColor="rgba(2, 132, 199, 0.2)"
+                      strokeColor="rgba(2, 132, 199, 0.6)"
+                      strokeWidth={1}
+                    />
+                    <Marker
+                      coordinate={currentPos}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                      tracksViewChanges={false}
+                      draggable={true}
+                      onDragEnd={(e) => {
+                        const coord = e.nativeEvent.coordinate;
+                        if (isValidCoord(coord)) {
+                          setCurrentPos(coord);
+                        }
+                      }}
+                    >
+                      <View style={s.gpsMarkerCircle}>
+                        <View style={s.gpsMarkerInner} />
+                      </View>
+                    </Marker>
+                  </>
+                )}
+
+                {/* Garis Menuju Target (Polyline Putus-putus Merah/Oranye) */}
+                {targetCoord && currentPos && isValidCoord(currentPos) && (
+                  <Polyline
+                    coordinates={[currentPos, targetCoord]}
+                    strokeColor="#EF4444"
+                    strokeWidth={2.5}
+                    lineDashPattern={[8, 4]}
+                  />
+                )}
+              </MapView>
+
+              {/* TOP-LEFT OVERLAY BADGE */}
+              <View style={s.topLeftCard}>
+                <View style={s.mapIconBadge}>
+                  <FastImage
+                    source={require('../assets/img/map.png')}
+                    style={s.mapIconImg}
+                    resizeMode={FastImage.resizeMode.contain}
+                    tintColor="#FFFFFF"
+                  />
+                </View>
+                <View style={s.topLeftTextCol}>
+                  <Text style={s.mapTitleHeader}>Peta Target Navigasi</Text>
+                  <Text style={s.mapSubHeader} numberOfLines={1}>
+                    {targetCoord
+                      ? `${targetLat}, ${targetLng}`
+                      : 'Ketuk peta untuk tentukan target'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* TOP-RIGHT OVERLAY: PILIH LAYER BUTTON */}
+              <TouchableOpacity
+                style={s.layerSelectorBtn}
+                onPress={() => setShowLayerModal(true)}
+                activeOpacity={0.8}
+              >
+                <FastImage
+                  source={require('../assets/img/gis_pirate-map.png')}
+                  style={s.layerIcon}
+                  resizeMode={FastImage.resizeMode.contain}
+                  tintColor="#0284C7"
+                />
+                <Text style={s.layerText}>Pilih Layer</Text>
+                <Text style={s.layerChevron}>⌵</Text>
+              </TouchableOpacity>
+
+              {/* RIGHT VERTICAL CONTROLS (KOMPAS, ZOOM IN, ZOOM OUT, LOKASI) */}
+              <View style={s.rightControlsStack}>
+                <TouchableOpacity
+                  style={s.controlCircleBtn}
+                  onPress={() => handleResetCompass(previewMapRef)}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Reset Kompas"
+                >
+                  <Text style={s.compassIcon}>🧭</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.controlCircleBtn}
+                  onPress={() => handleZoomIn(previewMapRef)}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Perbesar Peta"
+                >
+                  <Text style={s.zoomIconText}>＋</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.controlCircleBtn}
+                  onPress={() => handleZoomOut(previewMapRef)}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Perkecil Peta"
+                >
+                  <Text style={s.zoomIconText}>−</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.controlCircleBtn, s.controlCircleAccent]}
+                  onPress={handleCenterPreviewMap}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Pusatkan Peta"
+                >
+                  <Text style={s.targetIcon}>🎯</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* BOTTOM-LEFT INFO CARD */}
+              <View style={s.bottomLeftCard}>
+                <View style={s.bottomCardContent}>
+                  <Text style={s.bottomCardTitle} numberOfLines={1}>
+                    {targetName || (targetCoord ? 'Target Terpilih' : 'Belum Ada Target')}
+                  </Text>
+                  <Text style={s.bottomCardSubtitle} numberOfLines={1}>
+                    {targetCoord && currentPos && isValidCoord(currentPos)
+                      ? `${formatDistance(distance)} • Arah ${getCompassDirection(bearing)}`
+                      : targetCoord
+                      ? `${targetLat}, ${targetLng}`
+                      : 'Tap peta atau pilih dari modal'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* BOTTOM-RIGHT GRAPHIC SCALE BAR */}
+              <View style={s.scaleBarContainer}>
+                <Text style={s.scaleText}>0      5      10 km</Text>
+                <View style={s.scaleRuler}>
+                  <View style={s.rulerSegmentWhite} />
+                  <View style={s.rulerSegmentBlack} />
+                  <View style={s.rulerSegmentWhite} />
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* 2. SECTION: PILIH / INPUT TARGET */}
+          <View style={s.card}>
+            <Text style={s.cardTitle}>🎯 Tentukan Lokasi Target</Text>
+            <Text style={s.cardSubtitle}>Pilih dari peta interaktif di atas atau masukkan koordinat manual</Text>
+
+            {/* Tombol Pilih dari Peta Layar Penuh */}
             <TouchableOpacity style={s.mapPickerButton} onPress={openMapPicker}>
               <Text style={s.mapPickerIcon}>🗺️</Text>
               <View style={{ flex: 1 }}>
-                <Text style={s.mapPickerText}>Pilih dari Peta</Text>
-                <Text style={s.mapPickerSubText}>Tap pada peta untuk menentukan titik tujuan</Text>
+                <Text style={s.mapPickerText}>Pilih dari Peta Layar Penuh</Text>
+                <Text style={s.mapPickerSubText}>Buka peta penuh untuk penempatan titik yang lebih presisi</Text>
               </View>
               <Text style={{ fontSize: 16, color: '#208DC0' }}>›</Text>
             </TouchableOpacity>
@@ -390,10 +789,10 @@ const NavigasiKoordinat = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Preview Target */}
-          {targetLat !== '' && targetLng !== '' && (
+          {/* 3. CARD DETAIL TARGET TERPILIH */}
+          {targetCoord && (
             <View style={s.card}>
-              <Text style={s.cardTitle}>📌 Target Terpilih</Text>
+              <Text style={s.cardTitle}>📌 Detail Target Terpilih</Text>
               {targetName !== '' && (
                 <Text style={s.targetNameText}>{targetName}</Text>
               )}
@@ -407,51 +806,14 @@ const NavigasiKoordinat = ({ navigation }) => {
                   <Text style={s.targetInfoValue}>{targetLng}</Text>
                 </View>
               </View>
-              {currentPos && (
+              {currentPos && isValidCoord(currentPos) && (
                 <View style={s.previewDistance}>
-                  <Text style={s.previewDistLabel}>Estimasi Jarak:</Text>
+                  <Text style={s.previewDistLabel}>Estimasi Jarak & Waktu:</Text>
                   <Text style={s.previewDistValue}>
-                    {formatDistance(calculateDistance(
-                      currentPos.latitude, currentPos.longitude,
-                      parseFloat(targetLat), parseFloat(targetLng)
-                    ))}
+                    {formatDistance(distance)} ({estimateWalkingTime(distance)})
                   </Text>
                 </View>
               )}
-
-              {/* Mini Map Preview */}
-              <View style={s.miniMapContainer}>
-                <MapView
-                  style={s.miniMap}
-                  provider="google"
-                  region={{
-                    latitude: parseFloat(targetLat) || -4.234658,
-                    longitude: parseFloat(targetLng) || 122.353003,
-                    latitudeDelta: 0.02,
-                    longitudeDelta: 0.02,
-                  }}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  rotateEnabled={false}
-                  pitchEnabled={false}
-                >
-                  <Marker
-                    coordinate={{
-                      latitude: parseFloat(targetLat) || 0,
-                      longitude: parseFloat(targetLng) || 0,
-                    }}
-                    pinColor="red"
-                    title="Target"
-                  />
-                  {currentPos && (
-                    <Marker
-                      coordinate={currentPos}
-                      pinColor="blue"
-                      title="Posisi Anda"
-                    />
-                  )}
-                </MapView>
-              </View>
             </View>
           )}
 
@@ -542,10 +904,25 @@ const NavigasiKoordinat = ({ navigation }) => {
             )}
           </View>
 
-          {/* Stop Button */}
-          <TouchableOpacity style={[s.actionButton, s.stopButton]} onPress={backToInput}>
-            <Text style={s.actionButtonText}>⏹ STOP NAVIGASI</Text>
-          </TouchableOpacity>
+          {/* Action Buttons: Kembali ke Menu (Tetap Berjalan) & Stop */}
+          <View style={{ gap: 10, marginTop: 12 }}>
+            <TouchableOpacity
+              style={s.minimizeBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.8}
+            >
+              <Text style={s.minimizeBtnText}>⇱ KEMBALI KE MENU (TETAP AKTIF)</Text>
+            </TouchableOpacity>
+
+            {/* Stop Button */}
+            <TouchableOpacity
+              style={[s.actionButton, s.stopButton]}
+              onPress={backToInput}
+              activeOpacity={0.8}
+            >
+              <Text style={s.actionButtonText}>⏹ HENTIKAN NAVIGASI</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
 
@@ -568,49 +945,50 @@ const NavigasiKoordinat = ({ navigation }) => {
               ref={mapRef}
               style={{ flex: 1 }}
               provider="google"
-              initialRegion={currentPos ? {
+              mapType={mapType}
+              initialRegion={currentPos && isValidCoord(currentPos) ? {
                 latitude: currentPos.latitude,
                 longitude: currentPos.longitude,
                 latitudeDelta: 0.02,
                 longitudeDelta: 0.02,
               } : initialRegion}
               showsUserLocation={false}
-              showsCompass={true}
+              showsCompass={false}
             >
               {/* Posisi saat ini */}
-              {currentPos && (
+              {currentPos && isValidCoord(currentPos) && (
                 <>
                   <Circle
                     center={currentPos}
-                    radius={gpsAccuracy || 10}
-                    fillColor="rgba(32, 141, 192, 0.15)"
-                    strokeColor="rgba(32, 141, 192, 0.3)"
+                    radius={gpsAccuracy && isFinite(gpsAccuracy) && gpsAccuracy > 0 ? gpsAccuracy : 15}
+                    fillColor="rgba(2, 132, 199, 0.2)"
+                    strokeColor="rgba(2, 132, 199, 0.6)"
                     strokeWidth={1}
                   />
-                  <Marker coordinate={currentPos} title="Posisi Anda" pinColor="blue" />
+                  <Marker coordinate={currentPos} anchor={{ x: 0.5, y: 0.5 }} title="Posisi Anda">
+                    <View style={s.gpsMarkerCircle}>
+                      <View style={s.gpsMarkerInner} />
+                    </View>
+                  </Marker>
                 </>
               )}
 
-              {/* Target */}
-              <Marker
-                coordinate={{
-                  latitude: parseFloat(targetLat),
-                  longitude: parseFloat(targetLng),
-                }}
-                title="Target"
-                description={targetName || `${targetLat}, ${targetLng}`}
-                pinColor="red"
-              />
+              {/* Target Marker */}
+              {targetCoord && (
+                <Marker
+                  coordinate={targetCoord}
+                  title="Target"
+                  description={targetName || `${targetLat}, ${targetLng}`}
+                  pinColor="red"
+                />
+              )}
 
               {/* Garis lurus ke target */}
-              {currentPos && (
+              {currentPos && targetCoord && isValidCoord(currentPos) && (
                 <Polyline
-                  coordinates={[
-                    currentPos,
-                    { latitude: parseFloat(targetLat), longitude: parseFloat(targetLng) },
-                  ]}
-                  strokeColor="#E74C3C"
-                  strokeWidth={2}
+                  coordinates={[currentPos, targetCoord]}
+                  strokeColor="#EF4444"
+                  strokeWidth={2.5}
                   lineDashPattern={[10, 5]}
                 />
               )}
@@ -619,11 +997,52 @@ const NavigasiKoordinat = ({ navigation }) => {
               {trackHistory.length > 1 && (
                 <Polyline
                   coordinates={trackHistory}
-                  strokeColor="#208DC0"
-                  strokeWidth={3}
+                  strokeColor="#0284C7"
+                  strokeWidth={3.5}
                 />
               )}
             </MapView>
+
+            {/* Layer Selector Button di Full Map Tracking */}
+            <TouchableOpacity
+              style={[s.layerSelectorBtn, { top: 80 }]}
+              onPress={() => setShowLayerModal(true)}
+              activeOpacity={0.8}
+            >
+              <FastImage
+                source={require('../assets/img/gis_pirate-map.png')}
+                style={s.layerIcon}
+                resizeMode={FastImage.resizeMode.contain}
+                tintColor="#0284C7"
+              />
+              <Text style={s.layerText}>Layer</Text>
+              <Text style={s.layerChevron}>⌵</Text>
+            </TouchableOpacity>
+
+            {/* Right Controls di Full Map Tracking */}
+            <View style={[s.rightControlsStack, { top: 125 }]}>
+              <TouchableOpacity
+                style={s.controlCircleBtn}
+                onPress={() => handleResetCompass(mapRef)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.compassIcon}>🧭</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.controlCircleBtn}
+                onPress={() => handleZoomIn(mapRef)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.zoomIconText}>＋</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.controlCircleBtn}
+                onPress={() => handleZoomOut(mapRef)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.zoomIconText}>−</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Floating Info */}
             <View style={s.floatingInfo}>
@@ -643,13 +1062,27 @@ const NavigasiKoordinat = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Floating Stop Button */}
-            <TouchableOpacity style={s.floatingStop} onPress={backToInput}>
-              <Text style={s.floatingStopText}>⏹ Stop</Text>
-            </TouchableOpacity>
+            {/* Floating Menu & Stop Buttons */}
+            <View style={s.floatingActionRow}>
+              <TouchableOpacity
+                style={s.floatingMenuBtn}
+                onPress={() => navigation.goBack()}
+                activeOpacity={0.8}
+              >
+                <Text style={s.floatingMenuText}>⇱ Menu</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.floatingStop}
+                onPress={backToInput}
+                activeOpacity={0.8}
+              >
+                <Text style={s.floatingStopText}>⏹ Stop</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Floating Recenter */}
-            {currentPos && (
+            {currentPos && isValidCoord(currentPos) && (
               <TouchableOpacity
                 style={s.floatingRecenter}
                 onPress={() => {
@@ -684,89 +1117,406 @@ const NavigasiKoordinat = ({ navigation }) => {
         <View style={{ flex: 1 }}>
           {/* Modal Header */}
           <View style={s.modalHeader}>
-            <TouchableOpacity onPress={() => setShowMapPicker(false)}>
+            <TouchableOpacity onPress={cancelMapPick}>
               <Text style={s.modalCancel}>Batal</Text>
             </TouchableOpacity>
             <Text style={s.modalTitle}>Pilih Lokasi Target</Text>
             <TouchableOpacity
               onPress={confirmMapPick}
-              disabled={!mapPickerCoord}
+              disabled={!mapPickerCoord && !currentPos}
             >
-              <Text style={[s.modalConfirm, !mapPickerCoord && { color: '#ccc' }]}>Pilih</Text>
+              <Text
+                style={[
+                  s.modalConfirm,
+                  !mapPickerCoord && !currentPos && { color: '#ccc' },
+                ]}
+              >
+                Pilih
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Instruction */}
-          <View style={s.modalInstruction}>
-            <Text style={s.modalInstructionText}>
-              👆 Tap pada peta untuk menentukan titik tujuan
+          {/* Mode Switcher: Target (Merah) vs Posisi Saya (Biru) */}
+          <View style={s.pickerModeBar}>
+            <TouchableOpacity
+              style={[
+                s.pickerModeBtn,
+                pickerMode === 'target' && s.pickerModeBtnActiveTarget,
+              ]}
+              onPress={() => setPickerMode('target')}
+              activeOpacity={0.8}
+            >
+              <View style={[s.modeDot, { backgroundColor: '#EF4444' }]} />
+              <Text
+                style={[
+                  s.pickerModeText,
+                  pickerMode === 'target' && s.pickerModeTextActiveTarget,
+                ]}
+              >
+                Titik Target (Merah)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                s.pickerModeBtn,
+                pickerMode === 'user' && s.pickerModeBtnActiveUser,
+              ]}
+              onPress={() => setPickerMode('user')}
+              activeOpacity={0.8}
+            >
+              <View style={[s.modeDot, { backgroundColor: '#2563EB' }]} />
+              <Text
+                style={[
+                  s.pickerModeText,
+                  pickerMode === 'user' && s.pickerModeTextActiveUser,
+                ]}
+              >
+                Posisi Saya (Biru)
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Dynamic Instruction */}
+          <View
+            style={[
+              s.modalInstruction,
+              pickerMode === 'user'
+                ? s.modalInstructionUser
+                : s.modalInstructionTarget,
+            ]}
+          >
+            <Text
+              style={[
+                s.modalInstructionText,
+                pickerMode === 'user'
+                  ? s.modalInstructionTextUser
+                  : s.modalInstructionTextTarget,
+              ]}
+            >
+              {pickerMode === 'user'
+                ? '📍 Tap peta atau tahan & geser pin BIRU ke lokasi Anda sebenarnya'
+                : '🎯 Tap peta atau tahan & geser pin MERAH untuk target tujuan'}
             </Text>
           </View>
 
-          {/* Full Screen Map */}
-          <MapView
-            style={{ flex: 1 }}
-            provider="google"
-            initialRegion={initialRegion}
-            onPress={(e) => {
-              setMapPickerCoord(e.nativeEvent.coordinate);
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-          >
-            {/* Picked marker */}
-            {mapPickerCoord && (
-              <Marker
-                coordinate={mapPickerCoord}
-                pinColor="red"
-                title="Target Tujuan"
-                description={`${mapPickerCoord.latitude.toFixed(6)}, ${mapPickerCoord.longitude.toFixed(6)}`}
-              />
-            )}
+          {/* Container Peta & Overlays */}
+          <View style={{ flex: 1, position: 'relative' }}>
+            {/* Full Screen Map Picker */}
+            <MapView
+              ref={pickerMapRef}
+              style={{ flex: 1 }}
+              provider="google"
+              mapType={mapType}
+              initialRegion={initialRegion}
+              onPress={(e) => {
+                const coord = e.nativeEvent.coordinate;
+                if (isValidCoord(coord)) {
+                  if (pickerMode === 'user') {
+                    setCurrentPos(coord);
+                  } else {
+                    setMapPickerCoord(coord);
+                  }
+                }
+              }}
+              showsUserLocation={true}
+              showsMyLocationButton={false}
+            >
+              {/* Picked target marker (Red) */}
+              {mapPickerCoord && isValidCoord(mapPickerCoord) && (
+                <Marker
+                  coordinate={mapPickerCoord}
+                  pinColor="red"
+                  title="Target Tujuan"
+                  description={`Tahan & tarik untuk menggeser (${mapPickerCoord.latitude.toFixed(6)}, ${mapPickerCoord.longitude.toFixed(6)})`}
+                  draggable={true}
+                  onDragEnd={(e) => {
+                    const coord = e.nativeEvent.coordinate;
+                    if (isValidCoord(coord)) {
+                      setMapPickerCoord(coord);
+                    }
+                  }}
+                />
+              )}
 
-            {/* Current pos marker */}
-            {currentPos && (
-              <Marker
-                coordinate={currentPos}
-                pinColor="blue"
-                title="Posisi Anda"
-              />
-            )}
+              {/* Current pos marker (Blue) */}
+              {currentPos && isValidCoord(currentPos) && (
+                <Marker
+                  coordinate={currentPos}
+                  pinColor="blue"
+                  title="Posisi Saya"
+                  description={`Tahan & tarik pin ini ke lokasi sebenarnya (${currentPos.latitude.toFixed(6)}, ${currentPos.longitude.toFixed(6)})`}
+                  draggable={true}
+                  onDragEnd={(e) => {
+                    const coord = e.nativeEvent.coordinate;
+                    if (isValidCoord(coord)) {
+                      setCurrentPos(coord);
+                    }
+                  }}
+                />
+              )}
 
-            {/* Line from current to target */}
-            {mapPickerCoord && currentPos && (
-              <Polyline
-                coordinates={[currentPos, mapPickerCoord]}
-                strokeColor="#E74C3C"
-                strokeWidth={2}
-                lineDashPattern={[10, 5]}
-              />
-            )}
-          </MapView>
+              {/* Line from current to target */}
+              {mapPickerCoord &&
+                currentPos &&
+                isValidCoord(currentPos) &&
+                isValidCoord(mapPickerCoord) && (
+                  <Polyline
+                    coordinates={[currentPos, mapPickerCoord]}
+                    strokeColor="#EF4444"
+                    strokeWidth={2.5}
+                    lineDashPattern={[10, 5]}
+                  />
+                )}
+            </MapView>
 
-          {/* Picked coordinate info */}
-          {mapPickerCoord && (
-            <View style={s.modalPickedInfo}>
-              <View style={s.modalPickedRow}>
-                <Text style={s.modalPickedLabel}>Koordinat Terpilih:</Text>
-                <Text style={s.modalPickedValue}>
-                  {mapPickerCoord.latitude.toFixed(6)}, {mapPickerCoord.longitude.toFixed(6)}
-                </Text>
+            {/* Layer Selector Button di Map Picker */}
+            <TouchableOpacity
+              style={s.layerSelectorBtn}
+              onPress={() => setShowLayerModal(true)}
+              activeOpacity={0.8}
+            >
+              <FastImage
+                source={require('../assets/img/gis_pirate-map.png')}
+                style={s.layerIcon}
+                resizeMode={FastImage.resizeMode.contain}
+                tintColor="#0284C7"
+              />
+              <Text style={s.layerText}>Layer</Text>
+              <Text style={s.layerChevron}>⌵</Text>
+            </TouchableOpacity>
+
+            {/* Right Controls di Map Picker */}
+            <View style={s.rightControlsStack}>
+              <TouchableOpacity
+                style={s.controlCircleBtn}
+                onPress={() => handleResetCompass(pickerMapRef)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.compassIcon}>🧭</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.controlCircleBtn}
+                onPress={() => handleZoomIn(pickerMapRef)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.zoomIconText}>＋</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.controlCircleBtn}
+                onPress={() => handleZoomOut(pickerMapRef)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.zoomIconText}>−</Text>
+              </TouchableOpacity>
+
+              {/* Focus ke Posisi Saya (Biru) */}
+              {currentPos && isValidCoord(currentPos) && (
+                <TouchableOpacity
+                  style={s.controlCircleBtn}
+                  onPress={() => {
+                    pickerMapRef.current?.animateToRegion(
+                      {
+                        latitude: currentPos.latitude,
+                        longitude: currentPos.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      },
+                      500
+                    );
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={{ fontSize: 16 }}>📍</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Focus ke Target (Merah) */}
+              {mapPickerCoord && isValidCoord(mapPickerCoord) && (
+                <TouchableOpacity
+                  style={s.controlCircleBtn}
+                  onPress={() => {
+                    pickerMapRef.current?.animateToRegion(
+                      {
+                        latitude: mapPickerCoord.latitude,
+                        longitude: mapPickerCoord.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      },
+                      500
+                    );
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={{ fontSize: 16 }}>🎯</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Coordinate info bar */}
+          <View style={s.modalPickedInfo}>
+            <View style={s.modalPickedRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[s.modeDot, { backgroundColor: '#2563EB' }]} />
+                <Text style={s.modalPickedLabel}>Posisi Anda:</Text>
               </View>
-              {currentPos && (
-                <View style={s.modalPickedRow}>
-                  <Text style={s.modalPickedLabel}>Jarak dari posisi Anda:</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={s.modalPickedValue}>
+                  {currentPos && isValidCoord(currentPos)
+                    ? `${currentPos.latitude.toFixed(6)}, ${currentPos.longitude.toFixed(6)}`
+                    : 'Mencari sinyal...'}
+                </Text>
+                <TouchableOpacity
+                  style={s.resetGpsSmallBtn}
+                  onPress={resetGpsToSensor}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.resetGpsSmallText}>↺ Reset GPS</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={s.modalPickedRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[s.modeDot, { backgroundColor: '#EF4444' }]} />
+                <Text style={s.modalPickedLabel}>Titik Target:</Text>
+              </View>
+              <Text
+                style={[
+                  s.modalPickedValue,
+                  (!mapPickerCoord || !isValidCoord(mapPickerCoord)) && {
+                    color: '#94A3B8',
+                    fontWeight: 'normal',
+                  },
+                ]}
+              >
+                {mapPickerCoord && isValidCoord(mapPickerCoord)
+                  ? `${mapPickerCoord.latitude.toFixed(6)}, ${mapPickerCoord.longitude.toFixed(6)}`
+                  : 'Belum dipilih (Tap di peta)'}
+              </Text>
+            </View>
+
+            {mapPickerCoord &&
+              isValidCoord(mapPickerCoord) &&
+              currentPos &&
+              isValidCoord(currentPos) && (
+                <View
+                  style={[
+                    s.modalPickedRow,
+                    {
+                      marginTop: 4,
+                      paddingTop: 6,
+                      borderTopWidth: 1,
+                      borderTopColor: '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Text style={s.modalPickedLabel}>Jarak Langsung:</Text>
                   <Text style={[s.modalPickedValue, { color: '#E74C3C' }]}>
-                    {formatDistance(calculateDistance(
-                      currentPos.latitude, currentPos.longitude,
-                      mapPickerCoord.latitude, mapPickerCoord.longitude
-                    ))}
+                    {formatDistance(
+                      calculateDistance(
+                        currentPos.latitude,
+                        currentPos.longitude,
+                        mapPickerCoord.latitude,
+                        mapPickerCoord.longitude
+                      )
+                    )}
                   </Text>
                 </View>
               )}
-            </View>
-          )}
+          </View>
         </View>
+      </Modal>
+
+      {/* ============ MODAL PILIH LAYER BASEMAP ============ */}
+      <Modal
+        visible={showLayerModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLayerModal(false)}
+      >
+        <TouchableOpacity
+          style={s.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowLayerModal(false)}
+        >
+          <View style={s.layerModalCard}>
+            <Text style={s.layerModalTitle}>Tipe Peta Dasar (Basemap)</Text>
+
+            <TouchableOpacity
+              style={[
+                s.layerOptionRow,
+                mapType === 'hybrid' && s.layerOptionActive,
+              ]}
+              onPress={() => {
+                setMapType('hybrid');
+                setShowLayerModal(false);
+              }}
+            >
+              <Text style={s.layerOptionIcon}>🛰️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.layerOptionText}>Citra Satelit & Jalan (Hybrid)</Text>
+                <Text style={s.layerOptionSub}>Rekomendasi survei spasial batas</Text>
+              </View>
+              {mapType === 'hybrid' && <Text style={s.checkIcon}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                s.layerOptionRow,
+                mapType === 'satellite' && s.layerOptionActive,
+              ]}
+              onPress={() => {
+                setMapType('satellite');
+                setShowLayerModal(false);
+              }}
+            >
+              <Text style={s.layerOptionIcon}>🌍</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.layerOptionText}>Satelit Murni</Text>
+                <Text style={s.layerOptionSub}>Foto udara resolusi tinggi</Text>
+              </View>
+              {mapType === 'satellite' && <Text style={s.checkIcon}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                s.layerOptionRow,
+                mapType === 'standard' && s.layerOptionActive,
+              ]}
+              onPress={() => {
+                setMapType('standard');
+                setShowLayerModal(false);
+              }}
+            >
+              <Text style={s.layerOptionIcon}>🗺️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.layerOptionText}>Peta Jalan Vektor (Standar)</Text>
+                <Text style={s.layerOptionSub}>Hemat kuota & cepat dimuat</Text>
+              </View>
+              {mapType === 'standard' && <Text style={s.checkIcon}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                s.layerOptionRow,
+                mapType === 'terrain' && s.layerOptionActive,
+              ]}
+              onPress={() => {
+                setMapType('terrain');
+                setShowLayerModal(false);
+              }}
+            >
+              <Text style={s.layerOptionIcon}>⛰️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.layerOptionText}>Kontur Medan (Terrain)</Text>
+                <Text style={s.layerOptionSub}>Elevasi topografi pegunungan</Text>
+              </View>
+              {mapType === 'terrain' && <Text style={s.checkIcon}>✓</Text>}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -1038,6 +1788,84 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   modalInstructionText: { fontSize: 13, color: '#F57F17', fontWeight: '600' },
+  modalInstructionTarget: {
+    backgroundColor: '#FFF7ED',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFEDD5',
+  },
+  modalInstructionTextTarget: {
+    color: '#C2410C',
+  },
+  modalInstructionUser: {
+    backgroundColor: '#EFF6FF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#DBEAFE',
+  },
+  modalInstructionTextUser: {
+    color: '#1D4ED8',
+  },
+  pickerModeBar: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 8,
+  },
+  pickerModeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  pickerModeBtnActiveTarget: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+  },
+  pickerModeBtnActiveUser: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
+  },
+  modeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  pickerModeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  pickerModeTextActiveTarget: {
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+  pickerModeTextActiveUser: {
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+  resetGpsSmallBtn: {
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    marginLeft: 8,
+  },
+  resetGpsSmallText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
   modalPickedInfo: {
     backgroundColor: '#fff',
     padding: 14,
@@ -1052,6 +1880,413 @@ const s = StyleSheet.create({
   },
   modalPickedLabel: { fontSize: 12, color: '#666' },
   modalPickedValue: { fontSize: 13, fontWeight: 'bold', color: '#208DC0' },
+
+  // Map Preview GIS (Sesuai Desain Home V2)
+  mapWrapper: {
+    paddingHorizontal: 15,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  mapContainer: {
+    height: 300,
+    backgroundColor: '#0F172A',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapCanvas: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  topLeftCard: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    maxWidth: '55%',
+  },
+  mapIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: '#0284C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  mapIconImg: {
+    width: 18,
+    height: 18,
+  },
+  topLeftTextCol: {
+    justifyContent: 'center',
+    flexShrink: 1,
+  },
+  mapTitleHeader: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  mapSubHeader: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  layerSelectorBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  layerIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
+  },
+  layerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  layerChevron: {
+    fontSize: 11,
+    color: '#0284C7',
+    fontWeight: '800',
+    marginLeft: 6,
+    marginTop: -1,
+  },
+  rightControlsStack: {
+    position: 'absolute',
+    top: 58,
+    right: 12,
+    zIndex: 15,
+    gap: 7,
+  },
+  controlCircleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  controlCircleAccent: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+  },
+  compassIcon: {
+    fontSize: 18,
+  },
+  zoomIconText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 22,
+  },
+  targetIcon: {
+    fontSize: 16,
+  },
+  markerWithCalloutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  glowTargetCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(239, 68, 68, 0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glowTargetDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+  },
+  darkCalloutPill: {
+    backgroundColor: '#0B192C',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  darkCalloutArrow: {
+    position: 'absolute',
+    left: -5,
+    top: 8,
+    width: 0,
+    height: 0,
+    borderTopWidth: 5,
+    borderBottomWidth: 5,
+    borderRightWidth: 5,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderRightColor: '#0B192C',
+  },
+  darkCalloutText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  bottomLeftCard: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 15,
+    maxWidth: '65%',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  bottomCardContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bottomCardTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  bottomCardSubtitle: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  scaleBarContainer: {
+    position: 'absolute',
+    bottom: 12,
+    right: 14,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  scaleText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  scaleRuler: {
+    flexDirection: 'row',
+    width: 66,
+    height: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  rulerSegmentWhite: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  rulerSegmentBlack: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  gpsMarkerCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(2, 132, 199, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gpsMarkerInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#0284C7',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  layerModalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  layerModalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  layerOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  layerOptionActive: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#0284C7',
+  },
+  layerOptionIcon: {
+    fontSize: 22,
+    marginRight: 12,
+  },
+  layerOptionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  layerOptionSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  checkIcon: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0284C7',
+    marginLeft: 8,
+  },
+  bgTrackingStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginTop: 2,
+  },
+  greenDotLive: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
+    marginRight: 5,
+  },
+  bgTrackingStatusText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#15803D',
+    letterSpacing: 0.3,
+  },
+  minimizeBtn: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#3B82F6',
+    marginHorizontal: 15,
+  },
+  minimizeBtnText: {
+    color: '#1D4ED8',
+    fontWeight: '800',
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  floatingActionRow: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    flexDirection: 'row',
+    gap: 10,
+    zIndex: 20,
+  },
+  floatingMenuBtn: {
+    backgroundColor: '#0F172A',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  floatingMenuText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
 });
 
 export default NavigasiKoordinat;

@@ -56,6 +56,8 @@ import EksporData from "./views/ekspor/EksporData";
 // === Services ===
 import OfflineManager from "./views/library/OfflineManager";
 import NotificationService from "./views/library/NotificationService";
+import NavigasiService from "./views/library/NavigasiService";
+import notifee, { EventType } from "@notifee/react-native";
 
 const Stack = createNativeStackNavigator();
 
@@ -66,9 +68,20 @@ const AppContent = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
+    // Inisialisasi NavigasiService dan restore sesi jika ada
+    NavigasiService.init();
+    NavigasiService.restoreSession();
+
+    // Notifee foreground event handler (misal tombol Hentikan di notifikasi)
+    const unsubNotifeeForeground = notifee.onForegroundEvent(async ({ type, detail }) => {
+      if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'stop_nav') {
+        await NavigasiService.stopNavigation();
+      }
+    });
+
     // Setup auto-sync listener untuk offline mode
     const unsubscribe = OfflineManager.setupAutoSync(
-      (isOnline) => {
+      (isOnline: boolean) => {
         console.log('[App] Connection status:', isOnline ? 'ONLINE' : 'OFFLINE');
       },
       dispatch
@@ -76,7 +89,7 @@ const AppContent = () => {
 
     // Setup notification foreground handler
     const unsubNotif = NotificationService.setupForegroundHandler(
-      async (notif) => {
+      async (notif: any) => {
         console.log('[App] Notification received:', notif.title);
         const count = await NotificationService.getUnreadCount();
         dispatch({ type: 'SET_NOTIFICATION_COUNT', payload: count });
@@ -86,6 +99,7 @@ const AppContent = () => {
     return () => {
       if (unsubscribe) unsubscribe();
       if (unsubNotif) unsubNotif();
+      if (unsubNotifeeForeground) unsubNotifeeForeground();
     };
   }, []);
 

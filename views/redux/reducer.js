@@ -50,6 +50,9 @@ const initialState = {
 
     // === Modul 5: Placemark ===
     PLACEMARK_COUNT: 0,         // Jumlah placemark tersimpan (untuk badge)
+
+    // === Modul Navigasi Background ===
+    ACTIVE_NAVIGATION: null,    // State navigasi aktif { isNavigating, targetLat, targetLng, targetName, currentPos, distance, bearing, ... }
 }
 
 
@@ -85,6 +88,9 @@ const reducer = (state = initialState, action = {}) => {
     // === Modul 5: Placemark ===
     case 'SET_PLACEMARK_COUNT':
       return { ...state, PLACEMARK_COUNT: action.payload };
+    // === Modul Navigasi Background ===
+    case 'SET_ACTIVE_NAVIGATION':
+      return { ...state, ACTIVE_NAVIGATION: action.payload };
     default:
       return state;
   }

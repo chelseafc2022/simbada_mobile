@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
+  Text,
+  TouchableOpacity,
   ScrollView,
   Alert,
   StatusBar,
@@ -289,40 +291,13 @@ const Home = ({ navigation }) => {
     }
   };
 
-  // Fetch Desa by Selected Kecamatan
-  const getDesaByKecamatan = async () => {
-    if (!selectedKecamatan) return;
-    try {
-      const response = await fetch(URL.URL_KECAMATAN + 'petadasar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `kikensbatara ${TOKEN}`,
-        },
-        body: JSON.stringify({ kecamatan_id: selectedKecamatan }),
-      });
-
-      const result = await response.json();
-      if (Array.isArray(result) && result.length > 0) {
-        const processedDesa = result.map((item) => {
-          let area = '0';
-          if (item?.lokasi?.coordinat) {
-            area = calculatePolygonArea(item.lokasi.coordinat);
-          }
-          return { ...item, calculatedArea: area };
-        });
-        setDesa(processedDesa);
-      } else {
-        setDesa([]);
-      }
-    } catch (error) {
-      console.error('Fetch Error:', error);
+  // Fetch Desa & Poligon Sekaligus Berdasarkan Kecamatan Terpilih
+  const getPetadasarAndDesa = async () => {
+    if (!selectedKecamatan) {
+      setDesa([]);
+      setPetadasar([]);
+      return;
     }
-  };
-
-  // Fetch Polygons for Map
-  const getPetadasar = async () => {
-    if (!selectedKecamatan) return;
     try {
       setIsPolygonLoading(true);
       const response = await fetch(URL.URL_KECAMATAN + 'petadasar', {
@@ -335,36 +310,48 @@ const Home = ({ navigation }) => {
       });
 
       const data = await response.json();
-      if (Array.isArray(data)) {
-        const formattedPolygons = data.map((polygon) => ({
-          ...polygon,
-          lokasi: {
-            ...polygon.lokasi,
-            coordinat: Array.isArray(polygon.lokasi?.coordinat)
-              ? polygon.lokasi.coordinat
-                  .filter(
-                    (c) =>
-                      c &&
-                      c.lat != null &&
-                      c.lng != null &&
-                      !isNaN(parseFloat(c.lat)) &&
-                      !isNaN(parseFloat(c.lng))
-                  )
-                  .map((c) => ({
-                    latitude: parseFloat(c.lat),
-                    longitude: parseFloat(c.lng),
-                  }))
-              : [],
-          },
-        }));
-        setPetadasar(formattedPolygons);
-        if (formattedPolygons.length > 0) {
-          fitAllPolygons(formattedPolygons);
+      if (Array.isArray(data) && data.length > 0) {
+        const formatted = data.map((item) => {
+          const rawCoords = item?.lokasi?.coordinat;
+          const area = rawCoords ? calculatePolygonArea(rawCoords) : '0';
+          const validCoords = Array.isArray(rawCoords)
+            ? rawCoords
+                .filter(
+                  (c) =>
+                    c &&
+                    (c.latitude != null || c.lat != null) &&
+                    (c.longitude != null || c.lng != null) &&
+                    !isNaN(parseFloat(c.latitude ?? c.lat)) &&
+                    !isNaN(parseFloat(c.longitude ?? c.lng))
+                )
+                .map((c) => ({
+                  latitude: parseFloat(c.latitude ?? c.lat),
+                  longitude: parseFloat(c.longitude ?? c.lng),
+                }))
+            : [];
+
+          return {
+            ...item,
+            calculatedArea: area,
+            lokasi: {
+              ...item.lokasi,
+              coordinat: validCoords,
+            },
+          };
+        });
+
+        setDesa(formatted);
+        setPetadasar(formatted);
+        if (formatted.length > 0) {
+          fitAllPolygons(formatted);
         }
+      } else {
+        setDesa([]);
+        setPetadasar([]);
       }
     } catch (error) {
-      Alert.alert('Error', 'Gagal memuat koordinat polygon');
-      console.error(error);
+      Alert.alert('Error', 'Gagal memuat koordinat polygon desa');
+      console.error('Fetch Error:', error);
     } finally {
       setIsPolygonLoading(false);
     }
@@ -380,13 +367,24 @@ const Home = ({ navigation }) => {
     let hasValidCoordinates = false;
 
     polygons.forEach((polygon) => {
-      if (Array.isArray(polygon.lokasi?.coordinat)) {
-        polygon.lokasi.coordinat.forEach((coord) => {
+      const coords = polygon?.lokasi?.coordinat || polygon?.coordinates;
+      if (Array.isArray(coords)) {
+        coords.forEach((coord) => {
+          if (!coord) return;
           const lat =
-            coord.latitude != null ? coord.latitude : parseFloat(coord.lat);
+            coord.latitude != null
+              ? parseFloat(coord.latitude)
+              : parseFloat(coord.lat);
           const lng =
-            coord.longitude != null ? coord.longitude : parseFloat(coord.lng);
-          if (!isNaN(lat) && !isNaN(lng)) {
+            coord.longitude != null
+              ? parseFloat(coord.longitude)
+              : parseFloat(coord.lng);
+          if (
+            !isNaN(lat) &&
+            !isNaN(lng) &&
+            isFinite(lat) &&
+            isFinite(lng)
+          ) {
             minLat = Math.min(minLat, lat);
             maxLat = Math.max(maxLat, lat);
             minLng = Math.min(minLng, lng);
@@ -397,28 +395,34 @@ const Home = ({ navigation }) => {
       }
     });
 
-    if (hasValidCoordinates) {
+    if (hasValidCoordinates && minLat <= maxLat && minLng <= maxLng) {
       const midLat = (minLat + maxLat) / 2;
       const midLng = (minLng + maxLng) / 2;
-      const deltaLat = Math.max((maxLat - minLat) * 1.3, 0.05);
-      const deltaLng = Math.max((maxLng - minLng) * 1.3, 0.05);
+      const deltaLat = Math.max((maxLat - minLat) * 1.3, 0.02);
+      const deltaLng = Math.max((maxLng - minLng) * 1.3, 0.02);
 
-      mapRef.current.animateToRegion(
-        {
-          latitude: midLat,
-          longitude: midLng,
-          latitudeDelta: deltaLat,
-          longitudeDelta: deltaLng,
-        },
-        1000
-      );
+      if (
+        isFinite(midLat) &&
+        isFinite(midLng) &&
+        isFinite(deltaLat) &&
+        isFinite(deltaLng)
+      ) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: midLat,
+            longitude: midLng,
+            latitudeDelta: deltaLat,
+            longitudeDelta: deltaLng,
+          },
+          800
+        );
+      }
     }
   };
 
   useEffect(() => {
     if (selectedKecamatan) {
-      getDesaByKecamatan();
-      getPetadasar();
+      getPetadasarAndDesa();
     }
   }, [selectedKecamatan]);
 
@@ -438,11 +442,23 @@ const Home = ({ navigation }) => {
     : '';
 
   const handleFocusDesa = (desaItem) => {
-    setActivePolygon(desaItem);
+    if (!desaItem) return;
+
+    // Cari objek poligon yang sesuai di petadasar untuk konsistensi struktur koordinat
+    const targetItem =
+      petadasar.find(
+        (p) =>
+          (p.des_kel_id && p.des_kel_id === desaItem.des_kel_id) ||
+          (p.lokasi?.nama_desa &&
+            p.lokasi?.nama_desa === desaItem.lokasi?.nama_desa)
+      ) || desaItem;
+
+    setActivePolygon(targetItem);
+
     const coords =
-      desaItem?.lokasi?.coordinat ||
-      desaItem?.coordinates ||
-      (Array.isArray(desaItem) ? desaItem : null);
+      targetItem?.lokasi?.coordinat ||
+      targetItem?.coordinates ||
+      (Array.isArray(targetItem) ? targetItem : null);
 
     if (coords && coords.length > 0 && mapRef.current) {
       fitAllPolygons([
