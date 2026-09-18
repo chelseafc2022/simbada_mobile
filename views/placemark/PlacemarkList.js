@@ -61,7 +61,8 @@ const PlacemarkItem = React.memo(({ item, onPress, onLongPress, isPublicItem }) 
 ));
 
 const PlacemarkList = ({ navigation }) => {
-  const dispatch = useDispatch();
+  const token = useSelector((state) => state.TOKEN);
+  const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
   const profile = useSelector((state) => state.PROFILE);
   const userId = profile?.id || null;
   const ownerInfo = {
@@ -77,20 +78,31 @@ const PlacemarkList = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('SAYA'); // 'SAYA' | 'PUBLIK'
 
   const load = useCallback(async () => {
-    // Lakukan migrasi data lama sekali jika perlu
+    // 1. Tampilkan data lokal secara instan (Offline-First)
     await PlacemarkDB.migrateOldData(userId);
 
-    // Muat placemark milik user
     const myList = await PlacemarkDB.getAll(userId);
     setAll(myList);
     dispatch({ type: 'SET_PLACEMARK_COUNT', payload: myList.length });
 
-    // Muat placemark publik dari semua user
     const pubList = await PlacemarkDB.getAllPublic();
-    // Filter: hanya tampilkan publik dari user lain
     const otherPublic = pubList.filter(p => p.userId !== userId);
     setPublicList(otherPublic);
-  }, [userId]);
+
+    // 2. Sinkronkan dengan server backend di background jika online
+    if (userId && token && urlPlacemark) {
+      PlacemarkDB.syncWithServer(userId, token, urlPlacemark).then(async (res) => {
+        if (res.success) {
+          const refreshedMy = await PlacemarkDB.getAll(userId);
+          setAll(refreshedMy);
+          dispatch({ type: 'SET_PLACEMARK_COUNT', payload: refreshedMy.length });
+
+          const refreshedPub = await PlacemarkDB.getAllPublic();
+          setPublicList(refreshedPub.filter(p => p.userId !== userId));
+        }
+      });
+    }
+  }, [userId, token, urlPlacemark, dispatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -119,7 +131,7 @@ const PlacemarkList = ({ navigation }) => {
   const handleDelete = (item) => {
     Alert.alert('Hapus Placemark?', `"${item.judul}" akan dihapus permanen.`, [
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        await PlacemarkDB.delete(userId, item.id);
+        await PlacemarkDB.delete(userId, item.id, { urlPlacemark, token });
         load();
       }},
       { text: 'Batal', style: 'cancel' },

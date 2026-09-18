@@ -40,6 +40,8 @@ const MAP_TYPES = [
 
 const PlacemarkMap = ({ navigation, route }) => {
   const profile = useSelector((state) => state.PROFILE);
+  const token = useSelector((state) => state.TOKEN);
+  const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
   const userId = profile?.id || null;
 
   const initialPlacemarks = route?.params?.placemarks ?? [];
@@ -53,10 +55,11 @@ const PlacemarkMap = ({ navigation, route }) => {
   const [mapType, setMapType] = useState('satellite');
   const mapRef = useRef(null);
 
-  // Selalu muat data terkini dari PlacemarkDB
+  // Selalu muat data terkini dari PlacemarkDB dan sinkronkan dengan server
   useEffect(() => {
     let isActive = true;
     (async () => {
+      // 1. Tampilkan lokal instan
       const mine = await PlacemarkDB.getAll(userId);
       const pubs = await PlacemarkDB.getAllPublic();
       const otherPubs = pubs.filter(p => p.userId !== userId);
@@ -64,9 +67,21 @@ const PlacemarkMap = ({ navigation, route }) => {
         setMyList(mine);
         setPublicList(otherPubs);
       }
+
+      // 2. Sinkronkan dengan server backend di background
+      if (userId && token && urlPlacemark) {
+        PlacemarkDB.syncWithServer(userId, token, urlPlacemark).then(async (res) => {
+          if (res.success && isActive) {
+            const refreshedMine = await PlacemarkDB.getAll(userId);
+            const refreshedPubs = await PlacemarkDB.getAllPublic();
+            setMyList(refreshedMine);
+            setPublicList(refreshedPubs.filter(p => p.userId !== userId));
+          }
+        });
+      }
     })();
     return () => { isActive = false; };
-  }, [userId]);
+  }, [userId, token, urlPlacemark]);
 
   // Filter placemarks sesuai tab aktif
   const displayPlacemarks = useMemo(() => {

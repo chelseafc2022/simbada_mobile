@@ -55,8 +55,11 @@ const PIN_COLOR = {
 
 const PlacemarkForm = ({ navigation, route }) => {
   const dispatch = useDispatch();
+  const token = useSelector((state) => state.TOKEN);
+  const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
   const profile = useSelector((state) => state.PROFILE);
   const userId = profile?.id || null;
+  const serverOpts = { token, urlPlacemark };
   const ownerInfo = route?.params?.ownerInfo || {
     userId,
     nama: profile?.profile?.nama || profile?.nama || 'Pengguna',
@@ -191,9 +194,9 @@ const PlacemarkForm = ({ navigation, route }) => {
         accH: parseFloat(accH) || 0, coordSource, foto, isPublic,
       };
       if (isEdit) {
-        await PlacemarkDB.update(userId, editData.id, data);
+        await PlacemarkDB.update(userId, editData.id, data, serverOpts);
       } else {
-        await PlacemarkDB.create(userId, data, ownerInfo);
+        await PlacemarkDB.create(userId, data, ownerInfo, serverOpts);
       }
       const count = await PlacemarkDB.getCount(userId);
       dispatch({ type: 'SET_PLACEMARK_COUNT', payload: count });
@@ -210,7 +213,7 @@ const PlacemarkForm = ({ navigation, route }) => {
   const handleDelete = () => {
     Alert.alert('Hapus Placemark?', `"${editData?.judul}" akan dihapus permanen.`, [
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        await PlacemarkDB.delete(userId, editData.id);
+        await PlacemarkDB.delete(userId, editData.id, serverOpts);
         const count = await PlacemarkDB.getCount(userId);
         dispatch({ type: 'SET_PLACEMARK_COUNT', payload: count });
         navigation.goBack();
