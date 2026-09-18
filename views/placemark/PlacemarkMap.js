@@ -11,6 +11,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import MapView, { Marker, Callout } from 'react-native-maps';
 
 const SYMBOL_EMOJI = {
@@ -56,13 +57,22 @@ const PlacemarkMap = ({ navigation, route }) => {
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* HEADER SIMPLE */}
-      <View style={styles.appBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.appBarBack}>
-          <Text style={styles.appBarBackText}>‹</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <FastImage
+            style={{ width: 20, height: 20 }}
+            source={require('../assets/img/chevron-left.png')}
+            resizeMode={FastImage.resizeMode.contain}
+          />
         </TouchableOpacity>
-        <Text style={styles.appBarTitle}>📍 Peta Placemark</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>📍 Peta Placemark</Text>
+        </View>
+        <View style={{ flex: 1 }} />
       </View>
 
       {/* LAYER SELECTOR */}
@@ -146,40 +156,21 @@ const PlacemarkMap = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
 
-  // HEADER SIMPLE
-  appBar: {
-    paddingTop: 50,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+  // Header persis NavigasiKoordinat
+  header: {
     flexDirection: 'row',
+    padding: 15,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    elevation: 3,
+    backgroundColor: '#fff',
+    elevation: 5,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  appBarBack: {
-    padding: 4,
-    width: 40,
-  },
-  appBarBackText: {
-    color: '#0284C7',
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: '600',
-  },
-  appBarTitle: {
-    color: '#0284C7',
-    fontSize: 17,
-    fontWeight: '800',
-    flex: 1,
-    textAlign: 'center',
-  },
+  backButton: { flex: 1 },
+  headerCenter: { flex: 3, alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0', textAlign: 'center' },
 
   // LAYER BAR
   layerBar: {
@@ -200,8 +191,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   layerBtnActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#0284C7',
+    backgroundColor: '#208DC0',
+    borderColor: '#208DC0',
   },
   layerBtnText: {
     fontSize: 12,

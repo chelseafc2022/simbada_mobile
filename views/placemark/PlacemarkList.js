@@ -13,6 +13,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Alert, StatusBar,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import PlacemarkDB from '../library/PlacemarkDB';
@@ -91,7 +92,11 @@ const PlacemarkList = ({ navigation }) => {
     setPublicList(otherPublic);
   }, [userId]);
 
-  useFocusEffect(load);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const filteredMy = useMemo(() => {
     const q = search.toLowerCase();
@@ -128,18 +133,29 @@ const PlacemarkList = ({ navigation }) => {
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* HEADER SIMPLE */}
-      <View style={styles.appBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.appBarBack}>
-          <Text style={styles.appBarBackText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.appBarTitle}>📍 Daftar Placemark</Text>
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('PlacemarkMap', { placemarks: all })}
-          style={styles.appBarMapBtn}
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
         >
-          <Text style={styles.appBarMapBtnText}>🗺 Peta</Text>
+          <FastImage
+            style={{ width: 20, height: 20 }}
+            source={require('../assets/img/chevron-left.png')}
+            resizeMode={FastImage.resizeMode.contain}
+          />
         </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>📍 Daftar Placemark</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('PlacemarkMap', { placemarks: all })}
+            style={styles.headerMapBtn}
+          >
+            <Text style={styles.headerMapBtnText}>🗺 Peta</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* SEARCH BAR */}
@@ -236,40 +252,23 @@ const PlacemarkList = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  // HEADER SIMPLE
-  appBar: {
-    paddingTop: 50,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+  // Header persis NavigasiKoordinat
+  header: {
     flexDirection: 'row',
+    padding: 15,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    elevation: 3,
+    backgroundColor: '#fff',
+    elevation: 5,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  appBarBack: {
-    padding: 4,
-    width: 40,
-  },
-  appBarBackText: {
-    color: '#0284C7',
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: '600',
-  },
-  appBarTitle: {
-    color: '#0284C7',
-    fontSize: 17,
-    fontWeight: '800',
-    flex: 1,
-    textAlign: 'center',
-  },
-  appBarMapBtn: {
+  backButton: { flex: 1 },
+  headerCenter: { flex: 3, alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0', textAlign: 'center' },
+  headerRight: { flex: 1, alignItems: 'flex-end' },
+  headerMapBtn: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
@@ -277,10 +276,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#BAE6FD',
   },
-  appBarMapBtnText: {
-    color: '#0284C7',
+  headerMapBtnText: {
+    color: '#208DC0',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: 'bold',
   },
 
   // SEARCH BAR

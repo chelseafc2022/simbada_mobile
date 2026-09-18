@@ -15,6 +15,7 @@ import {
   ScrollView, Alert, Image, KeyboardAvoidingView, Platform,
   StatusBar, Modal, Dimensions,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import Geolocation from '@react-native-community/geolocation';
 import { launchCamera } from 'react-native-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
@@ -224,25 +225,36 @@ const PlacemarkForm = ({ navigation, route }) => {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* HEADER SIMPLE */}
-      <View style={styles.appBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.appBarBack}>
-          <Text style={styles.appBarBackText}>‹</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <FastImage
+            style={{ width: 20, height: 20 }}
+            source={require('../assets/img/chevron-left.png')}
+            resizeMode={FastImage.resizeMode.contain}
+          />
         </TouchableOpacity>
-        <Text style={styles.appBarTitle}>
-          {readOnly ? '📍 Detail Placemark' : isEdit ? '📍 Edit Placemark' : '📍 Placemark Baru'}
-        </Text>
-        {isEdit && !readOnly && (
-          <TouchableOpacity onPress={handleDelete} style={styles.appBarDeleteBtn}>
-            <Text style={styles.appBarDeleteText}>🗑 Hapus</Text>
-          </TouchableOpacity>
-        )}
-        {readOnly && (
-          <TouchableOpacity onPress={navigateToPlacemark} style={styles.appBarNavBtn}>
-            <Text style={styles.appBarNavText}>🧭 Navi</Text>
-          </TouchableOpacity>
-        )}
-        {!isEdit && !readOnly && <View style={{ width: 60 }} />}
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {readOnly ? '📍 Detail Placemark' : isEdit ? '📍 Edit Placemark' : '📍 Placemark Baru'}
+          </Text>
+        </View>
+        <View style={styles.headerRight}>
+          {isEdit && !readOnly && (
+            <TouchableOpacity onPress={handleDelete} style={styles.headerDeleteBtn}>
+              <Text style={styles.headerDeleteText}>🗑</Text>
+            </TouchableOpacity>
+          )}
+          {readOnly && (
+            <TouchableOpacity onPress={navigateToPlacemark} style={styles.headerNavBtn}>
+              <Text style={styles.headerNavText}>🧭</Text>
+            </TouchableOpacity>
+          )}
+          {!isEdit && !readOnly && <View style={{ width: 20 }} />}
+        </View>
       </View>
 
       <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
@@ -616,67 +628,46 @@ const PlacemarkForm = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  // HEADER SIMPLE
-  appBar: {
-    paddingTop: 50,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+  // Header persis NavigasiKoordinat
+  header: {
     flexDirection: 'row',
+    padding: 15,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    elevation: 3,
+    backgroundColor: '#fff',
+    elevation: 5,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  appBarBack: {
-    padding: 4,
-    width: 40,
-  },
-  appBarBackText: {
-    color: '#0284C7',
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: '600',
-  },
-  appBarTitle: {
-    color: '#0284C7',
-    fontSize: 16,
-    fontWeight: '800',
-    flex: 1,
-    textAlign: 'center',
-  },
-  appBarDeleteBtn: {
+  backButton: { flex: 1 },
+  headerCenter: { flex: 3, alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0', textAlign: 'center' },
+  headerRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  headerDeleteBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FECACA',
-    width: 70,
-    alignItems: 'center',
   },
-  appBarDeleteText: {
+  headerDeleteText: {
     color: '#EF4444',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
-  appBarNavBtn: {
+  headerNavBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: 8,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-    width: 70,
-    alignItems: 'center',
+    borderColor: '#BAE6FD',
   },
-  appBarNavText: {
-    color: '#16A34A',
-    fontSize: 11,
+  headerNavText: {
+    color: '#208DC0',
+    fontSize: 13,
     fontWeight: '700',
   },
 
