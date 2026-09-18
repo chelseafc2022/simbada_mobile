@@ -46,6 +46,13 @@ const SYMBOL_EMOJI = {
   bintang:'⭐', titik:'●',
 };
 
+const PIN_COLOR = {
+  pin_merah:'#EF4444', pin_biru:'#0284C7', bangunan:'#F59E0B',
+  pohon:'#22C55E', air:'#06B6D4', jalan:'#94A3B8', bahaya:'#F97316',
+  temuan:'#8B5CF6', sampel:'#EC4899', fotografi:'#0EA5E9',
+  bintang:'#EAB308', titik:'#64748B',
+};
+
 const PlacemarkForm = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const profile = useSelector((state) => state.PROFILE);
@@ -420,7 +427,15 @@ const PlacemarkForm = ({ navigation, route }) => {
                   coordinate={{ latitude: parseFloat(lat), longitude: parseFloat(lon) }}
                   title={judul || 'Titik Placemark'}
                   description={`${parseFloat(lat).toFixed(6)}, ${parseFloat(lon).toFixed(6)}`}
-                />
+                  anchor={{ x: 0.5, y: 1.0 }}
+                >
+                  <View style={styles.customPinWrapper}>
+                    <View style={[styles.customPinBubble, { backgroundColor: PIN_COLOR[simbol] || '#208DC0' }]}>
+                      <Text style={styles.customPinEmoji}>{SYMBOL_EMOJI[simbol] || '📍'}</Text>
+                    </View>
+                    <View style={[styles.customPinArrow, { borderTopColor: PIN_COLOR[simbol] || '#208DC0' }]} />
+                  </View>
+                </Marker>
               </MapView>
               {/* Toggle layer satelit / normal */}
               <View style={styles.mapTypeRow}>
@@ -571,10 +586,17 @@ const PlacemarkForm = ({ navigation, route }) => {
                 coordinate={mapPickerCoord}
                 draggable
                 onDragEnd={(e) => setMapPickerCoord(e.nativeEvent.coordinate)}
-                pinColor="#EF4444"
-                title="Titik Placemark"
+                title="Titik Placemark (Bisa Digeser)"
                 description={`${mapPickerCoord.latitude.toFixed(6)}, ${mapPickerCoord.longitude.toFixed(6)}`}
-              />
+                anchor={{ x: 0.5, y: 1.0 }}
+              >
+                <View style={styles.customPinWrapper}>
+                  <View style={[styles.customPinBubble, { backgroundColor: PIN_COLOR[simbol] || '#208DC0' }]}>
+                    <Text style={styles.customPinEmoji}>{SYMBOL_EMOJI[simbol] || '📍'}</Text>
+                  </View>
+                  <View style={[styles.customPinArrow, { borderTopColor: PIN_COLOR[simbol] || '#208DC0' }]} />
+                </View>
+              </Marker>
             )}
           </MapView>
 
@@ -641,6 +663,43 @@ const styles = StyleSheet.create({
     color: '#208DC0',
     fontSize: 13,
     fontWeight: '700',
+  },
+
+  // CUSTOM PIN MARKER
+  customPinWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customPinBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  customPinEmoji: {
+    fontSize: 18,
+    textAlign: 'center',
+  },
+  customPinArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    alignSelf: 'center',
+    marginTop: -1,
   },
 
   // OWNER CARD (readonly)

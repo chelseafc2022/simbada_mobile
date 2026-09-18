@@ -139,7 +139,12 @@ const PlacemarkList = ({ navigation }) => {
         navigation={navigation}
         rightComponent={
           <TouchableOpacity
-            onPress={() => navigation.navigate('PlacemarkMap', { placemarks: all })}
+            onPress={() => navigation.navigate('PlacemarkMap', {
+              placemarks: [...all, ...publicList],
+              myPlacemarks: all,
+              publicPlacemarks: publicList,
+              initialFilter: activeTab === 'PUBLIK' ? 'PUBLIK' : 'SEMUA',
+            })}
             style={styles.headerMapBtn}
           >
             <Text style={styles.headerMapBtnText}>🗺 Peta</Text>
