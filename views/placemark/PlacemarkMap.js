@@ -257,11 +257,6 @@ const PlacemarkMap = ({ navigation, route }) => {
           </Text>
         </View>
       )}
-
-      {/* Badge Count Titik di Kanan Atas */}
-      <View style={styles.countBadge}>
-        <Text style={styles.countBadgeText}>📍 {displayPlacemarks.length} Titik</Text>
-      </View>
     </View>
   );
 };
@@ -453,27 +448,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   emptyText: { color: '#64748B', fontSize: 13, textAlign: 'center' },
-
-  // COUNT BADGE DI KANAN ATAS PETA
-  countBadge: {
-    position: 'absolute',
-    top: 96,
-    right: 14,
-    backgroundColor: 'rgba(32,141,192,0.92)',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-  },
-  countBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
 });
 
 export default PlacemarkMap;
