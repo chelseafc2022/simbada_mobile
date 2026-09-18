@@ -222,24 +222,16 @@ const PlacemarkForm = ({ navigation, route }) => {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle="light-content" backgroundColor="#0284C7" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* APPBAR — Selaras dengan halaman lain */}
+      {/* HEADER SIMPLE */}
       <View style={styles.appBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.appBarBack}>
           <Text style={styles.appBarBackText}>‹</Text>
         </TouchableOpacity>
-        <View style={styles.appBarCenter}>
-          <View style={styles.brandTag}>
-            <View style={styles.brandDot} />
-            <Text style={styles.brandTagText}>
-              {readOnly ? 'DETAIL PLACEMARK' : isEdit ? 'EDIT PLACEMARK' : 'PLACEMARK BARU'}
-            </Text>
-          </View>
-          <Text style={styles.appBarTitle}>
-            {readOnly ? (judul || 'Detail') : isEdit ? 'Edit Patok Batas' : 'Tambah Titik Patok'}
-          </Text>
-        </View>
+        <Text style={styles.appBarTitle}>
+          {readOnly ? '📍 Detail Placemark' : isEdit ? '📍 Edit Placemark' : '📍 Placemark Baru'}
+        </Text>
         {isEdit && !readOnly && (
           <TouchableOpacity onPress={handleDelete} style={styles.appBarDeleteBtn}>
             <Text style={styles.appBarDeleteText}>🗑 Hapus</Text>
@@ -247,9 +239,10 @@ const PlacemarkForm = ({ navigation, route }) => {
         )}
         {readOnly && (
           <TouchableOpacity onPress={navigateToPlacemark} style={styles.appBarNavBtn}>
-            <Text style={styles.appBarNavText}>🧭 Navigasi</Text>
+            <Text style={styles.appBarNavText}>🧭 Navi</Text>
           </TouchableOpacity>
         )}
+        {!isEdit && !readOnly && <View style={{ width: 60 }} />}
       </View>
 
       <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
@@ -623,63 +616,51 @@ const PlacemarkForm = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  // APPBAR
+  // HEADER SIMPLE
   appBar: {
-    paddingTop: 45,
+    paddingTop: 50,
     paddingBottom: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#0284C7',
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#0369A1',
+    borderBottomColor: '#E2E8F0',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
   appBarBack: {
-    paddingRight: 12,
-    paddingVertical: 4,
+    padding: 4,
+    width: 40,
   },
   appBarBackText: {
-    color: '#BAE6FD',
+    color: '#0284C7',
     fontSize: 28,
     lineHeight: 30,
     fontWeight: '600',
   },
-  appBarCenter: {
-    flex: 1,
-  },
-  brandTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  brandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#38BDF8',
-    marginRight: 6,
-  },
-  brandTagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#BAE6FD',
-    letterSpacing: 1,
-  },
   appBarTitle: {
-    color: '#FFFFFF',
+    color: '#0284C7',
     fontSize: 16,
     fontWeight: '800',
+    flex: 1,
+    textAlign: 'center',
   },
   appBarDeleteBtn: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: 'rgba(239,68,68,0.2)',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: '#FECACA',
+    width: 70,
+    alignItems: 'center',
   },
   appBarDeleteText: {
-    color: '#FCA5A5',
+    color: '#EF4444',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -687,12 +668,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: 'rgba(34,197,94,0.2)',
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#22C55E',
+    borderColor: '#BBF7D0',
+    width: 70,
+    alignItems: 'center',
   },
   appBarNavText: {
-    color: '#4ADE80',
+    color: '#16A34A',
     fontSize: 11,
     fontWeight: '700',
   },

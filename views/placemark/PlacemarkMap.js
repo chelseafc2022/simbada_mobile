@@ -54,20 +54,15 @@ const PlacemarkMap = ({ navigation, route }) => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor="#0284C7" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* APPBAR — Selaras dengan halaman lain */}
+      {/* HEADER SIMPLE */}
       <View style={styles.appBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.appBarBack}>
           <Text style={styles.appBarBackText}>‹</Text>
         </TouchableOpacity>
-        <View style={styles.appBarCenter}>
-          <View style={styles.brandTag}>
-            <View style={styles.brandDot} />
-            <Text style={styles.brandTagText}>TITIK PATOK BATAS</Text>
-          </View>
-          <Text style={styles.appBarTitle}>Peta Placemark ({placemarks.length})</Text>
-        </View>
+        <Text style={styles.appBarTitle}>📍 Peta Placemark</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* LAYER SELECTOR */}
@@ -151,50 +146,39 @@ const PlacemarkMap = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
 
-  // APPBAR
+  // HEADER SIMPLE
   appBar: {
-    paddingTop: 45,
+    paddingTop: 50,
     paddingBottom: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#0284C7',
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#0369A1',
+    borderBottomColor: '#E2E8F0',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
   appBarBack: {
-    paddingRight: 12,
-    paddingVertical: 4,
+    padding: 4,
+    width: 40,
   },
   appBarBackText: {
-    color: '#BAE6FD',
+    color: '#0284C7',
     fontSize: 28,
     lineHeight: 30,
     fontWeight: '600',
   },
-  appBarCenter: { flex: 1 },
-  brandTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  brandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#38BDF8',
-    marginRight: 6,
-  },
-  brandTagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#BAE6FD',
-    letterSpacing: 1,
-  },
   appBarTitle: {
-    color: '#FFFFFF',
+    color: '#0284C7',
     fontSize: 17,
     fontWeight: '800',
+    flex: 1,
+    textAlign: 'center',
   },
 
   // LAYER BAR
