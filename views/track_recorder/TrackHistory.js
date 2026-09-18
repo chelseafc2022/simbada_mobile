@@ -12,6 +12,7 @@ import MapView, { Polyline } from 'react-native-maps';
 import { useFocusEffect } from '@react-navigation/native';
 import FastImage from 'react-native-fast-image';
 import moment from 'moment';
+import AppHeader from '../components/AppHeader';
 import TrackDB from '../library/TrackDB';
 
 const fmtDist = (m) => m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m || 0)} m`;
@@ -113,22 +114,14 @@ const TrackHistory = ({ navigation }) => {
 
   return (
     <View style={styles.screen}>
-      {/* Header — Style sama dengan NavigasiKoordinat */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Riwayat Trek</Text>
-        </View>
-        <View style={styles.headerRight}>
+      {/* Header Reusable */}
+      <AppHeader
+        title="Riwayat Trek"
+        navigation={navigation}
+        rightComponent={
           <Text style={styles.count}>{tracks.length} trek</Text>
-        </View>
-      </View>
+        }
+      />
 
       {tracks.length === 0 ? (
         <View style={styles.empty}>
@@ -224,21 +217,6 @@ const TrackHistory = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: {
-    flexDirection: 'row',
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  backButton: { flex: 1, justifyContent: 'center' },
-  headerCenter: { flex: 3, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0' },
-  headerRight: { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
   count: { color: '#64748B', fontSize: 13, fontWeight: '600' },
   card: {
     flexDirection: 'row', alignItems: 'center',

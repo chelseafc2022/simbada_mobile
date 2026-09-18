@@ -15,7 +15,7 @@ import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
   Alert, ActivityIndicator, ImageBackground, RefreshControl,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import AppHeader from '../components/AppHeader';
 import { useSelector, useDispatch } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
 import NotificationService from '../library/NotificationService';
@@ -208,22 +208,16 @@ const NotificationList = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={() => navigation.goBack()}>
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={{ flex: 3, alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>Notifikasi</Text>
-        </View>
-        <TouchableOpacity style={{ flex: 1, alignItems: 'flex-end' }} onPress={handleMarkAllRead}>
-          <Text style={styles.markAllText}>Baca Semua</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Header Reusable */}
+      <AppHeader
+        title="Notifikasi"
+        navigation={navigation}
+        rightComponent={
+          <TouchableOpacity onPress={handleMarkAllRead} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.markAllText}>Baca Semua</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Unread count */}
       {unreadCount > 0 && (
@@ -301,18 +295,6 @@ const NotificationList = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    elevation: 5,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#208DC0',
-  },
   markAllText: {
     fontSize: 11,
     color: '#208DC0',

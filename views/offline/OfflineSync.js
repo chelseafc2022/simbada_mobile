@@ -21,6 +21,7 @@ import FastImage from 'react-native-fast-image';
 import { useSelector, useDispatch } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
+import AppHeader from '../components/AppHeader';
 import OfflineManager from '../library/OfflineManager';
 import moment from 'moment';
 
@@ -240,20 +241,11 @@ const OfflineSync = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={() => navigation.goBack()}>
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={{ flex: 3, alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>Sinkronisasi Offline</Text>
-        </View>
-        <View style={{ flex: 1 }} />
-      </View>
+      {/* Header Reusable */}
+      <AppHeader
+        title="Sinkronisasi Offline"
+        navigation={navigation}
+      />
 
       {/* Connection Status Banner */}
       <View style={[
@@ -418,18 +410,6 @@ const OfflineSync = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    elevation: 5,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#208DC0',
-  },
   connectionBanner: {
     flexDirection: 'row',
     alignItems: 'center',

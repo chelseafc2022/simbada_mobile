@@ -18,6 +18,7 @@ import Geolocation from '@react-native-community/geolocation';
 import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import FastImage from 'react-native-fast-image';
 import { useSelector } from 'react-redux';
+import AppHeader from '../components/AppHeader';
 import CompassView from './CompassView';
 import NavigasiService from '../library/NavigasiService';
 
@@ -477,37 +478,29 @@ const NavigasiKoordinat = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F0F4F8' }}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.backButton}
-          onPress={() => {
-            // Navigasi tetap aktif di latar belakang saat kembali
-            navigation.goBack();
-          }}
-        >
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={s.headerCenter}>
-          <Text style={s.headerTitle}>🧭 Navigasi Koordinat</Text>
-          {isTracking && (
+      {/* Header Reusable */}
+      <AppHeader
+        title="🧭 Navigasi Koordinat"
+        onBack={() => {
+          // Navigasi tetap aktif di latar belakang saat kembali
+          navigation.goBack();
+        }}
+        subtitle={
+          isTracking ? (
             <View style={s.bgTrackingStatusPill}>
               <View style={s.greenDotLive} />
               <Text style={s.bgTrackingStatusText}>LATAR BELAKANG AKTIF</Text>
             </View>
-          )}
-        </View>
-        {isTracking && (
-          <TouchableOpacity onPress={backToInput} style={s.headerRight}>
-            <Text style={s.headerRightText}>✕</Text>
-          </TouchableOpacity>
-        )}
-        {!isTracking && <View style={{ flex: 1 }} />}
-      </View>
+          ) : null
+        }
+        rightComponent={
+          isTracking ? (
+            <TouchableOpacity onPress={backToInput} style={{ padding: 4 }}>
+              <Text style={s.headerRightText}>✕</Text>
+            </TouchableOpacity>
+          ) : null
+        }
+      />
 
       {/* ============ VIEW: INPUT MODE ============ */}
       {viewMode === 'input' && (

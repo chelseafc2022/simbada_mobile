@@ -15,7 +15,7 @@ import {
   ScrollView, Alert, Image, KeyboardAvoidingView, Platform,
   StatusBar, Modal, Dimensions,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import AppHeader from '../components/AppHeader';
 import Geolocation from '@react-native-community/geolocation';
 import { launchCamera } from 'react-native-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
@@ -225,37 +225,25 @@ const PlacemarkForm = ({ navigation, route }) => {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {readOnly ? '📍 Detail Placemark' : isEdit ? '📍 Edit Placemark' : '📍 Placemark Baru'}
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          {isEdit && !readOnly && (
-            <TouchableOpacity onPress={handleDelete} style={styles.headerDeleteBtn}>
-              <Text style={styles.headerDeleteText}>🗑</Text>
-            </TouchableOpacity>
-          )}
-          {readOnly && (
-            <TouchableOpacity onPress={navigateToPlacemark} style={styles.headerNavBtn}>
-              <Text style={styles.headerNavText}>🧭</Text>
-            </TouchableOpacity>
-          )}
-          {!isEdit && !readOnly && <View style={{ width: 20 }} />}
-        </View>
-      </View>
+      {/* Header Reusable */}
+      <AppHeader
+        title={readOnly ? '📍 Detail Placemark' : isEdit ? '📍 Edit Placemark' : '📍 Placemark Baru'}
+        navigation={navigation}
+        rightComponent={
+          <>
+            {isEdit && !readOnly && (
+              <TouchableOpacity onPress={handleDelete} style={styles.headerDeleteBtn}>
+                <Text style={styles.headerDeleteText}>🗑</Text>
+              </TouchableOpacity>
+            )}
+            {readOnly && (
+              <TouchableOpacity onPress={navigateToPlacemark} style={styles.headerNavBtn}>
+                <Text style={styles.headerNavText}>🧭</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        }
+      />
 
       <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
 
@@ -628,22 +616,6 @@ const PlacemarkForm = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  // Header persis NavigasiKoordinat
-  header: {
-    flexDirection: 'row',
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  backButton: { flex: 1 },
-  headerCenter: { flex: 3, alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0', textAlign: 'center' },
-  headerRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
   headerDeleteBtn: {
     paddingVertical: 6,
     paddingHorizontal: 8,

@@ -13,7 +13,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Alert, StatusBar,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import AppHeader from '../components/AppHeader';
 import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import PlacemarkDB from '../library/PlacemarkDB';
@@ -133,30 +133,19 @@ const PlacemarkList = ({ navigation }) => {
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>📍 Daftar Placemark</Text>
-        </View>
-        <View style={styles.headerRight}>
+      {/* Header Reusable */}
+      <AppHeader
+        title="📍 Daftar Placemark"
+        navigation={navigation}
+        rightComponent={
           <TouchableOpacity
             onPress={() => navigation.navigate('PlacemarkMap', { placemarks: all })}
             style={styles.headerMapBtn}
           >
             <Text style={styles.headerMapBtnText}>🗺 Peta</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
       {/* SEARCH BAR */}
       <View style={styles.searchBar}>
@@ -252,22 +241,6 @@ const PlacemarkList = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  // Header persis NavigasiKoordinat
-  header: {
-    flexDirection: 'row',
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  backButton: { flex: 1 },
-  headerCenter: { flex: 3, alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0', textAlign: 'center' },
-  headerRight: { flex: 1, alignItems: 'flex-end' },
   headerMapBtn: {
     paddingVertical: 6,
     paddingHorizontal: 10,

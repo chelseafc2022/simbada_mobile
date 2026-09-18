@@ -11,8 +11,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
 import MapView, { Marker, Callout } from 'react-native-maps';
+import AppHeader from '../components/AppHeader';
 
 const SYMBOL_EMOJI = {
   pin_merah:'📍', pin_biru:'📌', bangunan:'🏠', pohon:'🌳', air:'💧',
@@ -57,23 +57,11 @@ const PlacemarkMap = ({ navigation, route }) => {
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <FastImage
-            style={{ width: 20, height: 20 }}
-            source={require('../assets/img/chevron-left.png')}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>📍 Peta Placemark</Text>
-        </View>
-        <View style={{ flex: 1 }} />
-      </View>
+      {/* Header Reusable */}
+      <AppHeader
+        title="📍 Peta Placemark"
+        navigation={navigation}
+      />
 
       {/* LAYER SELECTOR */}
       <View style={styles.layerBar}>
@@ -155,22 +143,6 @@ const PlacemarkMap = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-
-  // Header persis NavigasiKoordinat
-  header: {
-    flexDirection: 'row',
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  backButton: { flex: 1 },
-  headerCenter: { flex: 3, alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#208DC0', textAlign: 'center' },
 
   // LAYER BAR
   layerBar: {
