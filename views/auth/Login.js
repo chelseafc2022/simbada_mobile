@@ -246,7 +246,11 @@ const Login = ({ navigation }) => {
 
   return (
     <View style={ui.screenContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F0F9FF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#E0F2FE" />
+
+      {/* Ambient background glow orbs */}
+      <View style={ui.orbTopLeft} pointerEvents="none" />
+      <View style={ui.orbTopRight} pointerEvents="none" />
 
       <ScrollView
         contentContainerStyle={ui.scrollContent}
@@ -254,26 +258,31 @@ const Login = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* ======================================================== */}
-        {/* 1. LOGO & BRANDING HEADER                                */}
+        {/* 1. LOGO & BRANDING HERO                                   */}
         {/* ======================================================== */}
         <View style={ui.brandingContainer}>
+          {/* Logo Simbada (Transparent & Prominent) */}
           <View style={ui.logoWrapper}>
             <FastImage
               style={ui.logo}
-              source={require('../assets/img/logo.jpeg')}
+              source={require('../assets/img/logo.png')}
               resizeMode={FastImage.resizeMode.contain}
             />
           </View>
+
           <Text style={ui.appTitle}>SIMBADA</Text>
           <Text style={ui.appSubtitle}>SISTEM INFORMASI BATAS DESA</Text>
-          <Text style={ui.appTagline}>Kabupaten Konawe Selatan</Text>
+          <Text style={ui.appTagline}>Portal Survei & Pemetaan Wilayah Terpadu</Text>
         </View>
 
         {/* ======================================================== */}
         {/* 2. FORM KARTU LOGIN                                      */}
         {/* ======================================================== */}
         <View style={ui.formCard}>
-          <Text style={ui.cardTitle}>Selamat Datang!</Text>
+          <View style={ui.cardHeaderRow}>
+            <View style={ui.cardIndicator} />
+            <Text style={ui.cardTitle}>Selamat Datang!</Text>
+          </View>
           <Text style={ui.cardSubtitle}>
             Silakan masuk dengan akun terdaftar untuk mengakses layanan survei & batas desa
           </Text>
@@ -386,7 +395,10 @@ const Login = ({ navigation }) => {
                   <Text style={ui.loginBtnText}>Memverifikasi...</Text>
                 </View>
               ) : (
-                <Text style={ui.loginBtnText}>Masuk</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={ui.loginBtnText}>Masuk ke Sistem</Text>
+                  <Icon name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
+                </View>
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -395,73 +407,84 @@ const Login = ({ navigation }) => {
         {/* ======================================================== */}
         {/* 3. FOOTER COPYRIGHT                                      */}
         {/* ======================================================== */}
-        <Text style={ui.copyright}>
-          © 2026 Bagian Pemerintahan, Kab. Konawe Selatan
-        </Text>
+        <View style={ui.footerContainer}>
+          <Text style={ui.copyright}>
+            © 2026 Bagian Tata Pemerintahan — Kab. Konawe Selatan
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
 };
 
 // ================================================================
-// DESIGN SYSTEM STYLING — Geo-Sapphire & Emerald Field
+// DESIGN SYSTEM STYLING — Geo-Sapphire Executive GIS
 // ================================================================
 const ui = RNStyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#F0F9FF', // Token: --color-bg-primary
+    backgroundColor: '#F0F9FF',
+    position: 'relative',
+  },
+  // Ambient Glowing Orbs
+  orbTopLeft: {
+    position: 'absolute',
+    top: -60,
+    left: -60,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(56, 189, 248, 0.16)',
+  },
+  orbTopRight: {
+    position: 'absolute',
+    top: 50,
+    right: -70,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(14, 165, 233, 0.12)',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 30,
     paddingBottom: 30,
     justifyContent: 'center',
   },
 
-  // BRANDING
+  // BRANDING HERO
   brandingContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 22,
   },
   logoWrapper: {
-    width: 140,
-    height: 75,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 8,
-    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   logo: {
-    width: '100%',
-    height: '100%',
+    width: 125,
+    height: 125,
   },
   appTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
-    color: '#0C4A6E', // Token: --color-text-heading
-    letterSpacing: 1,
+    color: '#0B3558',
+    letterSpacing: 2,
   },
   appSubtitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0284C7', // Token: --color-primary
-    letterSpacing: 1.5,
+    color: '#0284C7',
+    letterSpacing: 1.6,
     marginTop: 2,
   },
   appTagline: {
     fontSize: 12,
     color: '#64748B',
-    marginTop: 3,
+    marginTop: 4,
+    fontWeight: '500',
   },
 
   // FORM CARD
@@ -469,25 +492,36 @@ const ui = RNStyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 22,
-    elevation: 4,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  cardIndicator: {
+    width: 4,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: '#0284C7',
+    marginRight: 8,
+  },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
     color: '#0F172A',
-    marginBottom: 4,
   },
   cardSubtitle: {
     fontSize: 13,
     color: '#64748B',
     lineHeight: 18,
-    marginBottom: 20,
+    marginBottom: 18,
   },
 
   // ERROR BOX
@@ -511,7 +545,7 @@ const ui = RNStyleSheet.create({
 
   // INPUTS
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   label: {
     fontSize: 13,
@@ -525,7 +559,7 @@ const ui = RNStyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 52,
@@ -533,11 +567,11 @@ const ui = RNStyleSheet.create({
   inputWrapperFocused: {
     borderColor: '#0284C7',
     backgroundColor: '#FFFFFF',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#0284C7',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
   inputIcon: {
     marginRight: 10,
@@ -546,7 +580,7 @@ const ui = RNStyleSheet.create({
     flex: 1,
     color: '#0F172A',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   eyeBtn: {
     padding: 6,
@@ -557,8 +591,8 @@ const ui = RNStyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 20,
+    marginTop: 2,
+    marginBottom: 18,
     paddingHorizontal: 2,
   },
   rememberText: {
@@ -569,13 +603,13 @@ const ui = RNStyleSheet.create({
 
   // BUTTON CTA
   loginBtnContainer: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
-    elevation: 4,
+    elevation: 5,
     shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   loginBtn: {
     height: 52,
@@ -590,12 +624,15 @@ const ui = RNStyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // COPYRIGHT
+  // FOOTER
+  footerContainer: {
+    alignItems: 'center',
+    marginTop: 22,
+  },
   copyright: {
     color: '#94A3B8',
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
-    marginTop: 30,
   },
 });
 

@@ -14,7 +14,7 @@ const HomeHeader = ({ notificationCount = 0, onNotificationPress, onProfilePress
         {/* Logo Kabupaten Konawe Selatan / SIMBADA */}
         <View style={styles.logoContainer}>
           <FastImage
-            source={require('../../assets/img/logo.jpeg')}
+            source={require('../../assets/img/logo.png')}
             style={styles.logoImage}
             resizeMode={FastImage.resizeMode.contain}
           />
@@ -93,20 +93,25 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   logoContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
-    backgroundColor: '#F5F7FA',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    marginRight: 11,
+    borderWidth: 1.5,
+    borderColor: '#BAE6FD',
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
     overflow: 'hidden',
   },
   logoImage: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
   },
   titleContainer: {
     flex: 1,

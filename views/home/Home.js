@@ -273,16 +273,20 @@ const Home = ({ navigation }) => {
     try {
       setIsLoading(true);
       const response = await fetch(URL.URL_HOME + 'peta_final', {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `kikensbatara ${TOKEN}`,
         },
       });
 
-      const data = await response.json();
-      if (data && data.data && data.data[0]) {
-        SET_DATA_FINAL(data.data[0].jumlah_peta_final);
+      const resData = await response.json();
+      if (Array.isArray(resData) && typeof resData[0] === 'number') {
+        SET_DATA_FINAL(resData[0]);
+      } else if (resData && resData.data && resData.data[0]) {
+        SET_DATA_FINAL(resData.data[0].jumlah_peta_final ?? resData.data[0]);
+      } else if (typeof resData === 'number') {
+        SET_DATA_FINAL(resData);
       }
     } catch (error) {
       console.error('Error fetching peta final:', error);
