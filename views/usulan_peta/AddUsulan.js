@@ -611,13 +611,26 @@ const AddUsulan = ({navigation}) => {
                 await AsyncStorage.removeItem('lokasiData');
                 await AsyncStorage.removeItem('lokasiPolylineData');
 
+                // Bersihkan cache daftar usulan agar data terbaru langsung muncul
+                if (PROFILE?.id) {
+                    await AsyncStorage.removeItem(`@usulan_cache_${PROFILE.id}`);
+                }
+
                 // Setelah berhasil submit online, coba sync antrian offline juga
                 const offlineResult = await OfflineManager.syncAll();
-                if (offlineResult.synced > 0) {
-                    Alert.alert("Berhasil", `Data berhasil dikirim.\n\n📤 ${offlineResult.synced} data offline juga berhasil disinkronkan.`);
-                } else {
-                    Alert.alert("Berhasil", "Data berhasil dikirim dan form telah dikosongkan.");
-                }
+                const syncMsg = offlineResult.synced > 0 ? `\n\n📤 ${offlineResult.synced} antrean data offline juga berhasil disinkronkan.` : '';
+
+                Alert.alert(
+                    "Usulan Berhasil Diajukan!",
+                    `Data pengajuan batas desa telah berhasil dikirim ke server dan berstatus 'Menunggu Verifikasi'.${syncMsg}`,
+                    [
+                        {
+                            text: "Lihat Daftar Usulan",
+                            onPress: () => navigation.goBack()
+                        }
+                    ],
+                    { cancelable: false }
+                );
             }
             
             

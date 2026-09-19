@@ -1,5 +1,5 @@
 //import libraries
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import styles from '../assets/style';
 import { 
     View, 
@@ -19,6 +19,7 @@ import MapView, { Polygon, Polyline, Marker } from 'react-native-maps';
 import TabBar from '../components/TabBar';
 import { useSelector } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PdfWebViewModal from '../usulan_peta/PdfWebViewModal';
 
 const { width } = Dimensions.get('window');
@@ -31,6 +32,7 @@ const Zona = ({ navigation, route }) => {
     } = route.params || {};
 
     const TOKEN = useSelector(state => state.TOKEN);
+    const PROFILE = useSelector(state => state.PROFILE);
     const URL = useSelector(state => state.URL);
 
     const fileBaseUrl = URL.URL_APP 
@@ -70,6 +72,39 @@ const Zona = ({ navigation, route }) => {
     const [petaDasar, setPetaDasar] = useState([]);
     const [mapRegion, setMapRegion] = useState(null);
     const [isPolygonReady, setIsPolygonReady] = useState(false);
+    const [mapType, setMapType] = useState('hybrid');
+    const [showLayerModal, setShowLayerModal] = useState(false);
+    const mapRef = useRef(null);
+
+    const handleZoomIn = () => {
+        if (mapRef.current && mapRegion) {
+            const newRegion = {
+                ...mapRegion,
+                latitudeDelta: Math.max(mapRegion.latitudeDelta / 2, 0.002),
+                longitudeDelta: Math.max(mapRegion.longitudeDelta / 2, 0.002),
+            };
+            setMapRegion(newRegion);
+            mapRef.current.animateToRegion(newRegion, 300);
+        }
+    };
+
+    const handleZoomOut = () => {
+        if (mapRef.current && mapRegion) {
+            const newRegion = {
+                ...mapRegion,
+                latitudeDelta: Math.min(mapRegion.latitudeDelta * 2, 40),
+                longitudeDelta: Math.min(mapRegion.longitudeDelta * 2, 40),
+            };
+            setMapRegion(newRegion);
+            mapRef.current.animateToRegion(newRegion, 300);
+        }
+    };
+
+    const handleResetCenter = () => {
+        if (mapRef.current && mapRegion) {
+            mapRef.current.animateToRegion(mapRegion, 500);
+        }
+    };
 
     // Modal PDF & Zoom Foto
     const [isModalVisible, setModalVisible] = useState(false);
@@ -300,6 +335,81 @@ const Zona = ({ navigation, route }) => {
         return '📎';
     };
 
+    const handleDeleteZonaUsulan = () => {
+        const usulanId = detailData.id_usulan || id_usulan;
+        if (!usulanId) {
+            Alert.alert("Error", "ID usulan tidak valid.");
+            return;
+        }
+
+        Alert.alert(
+            "Hapus Pengajuan Usulan",
+            `Apakah Anda yakin ingin menghapus pengajuan batas desa "${detailData.nama || 'ini'}"? Tindakan ini akan menghapus data secara permanen dari server.`,
+            [
+                { text: "Batal", style: "cancel" },
+                {
+                    text: "Hapus",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const response = await fetch(URL.URL_ADD_ZONA + "removeData", {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: "kikensbatara " + TOKEN,
+                                },
+                                body: JSON.stringify({
+                                    id: usulanId,
+                                    file: detailData.file || '',
+                                }),
+                            });
+
+                            if (response.ok) {
+                                const cacheKey = `@usulan_cache_${PROFILE?.id || 'user'}`;
+                                await AsyncStorage.removeItem(cacheKey);
+
+                                Alert.alert("Berhasil", "Pengajuan usulan telah berhasil dihapus.", [
+                                    {
+                                        text: "OK",
+                                        onPress: () => navigation.goBack()
+                                    }
+                                ]);
+                            } else {
+                                Alert.alert("Gagal", "Gagal menghapus pengajuan dari server.");
+                            }
+                        } catch (err) {
+                            console.error("Error deleting usulan in Zona:", err);
+                            Alert.alert("Error", "Terjadi kesalahan koneksi saat menghapus usulan.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleEditZonaUsulan = () => {
+        navigation.navigate('EditUsulan', {
+            id_usulan: detailData.id_usulan || id_usulan,
+            nik: detailData.nik,
+            nama: detailData.nama,
+            alamat: detailData.alamat,
+            id_kecamatan: detailData.id_kecamatan,
+            nama_kecamatan: detailData.nama_kecamatan,
+            id_des_kel: detailData.id_des_kel,
+            nama_des_kel: detailData.nama_des_kel,
+            rwrt: detailData.rwrt,
+            no_telp: detailData.no_telp,
+            catatan: detailData.catatan,
+            lokasi: detailData.lokasi,
+            file: detailData.file,
+            status_pengajuan: detailData.status_pengajuan,
+            tipe: detailData.tipe || (petaPengajuan[0]?.tipe) || 'polygon',
+        });
+    };
+
+    const currentStatusStr = String(detailData.status_pengajuan || status_pengajuan || '1');
+    const canEditOrDelete = currentStatusStr === '1' || currentStatusStr === '2'; // Status 1 (Menunggu) atau 2 (Ditolak) bisa edit & hapus
+
     return (
         <View style={{ flex: 1, backgroundColor: '#F4F7FB' }}>
             {/* TOP NAVIGATION */}
@@ -340,28 +450,46 @@ const Zona = ({ navigation, route }) => {
                         {renderStatusBadge(detailData.status_pengajuan)}
                     </View>
 
-                    {/* Tombol Edit jika status ditolak */}
-                    {detailData.status_pengajuan === '2' && (
-                        <TouchableOpacity
-                            style={localStyles.editButton}
-                            onPress={() => navigation.navigate('EditUsulan', {
-                                id_usulan: detailData.id_usulan,
-                                nik: detailData.nik,
-                                nama: detailData.nama,
-                                alamat: detailData.alamat,
-                                id_kecamatan: detailData.id_kecamatan,
-                                nama_kecamatan: detailData.nama_kecamatan,
-                                id_des_kel: detailData.id_des_kel,
-                                nama_des_kel: detailData.nama_des_kel,
-                                rwrt: detailData.rwrt,
-                                no_telp: detailData.no_telp,
-                                catatan: detailData.catatan,
-                                lokasi: detailData.lokasi,
-                                file: detailData.file,
-                            })}
-                        >
-                            <Text style={localStyles.editButtonText}>✏️ Edit & Perbaiki Usulan</Text>
-                        </TouchableOpacity>
+                    {/* Tombol Aksi: Edit & Hapus jika Belum Diverifikasi (1) atau Ditolak (2) */}
+                    {canEditOrDelete ? (
+                        <View style={localStyles.actionBox}>
+                            <View style={localStyles.actionBoxTop}>
+                                <Text style={localStyles.actionBoxTitle}>⚙️ Tindakan Pengajuan Usulan</Text>
+                                <Text style={localStyles.actionBoxSubtitle}>
+                                    {currentStatusStr === '1' 
+                                        ? 'Pengajuan masih dalam status "Menunggu Verifikasi". Anda dapat mengubah data atau membatalkan usulan.' 
+                                        : 'Pengajuan ditolak. Anda dapat memperbaiki dokumen atau data usulan, lalu mengajukannya kembali.'}
+                                </Text>
+                            </View>
+                            <View style={localStyles.actionButtonsGroup}>
+                                <TouchableOpacity
+                                    style={localStyles.detailEditBtn}
+                                    onPress={handleEditZonaUsulan}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={localStyles.detailEditBtnText}>✏️ Edit Usulan</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={localStyles.detailDeleteBtn}
+                                    onPress={handleDeleteZonaUsulan}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={localStyles.detailDeleteBtnText}>🗑️ Hapus Usulan</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        /* Jika status === '3' (Disetujui): Fitur edit dan hapus tidak ada, tampilkan informasi pengesahan */
+                        <View style={localStyles.verifiedNoticeBox}>
+                            <Text style={{ fontSize: 20 }}>🔒</Text>
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={localStyles.verifiedNoticeTitle}>Usulan Telah Disahkan</Text>
+                                <Text style={localStyles.verifiedNoticeSub}>
+                                    Batas wilayah desa ini telah diverifikasi & disetujui resmi oleh Kabupaten. Data terkunci permanen.
+                                </Text>
+                            </View>
+                        </View>
                     )}
                 </View>
 
@@ -369,16 +497,29 @@ const Zona = ({ navigation, route }) => {
                 <View style={localStyles.card}>
                     <View style={localStyles.cardHeaderRow}>
                         <Text style={localStyles.cardTitle}>🗺️ Visualisasi Peta Zona</Text>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('FullMap', {
-                                petaPengajuan,
-                                petaDasar,
-                                region: mapRegion
-                            })}
-                            style={localStyles.fullMapButton}
-                        >
-                            <Text style={localStyles.fullMapText}>⛶ Layar Penuh</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity
+                                onPress={() => setShowLayerModal(true)}
+                                style={localStyles.layerButton}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={localStyles.layerButtonText}>
+                                    {mapType === 'satellite' ? '🌍 Satelit' : mapType === 'terrain' ? '⛰️ Terrain' : mapType === 'standard' ? '🗺️ Standar' : '🛰️ Hybrid'} ⌵
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('FullMap', {
+                                    petaPengajuan,
+                                    petaDasar,
+                                    region: mapRegion,
+                                    mapType,
+                                })}
+                                style={localStyles.fullMapButton}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={localStyles.fullMapText}>⛶ Layar Penuh</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Legend Pills */}
@@ -396,50 +537,70 @@ const Zona = ({ navigation, route }) => {
                     {/* Map Box */}
                     <View style={localStyles.mapWrapper}>
                         {(petaPengajuan.length > 0 || petaDasar.length > 0) ? (
-                            <MapView style={{ flex: 1 }} region={mapRegion}>
-                                {petaPengajuan.map((item, index) => (
-                                    item.tipe === 'polyline' ? (
-                                        <Polyline
-                                            key={`pengajuan-${index}`}
-                                            coordinates={item.coordinates}
-                                            strokeColor="blue"
-                                            strokeWidth={3}
-                                        />
-                                    ) : (
+                            <>
+                                <MapView
+                                    ref={mapRef}
+                                    style={{ flex: 1 }}
+                                    region={mapRegion}
+                                    mapType={mapType}
+                                >
+                                    {petaPengajuan.map((item, index) => (
+                                        item.tipe === 'polyline' ? (
+                                            <Polyline
+                                                key={`pengajuan-${index}`}
+                                                coordinates={item.coordinates}
+                                                strokeColor="blue"
+                                                strokeWidth={3}
+                                            />
+                                        ) : (
+                                            <Polygon
+                                                key={`pengajuan-${index}`}
+                                                coordinates={item.coordinates}
+                                                strokeColor="blue"
+                                                fillColor="rgba(0,0,255,0.25)"
+                                            />
+                                        )
+                                    ))}
+
+                                    {petaDasar.map((item, index) => (
                                         <Polygon
-                                            key={`pengajuan-${index}`}
+                                            key={`dasar-${index}`}
                                             coordinates={item.coordinates}
-                                            strokeColor="blue"
-                                            fillColor="rgba(0,0,255,0.25)"
+                                            strokeColor="red"
+                                            fillColor="rgba(255,0,0,0.2)"
                                         />
-                                    )
-                                ))}
+                                    ))}
 
-                                {petaDasar.map((item, index) => (
-                                    <Polygon
-                                        key={`dasar-${index}`}
-                                        coordinates={item.coordinates}
-                                        strokeColor="red"
-                                        fillColor="rgba(255,0,0,0.2)"
-                                    />
-                                ))}
+                                    {/* Marker Titik-titik Koordinat */}
+                                    {detailData.lokasi && detailData.lokasi.map((pt, idx) => {
+                                        const lat = parseFloat(pt.lat);
+                                        const lng = parseFloat(pt.lng);
+                                        if (isNaN(lat) || isNaN(lng)) return null;
+                                        return (
+                                            <Marker
+                                                key={`marker-pt-${idx}`}
+                                                coordinate={{ latitude: lat, longitude: lng }}
+                                                title={`Patok #${idx + 1}`}
+                                                description={`Lat: ${lat}, Lng: ${lng}`}
+                                                pinColor="blue"
+                                            />
+                                        );
+                                    })}
+                                </MapView>
 
-                                {/* Marker Titik-titik Koordinat */}
-                                {detailData.lokasi && detailData.lokasi.map((pt, idx) => {
-                                    const lat = parseFloat(pt.lat);
-                                    const lng = parseFloat(pt.lng);
-                                    if (isNaN(lat) || isNaN(lng)) return null;
-                                    return (
-                                        <Marker
-                                            key={`marker-pt-${idx}`}
-                                            coordinate={{ latitude: lat, longitude: lng }}
-                                            title={`Patok #${idx + 1}`}
-                                            description={`Lat: ${lat}, Lng: ${lng}`}
-                                            pinColor="blue"
-                                        />
-                                    );
-                                })}
-                            </MapView>
+                                {/* Floating Map Controls: Zoom & Center */}
+                                <View style={localStyles.mapFloatingControls}>
+                                    <TouchableOpacity style={localStyles.mapControlBtn} onPress={handleZoomIn} activeOpacity={0.75}>
+                                        <Text style={localStyles.mapControlBtnText}>+</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={localStyles.mapControlBtn} onPress={handleZoomOut} activeOpacity={0.75}>
+                                        <Text style={localStyles.mapControlBtnText}>−</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={localStyles.mapControlBtn} onPress={handleResetCenter} activeOpacity={0.75}>
+                                        <Text style={{ fontSize: 13 }}>🎯</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </>
                         ) : (
                             <View style={localStyles.mapLoading}>
                                 {isLoading ? (
@@ -657,6 +818,88 @@ const Zona = ({ navigation, route }) => {
                 </View>
             </Modal>
 
+            {/* MODAL PILIH TIPE LAYER BASEMAP */}
+            <Modal
+                visible={showLayerModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowLayerModal(false)}
+            >
+                <TouchableOpacity
+                    style={localStyles.layerModalBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setShowLayerModal(false)}
+                >
+                    <View style={localStyles.layerModalCard}>
+                        <View style={localStyles.layerModalHeader}>
+                            <Text style={localStyles.layerModalTitle}>🗺️ Pilih Tipe Layer Peta</Text>
+                            <TouchableOpacity onPress={() => setShowLayerModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                <Text style={{ fontSize: 18, color: '#64748B', fontWeight: 'bold' }}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={localStyles.layerModalDesc}>
+                            Pilih tampilan peta dasar untuk melihat batas wilayah desa dengan lebih jelas:
+                        </Text>
+
+                        <TouchableOpacity
+                            style={[localStyles.layerOptionRow, mapType === 'hybrid' && localStyles.layerOptionActive]}
+                            onPress={() => { setMapType('hybrid'); setShowLayerModal(false); }}
+                        >
+                            <Text style={localStyles.layerOptionIcon}>🛰️</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[localStyles.layerOptionText, mapType === 'hybrid' && { color: '#0284C7', fontWeight: 'bold' }]}>
+                                    Citra Satelit & Jalan (Hybrid)
+                                </Text>
+                                <Text style={localStyles.layerOptionSub}>Foto satelit lengkap dengan label nama jalan & batas wilayah</Text>
+                            </View>
+                            {mapType === 'hybrid' && <Text style={localStyles.checkIcon}>✓</Text>}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[localStyles.layerOptionRow, mapType === 'satellite' && localStyles.layerOptionActive]}
+                            onPress={() => { setMapType('satellite'); setShowLayerModal(false); }}
+                        >
+                            <Text style={localStyles.layerOptionIcon}>🌍</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[localStyles.layerOptionText, mapType === 'satellite' && { color: '#0284C7', fontWeight: 'bold' }]}>
+                                    Citra Satelit Murni
+                                </Text>
+                                <Text style={localStyles.layerOptionSub}>Foto udara resolusi tinggi tanpa overlay teks/vektor</Text>
+                            </View>
+                            {mapType === 'satellite' && <Text style={localStyles.checkIcon}>✓</Text>}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[localStyles.layerOptionRow, mapType === 'standard' && localStyles.layerOptionActive]}
+                            onPress={() => { setMapType('standard'); setShowLayerModal(false); }}
+                        >
+                            <Text style={[localStyles.layerOptionIcon]}>🗺️</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[localStyles.layerOptionText, mapType === 'standard' && { color: '#0284C7', fontWeight: 'bold' }]}>
+                                    Peta Jalan Vektor (Standar)
+                                </Text>
+                                <Text style={localStyles.layerOptionSub}>Peta skematik jalan Google Maps, hemat kuota data</Text>
+                            </View>
+                            {mapType === 'standard' && <Text style={localStyles.checkIcon}>✓</Text>}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[localStyles.layerOptionRow, mapType === 'terrain' && localStyles.layerOptionActive]}
+                            onPress={() => { setMapType('terrain'); setShowLayerModal(false); }}
+                        >
+                            <Text style={localStyles.layerOptionIcon}>⛰️</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[localStyles.layerOptionText, mapType === 'terrain' && { color: '#0284C7', fontWeight: 'bold' }]}>
+                                    Kontur Medan (Terrain)
+                                </Text>
+                                <Text style={localStyles.layerOptionSub}>Menampilkan topografi, kontur elevasi, dan perbukitan</Text>
+                            </View>
+                            {mapType === 'terrain' && <Text style={localStyles.checkIcon}>✓</Text>}
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
             <TabBar />
         </View>
     );
@@ -693,17 +936,81 @@ const localStyles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 1,
     },
-    editButton: {
-        backgroundColor: '#208DC0',
-        borderRadius: 8,
-        paddingVertical: 8,
-        alignItems: 'center',
-        marginTop: 12,
+    actionBox: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
-    editButtonText: {
-        color: '#ffffff',
+    actionBoxTop: {
+        marginBottom: 10,
+    },
+    actionBoxTitle: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#1E293B',
+    },
+    actionBoxSubtitle: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    actionButtonsGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    detailEditBtn: {
+        flex: 1,
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        borderRadius: 8,
+        paddingVertical: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
+    detailEditBtnText: {
+        color: '#1D4ED8',
         fontWeight: 'bold',
         fontSize: 13,
+    },
+    detailDeleteBtn: {
+        flex: 1,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: 8,
+        paddingVertical: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    detailDeleteBtnText: {
+        color: '#DC2626',
+        fontWeight: 'bold',
+        fontSize: 13,
+    },
+    verifiedNoticeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 14,
+    },
+    verifiedNoticeTitle: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#15803D',
+    },
+    verifiedNoticeSub: {
+        fontSize: 11,
+        color: '#166534',
+        marginTop: 2,
     },
     card: {
         backgroundColor: '#ffffff',
@@ -959,7 +1266,116 @@ const localStyles = StyleSheet.create({
         paddingVertical: 10,
         alignItems: 'center',
         marginTop: 14,
-    }
+    },
+    layerButton: {
+        backgroundColor: '#F0F9FF',
+        borderColor: '#BAE6FD',
+        borderWidth: 1,
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    layerButtonText: {
+        fontSize: 11,
+        color: '#0284C7',
+        fontWeight: 'bold',
+    },
+    mapFloatingControls: {
+        position: 'absolute',
+        right: 12,
+        bottom: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        borderRadius: 8,
+        padding: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        elevation: 4,
+        alignItems: 'center',
+    },
+    mapControlBtn: {
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#E2E8F0',
+    },
+    mapControlBtnText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#334155',
+        lineHeight: 20,
+    },
+    layerModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    layerModalCard: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        paddingBottom: 34,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    layerModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    layerModalTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#1E293B',
+    },
+    layerModalDesc: {
+        fontSize: 12,
+        color: '#64748B',
+        marginBottom: 16,
+    },
+    layerOptionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        marginBottom: 8,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    layerOptionActive: {
+        backgroundColor: '#F0F9FF',
+        borderColor: '#0284C7',
+    },
+    layerOptionIcon: {
+        fontSize: 22,
+        marginRight: 12,
+    },
+    layerOptionText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    layerOptionSub: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    checkIcon: {
+        fontSize: 16,
+        color: '#0284C7',
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
 });
 
 //make this component available to the app

@@ -17,6 +17,7 @@ import { useSelector } from 'react-redux';
 import { useIsFocused } from '@react-navigation/native';
 import moment from 'moment';
 import TabBar from '../components/TabBar';
+import AppHeader from '../components/AppHeader';
 import NavigasiService from '../library/NavigasiService';
 import PlacemarkDB from '../library/PlacemarkDB';
 import TrackDB from '../library/TrackDB';
@@ -148,7 +149,10 @@ const Monitoring = ({ navigation }) => {
 
       // 2. Ambil riwayat usulan batas milik desa bersangkutan
       if (token && url?.URL_ADD_ZONA) {
-        const idDesaUser = profile?.profile?.id_desa || profile?.profile?.id_des_kel;
+        const idDesaUser = 
+          (typeof profile?.profile?.id_desa === 'object' ? profile?.profile?.id_desa?.id : profile?.profile?.id_desa) ||
+          (typeof profile?.profile?.des_kel_id === 'object' ? profile?.profile?.des_kel_id?.id : profile?.profile?.des_kel_id) ||
+          (typeof profile?.profile?.id_des_kel === 'object' ? profile?.profile?.id_des_kel?.id : profile?.profile?.id_des_kel);
         const requestBody = {
           data_ke: 1,
           cari_value: '',
@@ -296,30 +300,13 @@ const Monitoring = ({ navigation }) => {
 
   return (
     <View style={styles.screenContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0284C7" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* 1. APPBAR DINAMIS (KABUPATEN VS OPERATOR DESA) */}
-      <View style={styles.appBar}>
-        <View style={styles.appBarTitleContainer}>
-          <View style={styles.brandTag}>
-            <View style={styles.brandDot} />
-            <Text style={styles.brandTagText}>
-              {isOperatorDesa ? 'AKTIVITAS OPERATOR DESA' : 'VERIFIKASI & MONITORING'}
-            </Text>
-          </View>
-          <Text style={styles.appBarTitle}>
-            {isOperatorDesa ? 'Monitoring Lapangan' : 'Status Usulan Batas'}
-          </Text>
-        </View>
-
-        <View style={styles.totalPill}>
-          <Text style={styles.totalPillText} numberOfLines={1}>
-            {isOperatorDesa
-              ? (desaName.length > 15 ? desaName.slice(0, 13) + '..' : desaName)
-              : `${dataMonitoring.length} Data`}
-          </Text>
-        </View>
-      </View>
+      {/* Header Reusable Standar (Gaya Navigasi Koordinat) */}
+      <AppHeader
+        title={isOperatorDesa ? 'Monitoring Lapangan' : 'Status Usulan Batas'}
+        onBack={() => navigation.goBack()}
+      />
 
       {/* ================================================================
           2. KONTEN TAMPILAN OPERATOR DESA (PUSAT AKTIVITAS LAPANGAN)
@@ -451,34 +438,6 @@ const Monitoring = ({ navigation }) => {
                 </Text>
                 <Text style={styles.desaGridLabel}>Trek Jejak Rute</Text>
                 <Text style={styles.desaGridAction}>Rekam Jejak ›</Text>
-              </TouchableOpacity>
-
-              {/* 3. Geotagging Foto */}
-              <TouchableOpacity
-                style={styles.desaGridCard}
-                onPress={() => navigation.navigate('GeoTagCamera')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.desaGridIconBox, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={{ fontSize: 20 }}>📷</Text>
-                </View>
-                <Text style={styles.desaGridCount}>Kamera</Text>
-                <Text style={styles.desaGridLabel}>Foto Geotag Patok</Text>
-                <Text style={styles.desaGridAction}>Ambil Foto ›</Text>
-              </TouchableOpacity>
-
-              {/* 4. Antrean Offline */}
-              <TouchableOpacity
-                style={styles.desaGridCard}
-                onPress={() => navigation.navigate('OfflineSync')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.desaGridIconBox, { backgroundColor: '#F3E8FF' }]}>
-                  <Text style={{ fontSize: 20 }}>🔄</Text>
-                </View>
-                <Text style={styles.desaGridCount}>{offlineQueueCount || 0}</Text>
-                <Text style={styles.desaGridLabel}>Antrean Offline</Text>
-                <Text style={styles.desaGridAction}>Kelola Sinkron ›</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -806,56 +765,26 @@ const styles = RNStyleSheet.create({
     backgroundColor: '#F8FAFC', // Slate 50 bersih
   },
 
-  // APPBAR
-  appBar: {
-    paddingTop: 45,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#0284C7',
-    borderBottomWidth: 1,
-    borderBottomColor: '#0369A1',
+  // HEADER STYLES (GAYA APPHEADER NAVIGASI KOORDINAT)
+  headerSubtitleText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
   },
-  appBarTitleContainer: {
-    flex: 1,
-  },
-  brandTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  brandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#38BDF8',
-    marginRight: 6,
-  },
-  brandTagText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#BAE6FD',
-    letterSpacing: 1,
-  },
-  appBarTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  totalPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  headerRightPill: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
     paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    maxWidth: 130,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
   },
-  totalPillText: {
-    color: '#FFFFFF',
+  headerRightPillText: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#0284C7',
   },
 
   // ==================== OPERATOR DESA STYLES ====================
