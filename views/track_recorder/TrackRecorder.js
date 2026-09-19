@@ -55,6 +55,10 @@ const MetricCard = React.memo(({ label, value, unit, color = '#208DC0' }) => (
 const TrackRecorder = ({ navigation }) => {
   const dispatch = useDispatch();
   const trackStatus = useSelector(s => s.TRACK_STATUS);
+  const token = useSelector(s => s.TOKEN);
+  const profile = useSelector(s => s.PROFILE);
+  const urlTrack = useSelector(s => s.URL?.URL_TRACK);
+  const userId = profile?.id || profile?._id || profile?.username;
 
   const [status, setStatus] = useState('idle'); // idle|recording|paused
   const [metrics, setMetrics] = useState({ distance: 0, avgSpeed: 0, maxSpeed: 0, duration: 0 });
@@ -226,7 +230,18 @@ const TrackRecorder = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             stopAll();
-            const finished = await TrackDB.finishTrack();
+            const serverOpts = {
+              userId,
+              token,
+              urlTrack,
+              ownerInfo: {
+                userId,
+                nama: profile?.nama || profile?.username || 'Pengguna',
+                desa: profile?.nama_desa || '',
+                kecamatan: profile?.nama_kecamatan || '',
+              },
+            };
+            const finished = await TrackDB.finishTrack(serverOpts);
             setStatus('idle');
             dispatch({ type: 'SET_TRACK_STATUS', payload: 'idle' });
             setSessionId(null);

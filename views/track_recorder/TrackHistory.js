@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import MapView, { Polyline } from 'react-native-maps';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import FastImage from 'react-native-fast-image';
 import moment from 'moment';
 import AppHeader from '../components/AppHeader';
@@ -51,18 +52,34 @@ const TrackItem = React.memo(({ item, onPress, onDelete }) => (
 ));
 
 const TrackHistory = ({ navigation }) => {
+  const token = useSelector(s => s.TOKEN);
+  const profile = useSelector(s => s.PROFILE);
+  const urlTrack = useSelector(s => s.URL?.URL_TRACK);
+  const userId = profile?.id || profile?._id || profile?.username;
+
   const [tracks, setTracks] = useState([]);
   const [selected, setSelected] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   useFocusEffect(useCallback(() => {
-    TrackDB.getAllTracks().then(setTracks);
-  }, []));
+    // 1. Muat dari database lokal HP dulu (instan)
+    TrackDB.getAllTracks(userId).then(setTracks);
+
+    // 2. Sinkronkan dengan server cloud ArangoDB jika ada koneksi
+    if (userId && token && urlTrack) {
+      TrackDB.syncWithServer(userId, token, urlTrack).then(async (res) => {
+        if (res && res.success) {
+          const updated = await TrackDB.getAllTracks(userId);
+          setTracks(updated);
+        }
+      });
+    }
+  }, [userId, token, urlTrack]));
 
   const handleDelete = (item) => {
     Alert.alert('Hapus Trek?', `"${item.label}" akan dihapus permanen.`, [
       { text: 'Hapus', style: 'destructive', onPress: async () => {
-        await TrackDB.deleteTrack(item.id);
+        await TrackDB.deleteTrack(item.id, userId, { urlTrack, token });
         setTracks(prev => prev.filter(t => t.id !== item.id));
       }},
       { text: 'Batal', style: 'cancel' },
@@ -79,7 +96,7 @@ const TrackHistory = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             for (const t of tracks) {
-              await TrackDB.deleteTrack(t.id);
+              await TrackDB.deleteTrack(t.id, userId, { urlTrack, token });
             }
             setTracks([]);
           },

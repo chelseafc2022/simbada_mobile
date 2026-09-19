@@ -1,12 +1,15 @@
 /**
- * TrackDB.js — Modul 3: Database Trek Lapangan
+ * TrackDB.js — Modul 3: Database Trek Lapangan (Offline-First + Server Sync)
  *
- * Menyimpan, mengelola, dan mengambil data track recording.
- * Menggunakan AsyncStorage dengan rolling buffer (chunk per 100 waypoint)
- * untuk menjaga penggunaan memori tetap rendah.
+ * FITUR:
+ * 1. Offline-First: Menyimpan dan mengelola rekaman trek secara instan di AsyncStorage
+ *    dengan rolling buffer (chunk per 100 waypoint) per-user (`TRACK_HISTORY_<userId>`).
+ * 2. Cloud-Sync: Sinkronisasi data rute survei ke server ArangoDB (`/api/v1/track/`).
+ * 3. Multi-Device: Data rute survei tersimpan aman di server, tidak hilang saat ganti perangkat.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { uuidv4 } from './uuid';
 
 const KEY_ACTIVE  = 'TRACK_SESSION_ACTIVE';
@@ -14,6 +17,12 @@ const KEY_HISTORY = 'TRACK_HISTORY';
 const CHUNK_SIZE  = 100;    // Flush ke storage tiap N waypoint
 const MAX_IN_MEM  = 200;    // Maks waypoint di memory (untuk preview peta)
 const MAX_TOTAL   = 10000;  // Batas total sebelum downsampling
+
+// Storage key per-user
+const getUserKey = (userId) => {
+  if (!userId) return KEY_HISTORY;
+  return `${KEY_HISTORY}_${userId}`;
+};
 
 // Hitung jarak Haversine antara dua titik (meter)
 const haversine = (la1, lo1, la2, lo2) => {
@@ -52,10 +61,11 @@ let _sessionMeta = null;   // metadata sesi aktif
 
 const TrackDB = {
   // ─── MEMULAI SESI BARU ─────────────────────────────────────────────────────
-  startNewTrack: async (label = null) => {
+  startNewTrack: async (label = null, userId = null) => {
     const id = uuidv4();
     const session = {
       id,
+      userId: userId || null,
       label: label || `Trek ${new Date().toLocaleDateString('id-ID')}`,
       startTime: new Date().toISOString(),
       waypoints: [],
@@ -124,8 +134,8 @@ const TrackDB = {
     return _sessionBuffer.slice(-MAX_IN_MEM);
   },
 
-  // ─── SELESAIKAN TREK ───────────────────────────────────────────────────────
-  finishTrack: async () => {
+  // ─── SELESAIKAN TREK (LOKAL + BACKGROUND CLOUD SYNC) ───────────────────────
+  finishTrack: async (serverOpts = {}) => {
     if (!_sessionMeta) return null;
 
     // Gabungkan buffer yang belum di-flush
@@ -140,16 +150,32 @@ const TrackDB = {
     stored.status = 'finished';
     stored.endTime = new Date().toISOString();
     stored.metrics = _sessionMeta.metrics;
+    stored.userId = serverOpts.userId || stored.userId || null;
+    stored.ownerInfo = serverOpts.ownerInfo || null;
 
-    // Simpan ke history
-    const history = await TrackDB.getAllTracks();
+    // 1. Simpan ke history lokal (per user)
+    const history = await TrackDB.getAllTracks(stored.userId);
     history.unshift(stored);   // Terbaru di atas
-    await AsyncStorage.setItem(KEY_HISTORY, JSON.stringify(history));
+    await AsyncStorage.setItem(getUserKey(stored.userId), JSON.stringify(history));
 
-    // Hapus sesi aktif
+    // Jika userId ada, juga sync ke KEY_HISTORY umum sebagai fallback
+    if (stored.userId) {
+      const legacyHistory = await TrackDB.getAllTracks();
+      legacyHistory.unshift(stored);
+      await AsyncStorage.setItem(KEY_HISTORY, JSON.stringify(legacyHistory));
+    }
+
+    // 2. Hapus sesi aktif
     await AsyncStorage.removeItem(KEY_ACTIVE);
     _sessionBuffer = [];
     _sessionMeta = null;
+
+    // 3. Sync ke server di background jika online
+    if (serverOpts.urlTrack && serverOpts.token) {
+      TrackDB.syncItemToServer(stored, serverOpts.urlTrack, serverOpts.token).catch(err => {
+        console.log('[TrackDB] Gagal kirim ke server (akan disinkronkan saat online):', err.message);
+      });
+    }
 
     return stored;
   },
@@ -162,33 +188,150 @@ const TrackDB = {
     if (_sessionMeta) _sessionMeta.status = 'recording';
   },
 
-  // ─── AMBIL SEMUA RIWAYAT TREK ──────────────────────────────────────────────
-  getAllTracks: async () => {
+  // ─── AMBIL SEMUA RIWAYAT TREK (LOKAL) ──────────────────────────────────────
+  getAllTracks: async (userId = null) => {
     try {
-      const raw = await AsyncStorage.getItem(KEY_HISTORY);
-      return raw ? JSON.parse(raw) : [];
+      const userKey = getUserKey(userId);
+      const raw = await AsyncStorage.getItem(userKey);
+      if (raw) return JSON.parse(raw);
+
+      // Fallback ke KEY_HISTORY lama jika belum ada key per-user
+      if (userId) {
+        const legacyRaw = await AsyncStorage.getItem(KEY_HISTORY);
+        return legacyRaw ? JSON.parse(legacyRaw) : [];
+      }
+      return [];
     } catch {
       return [];
     }
   },
 
   // ─── AMBIL SATU TREK ───────────────────────────────────────────────────────
-  getTrackById: async (id) => {
-    const all = await TrackDB.getAllTracks();
+  getTrackById: async (id, userId = null) => {
+    const all = await TrackDB.getAllTracks(userId);
     return all.find(t => t.id === id) || null;
   },
 
-  // ─── HAPUS TREK ────────────────────────────────────────────────────────────
-  deleteTrack: async (id) => {
-    const all = await TrackDB.getAllTracks();
+  // ─── HAPUS TREK (LOKAL + SERVER) ───────────────────────────────────────────
+  deleteTrack: async (id, userId = null, serverOpts = {}) => {
+    const all = await TrackDB.getAllTracks(userId);
     const filtered = all.filter(t => t.id !== id);
-    await AsyncStorage.setItem(KEY_HISTORY, JSON.stringify(filtered));
+    await AsyncStorage.setItem(getUserKey(userId), JSON.stringify(filtered));
+
+    // Juga bersihkan dari legacy key jika ada
+    if (userId) {
+      const legacy = await TrackDB.getAllTracks();
+      const filteredLegacy = legacy.filter(t => t.id !== id);
+      await AsyncStorage.setItem(KEY_HISTORY, JSON.stringify(filteredLegacy));
+    }
+
+    // Hapus di server jika online
+    const urlTrack = serverOpts.urlTrack;
+    const token = serverOpts.token;
+    if (urlTrack && token) {
+      TrackDB.deleteFromServer(id, userId, urlTrack, token).catch(err => {
+        console.log('[TrackDB] Gagal hapus trek di server:', err.message);
+      });
+    }
   },
 
   // ─── JUMLAH TREK ───────────────────────────────────────────────────────────
-  getTrackCount: async () => {
-    const all = await TrackDB.getAllTracks();
+  getTrackCount: async (userId = null) => {
+    const all = await TrackDB.getAllTracks(userId);
     return all.length;
+  },
+
+  // ─── SINKRONISASI 1 ITEM KE SERVER ─────────────────────────────────────────
+  syncItemToServer: async (item, urlTrack, token) => {
+    try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) return false;
+
+      const endpoint = urlTrack.endsWith('/') ? `${urlTrack}sync` : `${urlTrack}/sync`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ tracks: [item] }),
+      });
+      return response.ok;
+    } catch (e) {
+      console.warn('[TrackDB] Gagal sync 1 trek ke server:', e.message);
+      return false;
+    }
+  },
+
+  // ─── HAPUS ITEM DARI SERVER ───────────────────────────────────────────────
+  deleteFromServer: async (id, userId, urlTrack, token) => {
+    try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) return false;
+
+      const endpoint = urlTrack.endsWith('/') ? `${urlTrack}delete` : `${urlTrack}/delete`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id, userId }),
+      });
+      return response.ok;
+    } catch (e) {
+      console.warn('[TrackDB] Gagal delete trek di server:', e.message);
+      return false;
+    }
+  },
+
+  // ─── SINKRONISASI PENUH DENGAN SERVER (PULL & PUSH) ───────────────────────
+  syncWithServer: async (userId, token, urlTrack) => {
+    if (!userId || !token || !urlTrack) return { success: false, message: 'Kredensial tidak lengkap' };
+
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) return { success: false, message: 'Tidak ada koneksi internet' };
+
+    const baseUrl = urlTrack.endsWith('/') ? urlTrack : `${urlTrack}/`;
+
+    try {
+      // 1. PUSH: Kirim data lokal milik user ke server
+      const localMy = await TrackDB.getAllTracks(userId);
+      if (localMy.length > 0) {
+        await fetch(`${baseUrl}sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tracks: localMy }),
+        });
+      }
+
+      // 2. PULL: Ambil data milik user dari server (saat login di perangkat baru)
+      const myRes = await fetch(`${baseUrl}my`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+      const myData = await myRes.json();
+      if (myData.success && Array.isArray(myData.data)) {
+        // Gabungkan data server dengan lokal tanpa duplikasi id
+        const localMap = new Map();
+        myData.data.forEach(t => localMap.set(t.id, t));
+        localMy.forEach(t => localMap.set(t.id, t));
+        const merged = Array.from(localMap.values());
+        await AsyncStorage.setItem(getUserKey(userId), JSON.stringify(merged));
+      }
+
+      return { success: true, message: 'Sinkronisasi trek dengan server berhasil' };
+    } catch (e) {
+      console.warn('[TrackDB] Gagal sinkronisasi server:', e.message);
+      return { success: false, message: e.message };
+    }
   },
 
   // ─── STATUS SESI AKTIF ─────────────────────────────────────────────────────

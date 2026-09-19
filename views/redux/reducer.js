@@ -23,6 +23,7 @@ const initialState = {
         URL_PENGGUNA : URL + "api/v1/pengguna/",
         URL_PETA_FINAL : URL + "api/v1/petafinal/",
         URL_PLACEMARK : URL + "api/v1/placemark/",
+        URL_TRACK : URL + "api/v1/track/",
         // URL_VIEW : URL + "api/v1/web_zona_tanah/",
         // URL_PETA_DASAR : URL + ""
 
