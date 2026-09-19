@@ -29,6 +29,8 @@ import DetailDesaModal, {
   calculatePolygonArea,
 } from './components/DetailDesaModal';
 import TabBar from '../components/TabBar';
+import TrackDB from '../library/TrackDB';
+import PlacemarkDB from '../library/PlacemarkDB';
 
 /**
  * HOME SIMBADA MOBILE V2
@@ -43,6 +45,7 @@ const Home = ({ navigation }) => {
   // Redux Store State
   const URL = useSelector((state) => state.URL);
   const TOKEN = useSelector((state) => state.TOKEN);
+  const PROFILE = useSelector((state) => state.PROFILE);
   const IS_ONLINE = useSelector((state) => state.IS_ONLINE);
   const NOTIFICATION_COUNT = useSelector((state) => state.NOTIFICATION_COUNT);
   const OFFLINE_QUEUE_COUNT = useSelector((state) => state.OFFLINE_QUEUE_COUNT);
@@ -58,6 +61,10 @@ const Home = ({ navigation }) => {
   const [isPolygonLoading, setIsPolygonLoading] = useState(false);
   const [activePolygon, setActivePolygon] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Dynamic Recent Activity State
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
 
   // GPS Sensor & Telemetri State
   const [isGpsActive, setIsGpsActive] = useState(false);
@@ -430,10 +437,223 @@ const Home = ({ navigation }) => {
     }
   }, [selectedKecamatan]);
 
+  // ================================================================
+  // 3. AKTIVITAS TERBARU (DYNAMIC AUDIT TRAIL & LOG)
+  // ================================================================
+  const formatActivityTime = (dateInput) => {
+    if (!dateInput) return 'Baru saja';
+    try {
+      const normalized = typeof dateInput === 'string' ? dateInput.replace(' ', 'T') : dateInput;
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) return String(dateInput);
+
+      const now = new Date();
+      const isToday =
+        d.getDate() === now.getDate() &&
+        d.getMonth() === now.getMonth() &&
+        d.getFullYear() === now.getFullYear();
+
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      const isYesterday =
+        d.getDate() === yesterday.getDate() &&
+        d.getMonth() === yesterday.getMonth() &&
+        d.getFullYear() === yesterday.getFullYear();
+
+      const pad = (n) => (n < 10 ? '0' + n : n);
+      const hours = pad(d.getHours());
+      const minutes = pad(d.getMinutes());
+
+      if (isToday) {
+        return `Hari ini, ${hours}:${minutes}`;
+      }
+      if (isYesterday) {
+        return `Kemarin, ${hours}:${minutes}`;
+      }
+
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+      ];
+      return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${hours}:${minutes}`;
+    } catch {
+      return String(dateInput);
+    }
+  };
+
+  const fetchRecentActivities = async () => {
+    try {
+      setIsActivitiesLoading(true);
+      const userId = PROFILE?.id;
+      const combined = [];
+
+      // 1. Ambil trek survei GPS terbaru dari TrackDB
+      try {
+        const tracks = await TrackDB.getAllTracks(userId);
+        if (Array.isArray(tracks)) {
+          tracks.slice(0, 5).forEach((t) => {
+            const rawDate = t.endTime || t.startTime || Date.now();
+            const distKm = t.metrics?.distanceMeters
+              ? (t.metrics.distanceMeters / 1000).toFixed(2) + ' km'
+              : null;
+            const durMin = t.metrics?.durationSeconds
+              ? Math.round(t.metrics.durationSeconds / 60) + ' mnt'
+              : null;
+            const subInfo = [distKm, durMin].filter(Boolean).join(' • ');
+
+            combined.push({
+              id: `track-${t.id}`,
+              rawTime: new Date(rawDate).getTime(),
+              title: t.name || 'Perekaman Rute Batas Lapangan',
+              subtitle: subInfo ? `${subInfo} • Tersimpan lokal` : 'Trek GPS batas tersimpan di perangkat',
+              time: formatActivityTime(rawDate),
+              type: 'track',
+              badge: 'Trek GPS',
+              dotColor: '#0284C7',
+              onPress: () => Route('TrackHistory'),
+            });
+          });
+        }
+      } catch (e) {
+        console.log('[Home] Error fetching tracks:', e);
+      }
+
+      // 2. Ambil patok titik batas dari PlacemarkDB
+      try {
+        const placemarks = await PlacemarkDB.getAll(userId);
+        if (Array.isArray(placemarks)) {
+          placemarks.slice(0, 5).forEach((pm) => {
+            const rawDate = pm.createdAt || Date.now();
+            const katLabel = pm.kategori ? pm.kategori.replace(/_/g, ' ') : 'Titik Batas';
+            const coordsStr =
+              pm.lat != null && pm.lon != null
+                ? `(${pm.lat.toFixed(4)}, ${pm.lon.toFixed(4)})`
+                : '';
+
+            combined.push({
+              id: `placemark-${pm.id}`,
+              rawTime: new Date(rawDate).getTime(),
+              title: pm.judul || 'Survei Patok Titik Batas',
+              subtitle: `${katLabel} ${coordsStr}`.trim(),
+              time: formatActivityTime(rawDate),
+              type: 'placemark',
+              badge: 'Titik Batas',
+              dotColor: '#16A36A',
+              onPress: () => Route('PlacemarkList'),
+            });
+          });
+        }
+      } catch (e) {
+        console.log('[Home] Error fetching placemarks:', e);
+      }
+
+      // 3. Ambil usulan batas desa terkini (jika online & berautentikasi)
+      if (TOKEN && URL?.URL_ADD_ZONA) {
+        try {
+          const idDesaUser =
+            (typeof PROFILE?.profile?.id_desa === 'object' ? PROFILE?.profile?.id_desa?.id : PROFILE?.profile?.id_desa) ||
+            (typeof PROFILE?.profile?.des_kel_id === 'object' ? PROFILE?.profile?.des_kel_id?.id : PROFILE?.profile?.des_kel_id) ||
+            (typeof PROFILE?.profile?.id_des_kel === 'object' ? PROFILE?.profile?.id_des_kel?.id : PROFILE?.profile?.id_des_kel);
+
+          const userStatus = PROFILE?.status || '1';
+          const reqBody = {
+            data_ke: 1,
+            cari_value: '',
+            id: userId,
+            status: userStatus,
+            ...(userStatus === '2' && idDesaUser && { id_des_kel: idDesaUser }),
+          };
+
+          const res = await fetch(URL.URL_ADD_ZONA + 'viewUsulanNative', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `kikensbatara ${TOKEN}`,
+            },
+            body: JSON.stringify(reqBody),
+          });
+          const json = await res.json();
+          if (Array.isArray(json) && json[0]?.data1) {
+            json[0].data1.slice(0, 5).forEach((u) => {
+              const rawDate = (u.create_at || u.tgl_pengajuan || '').replace(' ', 'T') || Date.now();
+              const statusStr = String(u.status_pengajuan ?? u.status ?? '0');
+              let badge = 'Menunggu';
+              let dotColor = '#F59E0B';
+              if (statusStr === '2') {
+                badge = 'Ditolak';
+                dotColor = '#EF4444';
+              } else if (statusStr === '3' || statusStr === '1') {
+                badge = 'Disahkan';
+                dotColor = '#10B981';
+              }
+
+              combined.push({
+                id: `usulan-${u.id}`,
+                rawTime: new Date(rawDate).getTime(),
+                title: `Pengajuan Batas ${u.nama_desa || u.nama || 'Desa'}`,
+                subtitle: `Metode ${u.tipe || 'Polygon'} • Status: ${badge}`,
+                time: formatActivityTime(rawDate),
+                type: 'usulan',
+                badge: badge,
+                dotColor: dotColor,
+                onPress: () => Route('Monitoring'),
+              });
+            });
+          }
+        } catch (e) {
+          console.log('[Home] Error fetching usulan for activity:', e);
+        }
+      }
+
+      // Urutkan dari yang paling baru
+      combined.sort((a, b) => (b.rawTime || 0) - (a.rawTime || 0));
+
+      if (combined.length > 0) {
+        setRecentActivities(combined.slice(0, 4));
+      } else {
+        // Fallback interaktif jika database masih belum memiliki entri survei
+        setRecentActivities([
+          {
+            id: 'guide-1',
+            title: 'Mulai Survei Titik Batas Lapangan',
+            subtitle: 'Catat patok pilar batas dengan koordinat GPS akurat',
+            time: 'Panduan Cepat',
+            badge: 'Titik Batas',
+            dotColor: '#16A36A',
+            onPress: () => Route('PlacemarkList'),
+          },
+          {
+            id: 'guide-2',
+            title: 'Mulai Rekam Trek Jejak Batas',
+            subtitle: 'Rekam tracking rute batas desa secara offline-first',
+            time: 'Navigasi GPS',
+            badge: 'Trek GPS',
+            dotColor: '#0284C7',
+            onPress: () => Route('TrackRecorder'),
+          },
+          {
+            id: 'guide-3',
+            title: 'Pantau Pengajuan & Usulan Batas',
+            subtitle: 'Periksa status verifikasi batas desa oleh Tim Tata Pemerintahan',
+            time: 'Monitoring',
+            badge: 'Verifikasi',
+            dotColor: '#F59E0B',
+            onPress: () => Route('Monitoring'),
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error('[Home] Gagal memuat aktivitas terbaru:', err);
+    } finally {
+      setIsActivitiesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isFocused) {
       getKecamatan();
       getPetafinal();
+      fetchRecentActivities();
     }
   }, [isFocused]);
 
@@ -554,29 +774,12 @@ const Home = ({ navigation }) => {
           onSyncPress={() => Route('OfflineSync')}
         />
 
-        {/* 9. AKTIVITAS TERBARU (Timeline Ringkas) */}
+        {/* 9. AKTIVITAS TERBARU (Dinamis & Interaktif) */}
         <RecentActivity
-          activities={[
-            {
-              id: '1',
-              title: 'Survei titik batas Desa Ranomeeto',
-              time: 'Hari ini, 09:14',
-              dotColor: '#087FC1',
-            },
-            {
-              id: '2',
-              title: 'Polygon Desa Ambaipua disahkan',
-              time: 'Kemarin, 15:20',
-              dotColor: '#16A36A',
-            },
-            {
-              id: '3',
-              title: 'Sinkronisasi 3 berkas usulan batas selesai',
-              time: '13 Sep 2026, 11:45',
-              dotColor: '#F59E0B',
-            },
-          ]}
+          activities={recentActivities}
           onViewAllPress={() => Route('Monitoring')}
+          onTambahTitikPress={() => Route('PlacemarkList')}
+          onRekamTrekPress={() => Route('TrackRecorder')}
         />
       </ScrollView>
 

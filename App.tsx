@@ -29,6 +29,7 @@ import EditUsulan from "./views/usulan_peta/EditUsulan";
 import MetodeText from "./views/usulan_peta/MetodeText";
 import MetodePolyline from "./views/usulan_peta/MetodePolyline";
 import User from "./views/user/User";
+import KebijakanPrivasi from "./views/user/KebijakanPrivasi";
 import PetaDasar from "./views/peta_dasar/PetaDasar";
 import PetaFinal from "./views/peta_final/PetaFinal";
 import LihatUsulan from "./views/usulan_peta/LihatUsulan";
@@ -130,6 +131,7 @@ const AppContent = () => {
         
         {/* User */}
         <Stack.Screen name="User" component={User} />
+        <Stack.Screen name="KebijakanPrivasi" component={KebijakanPrivasi} />
 
         {/* === Modul Baru (Legacy) === */}
         <Stack.Screen name="NavigasiKoordinat" component={NavigasiKoordinat} />

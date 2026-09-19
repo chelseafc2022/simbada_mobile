@@ -444,6 +444,12 @@ const User = ({ navigation }) => {
             onPress={() => setShowAbout(true)}
           />
           <MenuItem
+            icon="🛡️"
+            label="Kebijakan Privasi"
+            subtitle="Ketentuan pelindungan data pribadi (UU PDP)"
+            onPress={() => navigation.navigate('KebijakanPrivasi')}
+          />
+          <MenuItem
             icon="📞"
             label="Hubungi Bantuan"
             subtitle="Laporkan masalah atau saran"
