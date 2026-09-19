@@ -90,8 +90,8 @@ android {
         applicationId "com.simbadakonselv2"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.0.2"
+        versionCode 7
+        versionName "2.0.0"
         multiDexEnabled true
         ndk {
         abiFilters "armeabi-v7a", "arm64-v8a"

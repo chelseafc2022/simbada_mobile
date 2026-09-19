@@ -5,10 +5,10 @@
  * @format
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { store } from './views/redux';
-import { Provider, useDispatch } from 'react-redux'
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import {SafeAreaView,ScrollView,StyleSheet,Text,TouchableOpacity,useColorScheme,View,} from 'react-native';
 
 import {Colors} from 'react-native/Libraries/NewAppScreen';
@@ -53,6 +53,8 @@ import PlacemarkMap from "./views/placemark/PlacemarkMap";
 import MapImporter from "./views/peta_offline/MapImporter";
 import MapViewer from "./views/peta_offline/MapViewer";
 import EksporData from "./views/ekspor/EksporData";
+import ForceUpdateModal from "./views/components/ForceUpdateModal";
+import VersionCheckService from "./views/library/VersionCheckService";
 
 // === Services ===
 import OfflineManager from "./views/library/OfflineManager";
@@ -67,6 +69,26 @@ const Stack = createNativeStackNavigator();
  */
 const AppContent = () => {
   const dispatch = useDispatch();
+  const URL = useSelector((state: any) => state.URL);
+  const [updateData, setUpdateData] = useState<any>(null);
+  const [showForceUpdate, setShowForceUpdate] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Periksa versi aplikasi ke server
+    const checkVersion = async () => {
+      try {
+        const baseUrl = URL?.URL_APP || 'https://server-simbada.konaweselatankab.go.id/';
+        const res = await VersionCheckService.checkAppVersion(baseUrl);
+        if (res && res.needs_update && res.force_update) {
+          setUpdateData(res);
+          setShowForceUpdate(true);
+        }
+      } catch (err) {
+        console.log('[App] Version check error:', err);
+      }
+    };
+    checkVersion();
+  }, [URL]);
 
   useEffect(() => {
     // Inisialisasi NavigasiService dan restore sesi jika ada
@@ -160,6 +182,9 @@ const AppContent = () => {
         {/* === Modul PRD: Ekspor Data === */}
         <Stack.Screen name="EksporData" component={EksporData} />
       </Stack.Navigator>
+
+      {/* Dialog Pembaruan Wajib Server (Force Update) */}
+      <ForceUpdateModal visible={showForceUpdate} updateData={updateData} />
     </NavigationContainer>
   );
 };

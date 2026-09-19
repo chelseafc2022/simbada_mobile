@@ -84,3 +84,8 @@ yarn-error.log
 doc/
 RAB SIMBADA UPDATE.xlsx
 
+# Release build outputs
+release_output/
+*.apk
+*.aab
+
