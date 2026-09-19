@@ -396,7 +396,7 @@ const Login = ({ navigation }) => {
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={ui.loginBtnText}>Masuk ke Sistem</Text>
+                  <Text style={ui.loginBtnText}>Masuk</Text>
                   <Icon name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
                 </View>
               )}
@@ -408,9 +408,13 @@ const Login = ({ navigation }) => {
         {/* 3. FOOTER COPYRIGHT                                      */}
         {/* ======================================================== */}
         <View style={ui.footerContainer}>
-          <Text style={ui.copyright}>
-            © 2026 Bagian Tata Pemerintahan — Kab. Konawe Selatan
-          </Text>
+          {/* <FastImage
+            source={require('../assets/img/logo.png')}
+            style={ui.footerLogo}
+            resizeMode={FastImage.resizeMode.contain}
+          /> */}
+          <Text style={ui.footerText}>SIMBADA Mobile v2.0.0 (2026)</Text>
+          <Text style={ui.footerCopy}>© 2026 Pemkab Konawe Selatan</Text>
         </View>
       </ScrollView>
     </View>
@@ -627,12 +631,25 @@ const ui = RNStyleSheet.create({
   // FOOTER
   footerContainer: {
     alignItems: 'center',
-    marginTop: 22,
+    paddingVertical: 20,
+    marginTop: 12,
   },
-  copyright: {
-    color: '#94A3B8',
+  footerLogo: {
+    width: 38,
+    height: 38,
+    marginBottom: 8,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  footerCopy: {
     fontSize: 11,
-    textAlign: 'center',
+    color: '#94A3B8',
+    marginTop: 3,
+    fontWeight: '500',
   },
 });
 
