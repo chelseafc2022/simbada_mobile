@@ -16,6 +16,7 @@ import FastImage from 'react-native-fast-image';
 import TabBar from '../components/TabBar';
 import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─────────────────────────────────────────────────────────
 // Design System Tokens — Geo-Sapphire
@@ -241,6 +242,7 @@ const AboutModal = ({ visible, onClose }) => (
 // MAIN COMPONENT: User / Profile
 // ═════════════════════════════════════════════════════════
 const User = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const [selectedUser, setSelectedUser] = useState(null);
   const [userInfo, setUserInfo] = useState([]);
@@ -395,7 +397,7 @@ const User = ({ navigation }) => {
       <StatusBar barStyle="dark-content" backgroundColor={C.WHITE} />
 
       {/* Top Bar */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 14) }]}>
         <TouchableOpacity style={styles.topBarBack} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <FastImage
             style={styles.topBarBackIcon}

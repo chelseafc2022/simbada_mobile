@@ -17,6 +17,8 @@ import { NavigationContainer, createStaticNavigation, useNavigation } from '@rea
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+
 // === Existing Screens ===
 import Home from "./views/home/Home";
 import Login from "./views/auth/Login";
@@ -97,8 +99,15 @@ const AppContent = () => {
 
     // Notifee foreground event handler (misal tombol Hentikan di notifikasi)
     const unsubNotifeeForeground = notifee.onForegroundEvent(async ({ type, detail }) => {
-      if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'stop_nav') {
-        await NavigasiService.stopNavigation();
+      if (type === EventType.ACTION_PRESS) {
+        if (detail.pressAction?.id === 'stop_nav') {
+          await NavigasiService.stopNavigation();
+        } else if (detail.pressAction?.id === 'stop') {
+          try {
+            await notifee.stopForegroundService();
+            await notifee.cancelNotification('simbada_track_recorder');
+          } catch (e) {}
+        }
       }
     });
 
@@ -193,9 +202,11 @@ function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <Provider store={store}>
-      <AppContent />
-    </Provider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <Provider store={store}>
+        <AppContent />
+      </Provider>
+    </SafeAreaProvider>
   );
 }
 

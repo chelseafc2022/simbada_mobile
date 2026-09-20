@@ -977,14 +977,14 @@ const styles = RNStyleSheet.create({
     marginBottom: 12,
   },
 
-  // GRID AKTIVITAS LAPANGAN 2x2
+  // GRID AKTIVITAS LAPANGAN (BERDAMPINGAN 2 KOLOM)
   desaGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'stretch',
+    gap: 12,
   },
   desaGridCard: {
-    width: '48.5%',
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 14,

@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as turf from '@turf/turf';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── COLOR PALETTE (HOME & MAPPREVIEW COMPLIANT) ─────────────────────────────
 const PRIMARY      = '#0284C7';
@@ -64,6 +65,7 @@ const calculateArea = (coordinates) => {
 };
 
 const PetaDasar = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const Route = (r) => navigation.navigate(r);
 
   const TOKEN   = useSelector((s) => s.TOKEN);
@@ -364,7 +366,7 @@ const PetaDasar = ({ navigation }) => {
       <StatusBar backgroundColor={DARK_NAVY} barStyle="light-content" />
 
       {/* HEADER (COMPACT GOVERNMENT GIS STYLE) */}
-      <View style={ss.header}>
+      <View style={[ss.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={ss.headerLeft}>
           <Text style={ss.headerTitle}>PETA DASAR</Text>
           <Text style={ss.headerSub}>Sistem Informasi Batas Desa • Konawe Selatan</Text>

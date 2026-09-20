@@ -16,6 +16,7 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import moment from 'moment';
 import FastImage from 'react-native-fast-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TelemetriPanel from '../telemetri/TelemetriPanel';
 import TrackDB from '../library/TrackDB';
 
@@ -60,6 +61,7 @@ const TrackRecorder = ({ navigation }) => {
   const urlTrack = useSelector(s => s.URL?.URL_TRACK);
   const userId = profile?.id || profile?._id || profile?.username;
 
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState('idle'); // idle|recording|paused
   const [metrics, setMetrics] = useState({ distance: 0, avgSpeed: 0, maxSpeed: 0, duration: 0 });
   const [previewPath, setPreviewPath] = useState([]);
@@ -72,6 +74,31 @@ const TrackRecorder = ({ navigation }) => {
   const durationRef = useRef(0);
   const prevPosRef = useRef(null);
   const notifTimerRef = useRef(null);
+
+  const stopAll = async () => {
+    if (watchIdRef.current !== null) {
+      Geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (notifTimerRef.current) {
+      clearInterval(notifTimerRef.current);
+      notifTimerRef.current = null;
+    }
+    try {
+      await notifee.stopForegroundService();
+    } catch (e) {
+      console.log('[TrackRecorder] Error stopping foreground service:', e);
+    }
+    try {
+      await notifee.cancelNotification(NOTIF_ID);
+    } catch (e) {
+      console.log('[TrackRecorder] Error cancelling notification:', e);
+    }
+  };
 
   // Setup notifee channel (sekali saja)
   useEffect(() => {
@@ -98,16 +125,6 @@ const TrackRecorder = ({ navigation }) => {
         smallIcon: 'ic_launcher',
       },
     });
-  };
-
-  const stopAll = () => {
-    if (watchIdRef.current !== null) {
-      Geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    clearInterval(timerRef.current);
-    clearInterval(notifTimerRef.current);
-    notifee.cancelNotification(NOTIF_ID);
   };
 
   // ─── MULAI REKAM ──────────────────────────────────────────────────────────
@@ -229,7 +246,7 @@ const TrackRecorder = ({ navigation }) => {
           text: 'Ya, Hentikan',
           style: 'destructive',
           onPress: async () => {
-            stopAll();
+            await stopAll();
             const serverOpts = {
               userId,
               token,
@@ -274,8 +291,24 @@ const TrackRecorder = ({ navigation }) => {
           {
             text: 'Hentikan & Keluar',
             style: 'destructive',
-            onPress: () => {
-              stopRecording();
+            onPress: async () => {
+              await stopAll();
+              const serverOpts = {
+                userId,
+                token,
+                urlTrack,
+                ownerInfo: {
+                  userId,
+                  nama: profile?.nama || profile?.username || 'Pengguna',
+                  desa: profile?.nama_desa || '',
+                  kecamatan: profile?.nama_kecamatan || '',
+                },
+              };
+              await TrackDB.finishTrack(serverOpts);
+              setStatus('idle');
+              dispatch({ type: 'SET_TRACK_STATUS', payload: 'idle' });
+              setSessionId(null);
+              navigation.goBack();
             },
           },
         ]
@@ -288,7 +321,7 @@ const TrackRecorder = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Header — Mengikuti style NavigasiKoordinat */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 15) }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <FastImage
             style={{ width: 20, height: 20 }}
@@ -307,7 +340,7 @@ const TrackRecorder = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 40) }}>
         {/* Panel Telemetri */}
         <TelemetriPanel showBoundsAlert compact={status !== 'idle'} />
 

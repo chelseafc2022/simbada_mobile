@@ -1,15 +1,18 @@
-// views/home/components/HomeHeader.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
  * Header SIMBADA V2 (Compact, Modern Government GIS)
  * Menampilkan nama sistem, kabupaten, logo resmi, dan tombol aksi Notifikasi & Profil.
  */
 const HomeHeader = ({ notificationCount = 0, onNotificationPress, onProfilePress }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, 12);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.brandRow}>
         {/* Logo Kabupaten Konawe Selatan / SIMBADA */}
         <View style={styles.logoContainer}>

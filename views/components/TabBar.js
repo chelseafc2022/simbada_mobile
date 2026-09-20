@@ -1,9 +1,9 @@
-// import pustaka
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import FastImage from 'react-native-fast-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ================================================================
 // KOMPONEN BOTTOM NAVIGATION (TabBar)
@@ -13,6 +13,8 @@ const TabBar = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const currentRoute = route.name;
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 0);
 
   const NOTIFICATION_COUNT = useSelector((state) => state.NOTIFICATION_COUNT);
   const IS_ONLINE = useSelector((state) => state.IS_ONLINE);
@@ -24,7 +26,13 @@ const TabBar = () => {
   const getTintColor = (screenName) => (isActive(screenName) ? '#0284C7' : '#94A3B8');
 
   return (
-    <View style={tabStyles.container}>
+    <View style={[
+      tabStyles.container,
+      {
+        height: 65 + bottomInset,
+        paddingBottom: bottomInset > 0 ? bottomInset : 0,
+      }
+    ]}>
       {/* Indikator Mode Offline di tengah atas TabBar */}
       {IS_ONLINE === false && <View style={tabStyles.offlineDot} />}
 

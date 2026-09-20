@@ -15,10 +15,17 @@ notifee.registerForegroundService((notification) => {
   });
 });
 
-// Handle background notification actions (e.g. stop navigation from notification tray)
+// Handle background notification actions (e.g. stop navigation or track recorder from notification tray)
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-  if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'stop_nav') {
-    await NavigasiService.stopNavigation();
+  if (type === EventType.ACTION_PRESS) {
+    if (detail.pressAction?.id === 'stop_nav') {
+      await NavigasiService.stopNavigation();
+    } else if (detail.pressAction?.id === 'stop') {
+      try {
+        await notifee.stopForegroundService();
+        await notifee.cancelNotification('simbada_track_recorder');
+      } catch (e) {}
+    }
   }
 });
 

@@ -1,5 +1,6 @@
-//import liraries
-import {StyleSheet} from 'react-native';
+import {StyleSheet, Platform, StatusBar} from 'react-native';
+
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 20;
 
 export default StyleSheet.create({
     
@@ -29,7 +30,9 @@ export default StyleSheet.create({
     },
     navTop: {
       flexDirection: 'row',
-      padding: 15,
+      paddingHorizontal: 15,
+      paddingBottom: 15,
+      paddingTop: Platform.OS === 'android' ? (STATUS_BAR_HEIGHT + 10) : 20,
       alignItems: 'center',
       backgroundColor: '#ffffff',
       elevation: 5,

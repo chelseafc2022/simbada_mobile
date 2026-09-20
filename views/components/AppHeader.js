@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
  * AppHeader — Komponen Header Reusable Standar Aplikasi
@@ -25,6 +26,9 @@ const AppHeader = ({
   containerStyle,
   titleStyle,
 }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, 15);
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -34,7 +38,7 @@ const AppHeader = ({
   };
 
   return (
-    <View style={[styles.header, containerStyle]}>
+    <View style={[styles.header, { paddingTop: topInset }, containerStyle]}>
       {/* Sisi Kiri: Tombol Back */}
       <View style={styles.leftContainer}>
         {showBack ? (

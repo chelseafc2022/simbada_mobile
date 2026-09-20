@@ -22,10 +22,12 @@ import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import messaging from '@react-native-firebase/messaging';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LIB from '../library/riswan';
 
 // Komponen Utama Login
 const Login = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const isFocused = useIsFocused();
 
@@ -253,7 +255,13 @@ const Login = ({ navigation }) => {
       <View style={ui.orbTopRight} pointerEvents="none" />
 
       <ScrollView
-        contentContainerStyle={ui.scrollContent}
+        contentContainerStyle={[
+          ui.scrollContent,
+          {
+            paddingTop: Math.max(insets.top + 15, 30),
+            paddingBottom: Math.max(insets.bottom + 15, 30),
+          },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
