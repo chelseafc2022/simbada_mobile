@@ -17,6 +17,7 @@ import { uuidv4 } from '../library/uuid';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import moment from 'moment';
+import AppHeader from '../components/AppHeader';
 
 const KEY_MAPS = 'IMPORTED_MAPS';
 const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
@@ -149,12 +150,7 @@ const MapImporter = ({ navigation }) => {
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={[styles.header, { paddingTop: Math.max(insets.top + 8, 44) }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>‹ Kembali</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Peta Offline</Text>
-      </LinearGradient>
+      <AppHeader title="Peta Offline" navigation={navigation} />
 
       <TouchableOpacity style={[styles.importBtn, importing && styles.importBtnDisabled]}
         onPress={handleImport} disabled={importing}>
@@ -208,12 +204,6 @@ const MapImporter = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: {
-    paddingTop: 50, paddingBottom: 16, paddingHorizontal: 20,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
-  back: { color: '#208DC0', fontSize: 16, fontWeight: '700' },
-  title: { color: '#fff', fontSize: 20, fontWeight: '800' },
   importBtn: {
     margin: 16, backgroundColor: '#208DC0', borderRadius: 16,
     padding: 18, alignItems: 'center',

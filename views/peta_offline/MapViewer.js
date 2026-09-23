@@ -18,6 +18,8 @@ import DocumentPicker from 'react-native-document-picker';
 import moment from 'moment';
 import TelemetriPanel from '../telemetri/TelemetriPanel';
 import OfflineLayerDB from '../library/OfflineLayerDB';
+import AppHeader from '../components/AppHeader';
+import CompassView from '../navigasi/CompassView';
 
 const fmtDist = (m) => {
   if (m == null) return '--';
@@ -59,12 +61,31 @@ const MapViewer = ({ navigation, route }) => {
     bearing: null,
   });
 
-  // Layer Tersimpan & Modals
   const [savedLayers, setSavedLayers] = useState([]);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [layerName, setLayerName] = useState('');
   const [layerNotes, setLayerNotes] = useState('');
   const [layersModalVisible, setLayersModalVisible] = useState(false);
+
+  // Kompas Heading Sensor
+  const [heading, setHeading] = useState(0);
+  const [compassModalVisible, setCompassModalVisible] = useState(false);
+  const sensorRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const { magnetometer } = require('react-native-sensors');
+      sensorRef.current = magnetometer.subscribe(({ x, y }) => {
+        let a = Math.atan2(y, x) * (180 / Math.PI);
+        setHeading((a + 360) % 360);
+      });
+    } catch (e) {
+      console.warn('[MapViewer] Magnetometer sensor error:', e.message);
+    }
+    return () => {
+      sensorRef.current?.unsubscribe?.();
+    };
+  }, []);
 
   const webviewRef = useRef(null);
   const isPdf = mapMeta?.path?.toLowerCase().endsWith('.pdf') || mapMeta?.format === 'geopdf';
@@ -177,6 +198,9 @@ const MapViewer = ({ navigation, route }) => {
     if (!currentPos || !webviewRef.current) return;
     const msg = JSON.stringify({ type: 'UPDATE_POSITION', lat: currentPos.lat, lon: currentPos.lon });
     webviewRef.current.injectJavaScript(`handleRNMessage({ data: ${JSON.stringify(msg)} }); true;`);
+    if (currentPos.heading != null && currentPos.heading >= 0) {
+      setHeading(currentPos.heading);
+    }
   }, [currentPos]);
 
   const flyToMyLocation = () => {
@@ -352,13 +376,10 @@ const MapViewer = ({ navigation, route }) => {
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={[styles.header, { paddingTop: Math.max(insets.top + 8, 44) }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.back}>‹ Kembali</Text>
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{mapMeta?.nama ?? 'Peta Offline'}</Text>
-        <View style={styles.headerRightSpacer} />
-      </LinearGradient>
+      <AppHeader
+        title={mapMeta?.nama ?? 'Peta Offline'}
+        navigation={navigation}
+      />
 
       {/* Banner di luar bounds */}
       {isOutside && (
@@ -493,10 +514,15 @@ const MapViewer = ({ navigation, route }) => {
         {navState.active && (
           <View style={styles.navHud}>
             <View style={styles.navHudHeader}>
-              <Text style={styles.navHudTitle}>🎯 PANDUAN NAVIGASI KE TARGET</Text>
-              <TouchableOpacity onPress={handleStopNavigation} style={styles.stopNavBtn}>
-                <Text style={styles.stopNavTxt}>✕ Hentikan</Text>
-              </TouchableOpacity>
+              <Text style={styles.navHudTitle}>🎯 NAVIGASI TARGET</Text>
+              <View style={styles.navHeaderActions}>
+                <TouchableOpacity onPress={() => setCompassModalVisible(true)} style={styles.openCompassBtn}>
+                  <Text style={styles.openCompassTxt}>🧭 Kompas</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleStopNavigation} style={styles.stopNavBtn}>
+                  <Text style={styles.stopNavTxt}>✕ Hentikan</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={styles.navMetricsRow}>
               <View style={styles.navMetricItem}>
@@ -505,14 +531,23 @@ const MapViewer = ({ navigation, route }) => {
               </View>
               <View style={styles.metricDivider} />
               <View style={styles.navMetricItem}>
-                <Text style={styles.navMetricLbl}>ARAH KOMPAS</Text>
-                <Text style={styles.navMetricVal}>{getBearingText(navState.bearing)}</Text>
+                <Text style={styles.navMetricLbl}>BEARING</Text>
+                <Text style={[styles.navMetricVal, { color: '#22C55E' }]}>
+                  {navState.bearing != null ? `${Math.round(navState.bearing)}°` : '--'}
+                </Text>
+              </View>
+              <View style={styles.metricDivider} />
+              <View style={styles.navMetricItem}>
+                <Text style={styles.navMetricLbl}>HEADING</Text>
+                <Text style={[styles.navMetricVal, { color: '#38BDF8' }]}>{Math.round(heading)}°</Text>
               </View>
             </View>
             {navState.target && (
-              <Text style={styles.navCoordTxt}>
-                Target: {navState.target.lat.toFixed(6)}, {navState.target.lon.toFixed(6)}
-              </Text>
+              <View style={styles.navBottomInfo}>
+                <Text style={styles.navCoordTxt}>
+                  Arah: {getBearingText(navState.bearing)} • Target: {navState.target.lat.toFixed(5)}, {navState.target.lon.toFixed(5)}
+                </Text>
+              </View>
             )}
           </View>
         )}
@@ -682,20 +717,75 @@ const MapViewer = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL KOMPAS NAVIGASI REAL-TIME */}
+      <Modal visible={compassModalVisible} transparent={false} animationType="slide">
+        <View style={styles.compassScreen}>
+          <AppHeader
+            title="Kompas Navigasi Target"
+            onBack={() => setCompassModalVisible(false)}
+          />
+          <ScrollView contentContainerStyle={styles.compassContent}>
+            {/* Target Card */}
+            <View style={styles.compassTargetCard}>
+              <Text style={styles.compassTargetLabel}>TITIK TARGET NAVIGASI</Text>
+              <Text style={styles.compassTargetCoords}>
+                {navState.target ? `${navState.target.lat.toFixed(6)}, ${navState.target.lon.toFixed(6)}` : 'Koordinat Target'}
+              </Text>
+              <View style={styles.compassTargetMetrics}>
+                <View style={styles.compassMetricCol}>
+                  <Text style={styles.compassMetricTitle}>Jarak Sisa</Text>
+                  <Text style={styles.compassMetricBig}>{fmtDist(navState.distance)}</Text>
+                </View>
+                <View style={styles.compassMetricColDivider} />
+                <View style={styles.compassMetricCol}>
+                  <Text style={styles.compassMetricTitle}>Arah (Bearing)</Text>
+                  <Text style={[styles.compassMetricBig, { color: '#22C55E' }]}>
+                    {navState.bearing != null ? `${Math.round(navState.bearing)}°` : '--'}
+                  </Text>
+                </View>
+                <View style={styles.compassMetricColDivider} />
+                <View style={styles.compassMetricCol}>
+                  <Text style={styles.compassMetricTitle}>Mata Angin</Text>
+                  <Text style={[styles.compassMetricBig, { color: '#38BDF8' }]}>
+                    {getBearingText(navState.bearing)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Kompas View */}
+            <View style={styles.compassWidgetWrapper}>
+              <CompassView
+                heading={heading}
+                bearing={navState.bearing ?? 0}
+                distance={navState.distance ?? 0}
+              />
+            </View>
+
+            {/* Petunjuk Arah */}
+            <View style={styles.compassTipCard}>
+              <Text style={styles.compassTipTitle}>💡 Panduan Mengarah ke Target</Text>
+              <Text style={styles.compassTipTxt}>
+                Sejajarkan ujung merah panah kompas ke arah atas (0°) dan mulailah berjalan. Jarak sisa akan otomatis berkurang seiring langkah Anda menuju titik target.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.backToMapBtn}
+              onPress={() => setCompassModalVisible(false)}
+            >
+              <Text style={styles.backToMapTxt}>🗺️ Kembali ke Tampilan Peta</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0F172A' },
-  header: {
-    paddingBottom: 12, paddingHorizontal: 20,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
-  backBtn: { paddingVertical: 4 },
-  back: { color: '#208DC0', fontSize: 16, fontWeight: '700' },
-  title: { color: '#fff', fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
-  headerRightSpacer: { width: 60 },
   outsideBanner: {
     backgroundColor: '#EF4444', paddingVertical: 6, paddingHorizontal: 16,
     alignItems: 'center',
@@ -758,13 +848,19 @@ const styles = StyleSheet.create({
   },
   navHudHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   navHudTitle: { color: '#10B981', fontSize: 11, fontWeight: '800' },
+  navHeaderActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  openCompassBtn: {
+    backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+  },
+  openCompassTxt: { color: '#fff', fontSize: 10, fontWeight: '700' },
   stopNavBtn: { backgroundColor: 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444' },
   stopNavTxt: { color: '#EF4444', fontSize: 10, fontWeight: '700' },
   navMetricsRow: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 8 },
   navMetricItem: { alignItems: 'center' },
   navMetricLbl: { color: '#94A3B8', fontSize: 9, fontWeight: '700' },
-  navMetricVal: { color: '#fff', fontSize: 16, fontWeight: '900', marginTop: 2 },
-  navCoordTxt: { color: '#64748B', fontSize: 10, textAlign: 'center' },
+  navMetricVal: { color: '#fff', fontSize: 15, fontWeight: '900', marginTop: 2 },
+  navBottomInfo: { marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 4 },
+  navCoordTxt: { color: '#94A3B8', fontSize: 10, textAlign: 'center' },
 
   // Overlay & Buttons
   loadingOverlay: {
@@ -856,6 +952,33 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.03)',
   },
   layerActTxt: { color: '#E2E8F0', fontSize: 11, fontWeight: '700' },
+
+  // Compass Modal Styles
+  compassScreen: { flex: 1, backgroundColor: '#0F172A' },
+  compassContent: { padding: 16, alignItems: 'center' },
+  compassTargetCard: {
+    width: '100%', backgroundColor: '#1E293B', borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 16,
+  },
+  compassTargetLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  compassTargetCoords: { color: '#fff', fontSize: 15, fontWeight: '800', marginTop: 4, marginBottom: 12 },
+  compassTargetMetrics: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 12 },
+  compassMetricCol: { flex: 1, alignItems: 'center' },
+  compassMetricTitle: { color: '#94A3B8', fontSize: 10, fontWeight: '700' },
+  compassMetricBig: { color: '#fff', fontSize: 16, fontWeight: '900', marginTop: 2 },
+  compassMetricColDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.1)' },
+  compassWidgetWrapper: { marginVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  compassTipCard: {
+    width: '100%', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)', marginVertical: 14,
+  },
+  compassTipTitle: { color: '#10B981', fontSize: 12, fontWeight: '800', marginBottom: 4 },
+  compassTipTxt: { color: '#CBD5E1', fontSize: 12, lineHeight: 18 },
+  backToMapBtn: {
+    width: '100%', backgroundColor: '#0284C7', borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 30,
+  },
+  backToMapTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });
 
 export default MapViewer;
