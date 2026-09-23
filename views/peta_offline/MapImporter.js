@@ -14,19 +14,22 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { uuidv4 } from '../library/uuid';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import moment from 'moment';
 
 const KEY_MAPS = 'IMPORTED_MAPS';
 const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
-const VALID_EXT = ['.tif', '.tiff', '.pdf'];
-const MAP_DIR = `${RNFS.ExternalStorageDirectoryPath}/simbada/maps`;
+const VALID_EXT = ['.tif', '.tiff', '.geotiff', '.pdf'];
+const MAP_DIR = `${RNFS.DocumentDirectoryPath}/simbada_maps`;
 
 const fmtSize = (bytes) => {
+  if (!bytes) return '0 KB';
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / 1024).toFixed(0)} KB`;
 };
 
 const MapImporter = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const [maps, setMaps] = useState([]);
   const [importing, setImporting] = useState(false);
@@ -41,34 +44,60 @@ const MapImporter = ({ navigation }) => {
 
   const handleImport = async () => {
     try {
-      const res = await DocumentPicker.pickSingle({ type: [DocumentPicker.types.allFiles] });
+      const res = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.allFiles],
+        copyTo: 'cachesDirectory',
+      });
       if (!res?.uri) return;
 
       // Validasi ekstensi
-      const fname = res.name?.toLowerCase() ?? '';
+      const fname = (res.name || res.uri || '').toLowerCase();
       const validExt = VALID_EXT.some(ext => fname.endsWith(ext));
       if (!validExt) {
-        Alert.alert('Format Tidak Didukung', `Hanya file GeoTIFF (.tif, .tiff) atau GeoPDF (.pdf) yang didukung.`);
-        return;
-      }
-
-      // Validasi ukuran
-      const stat = await RNFS.stat(res.uri.replace('file://', ''));
-      if (stat.size > MAX_FILE_BYTES) {
-        Alert.alert('File Terlalu Besar', `Ukuran file (${fmtSize(stat.size)}) melebihi batas 500 MB.`);
+        Alert.alert('Format Tidak Didukung', 'Hanya file GeoTIFF (.tif, .tiff) dan GeoPDF (.pdf) yang didukung.');
+        if (res.fileCopyUri) {
+          RNFS.unlink(decodeURIComponent(res.fileCopyUri.replace(/^file:\/\//, ''))).catch(() => {});
+        }
         return;
       }
 
       setImporting(true);
-      setImportStatus('Menyalin file...');
+      setImportStatus('Menyiapkan direktori...');
 
-      // Salin ke direktori simbada
-      await RNFS.mkdir(MAP_DIR);
+      // Pastikan direktori penyimpanan peta ada
+      const dirExists = await RNFS.exists(MAP_DIR);
+      if (!dirExists) {
+        await RNFS.mkdir(MAP_DIR);
+      }
+
+      setImportStatus('Menyalin file peta...');
       const destName = `${uuidv4()}${fname.endsWith('.pdf') ? '.pdf' : '.tif'}`;
       const destPath = `${MAP_DIR}/${destName}`;
-      await RNFS.copyFile(res.uri.replace('file://', ''), destPath);
 
-      setImportStatus('Memvalidasi georeferensi...');
+      // Prioritaskan fileCopyUri hasil copyTo bawaan DocumentPicker
+      if (res.fileCopyUri) {
+        const cleanCachePath = decodeURIComponent(res.fileCopyUri.replace(/^file:\/\//, ''));
+        await RNFS.copyFile(cleanCachePath, destPath);
+        // Hapus file temporary di cache
+        RNFS.unlink(cleanCachePath).catch(() => {});
+      } else {
+        const cleanUri = res.uri.startsWith('file://')
+          ? decodeURIComponent(res.uri.replace(/^file:\/\//, ''))
+          : res.uri;
+        await RNFS.copyFile(cleanUri, destPath);
+      }
+
+      // Validasi ukuran setelah file tersalin
+      const stat = await RNFS.stat(destPath);
+      if (stat.size > MAX_FILE_BYTES) {
+        await RNFS.unlink(destPath).catch(() => {});
+        setImporting(false);
+        setImportStatus('');
+        Alert.alert('File Terlalu Besar', `Ukuran file (${fmtSize(stat.size)}) melebihi batas 500 MB.`);
+        return;
+      }
+
+      setImportStatus('Menyimpan metadata...');
       // Simpan metadata (bounds akan diisi saat MapViewer membuka file)
       const mapMeta = {
         id: uuidv4(),
@@ -125,7 +154,7 @@ const MapImporter = ({ navigation }) => {
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
+      <LinearGradient colors={['#0F172A', '#1E293B']} style={[styles.header, { paddingTop: Math.max(insets.top + 8, 44) }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.back}>‹ Kembali</Text>
         </TouchableOpacity>
@@ -149,7 +178,7 @@ const MapImporter = ({ navigation }) => {
       <FlatList
         data={maps}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom + 20, 30) }}
         renderItem={({ item }) => (
           <View style={styles.mapCard}>
             <View style={styles.mapInfo}>

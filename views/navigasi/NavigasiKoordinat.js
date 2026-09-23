@@ -21,6 +21,7 @@ import { useSelector } from 'react-redux';
 import AppHeader from '../components/AppHeader';
 import CompassView from './CompassView';
 import NavigasiService from '../library/NavigasiService';
+import GpsService from '../library/GpsService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -87,12 +88,17 @@ const NavigasiKoordinat = ({ navigation }) => {
   const [targetName, setTargetName] = useState('');
 
   // GPS state
-  const [currentPos, setCurrentPos] = useState(null);
+  const reduxPos = useSelector((s) => s.CURRENT_POSITION);
+  const initialGps = reduxPos || GpsService.getLastPosition();
+
+  const [currentPos, setCurrentPos] = useState(
+    initialGps ? { latitude: initialGps.lat, longitude: initialGps.lon } : null
+  );
   const [heading, setHeading] = useState(0);
   const [distance, setDistance] = useState(0);
   const [bearing, setBearing] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
-  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState(initialGps?.accH ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [trackHistory, setTrackHistory] = useState([]);
 
@@ -106,11 +112,19 @@ const NavigasiKoordinat = ({ navigation }) => {
   const [pickerMode, setPickerMode] = useState('target'); // 'target' | 'user'
   const initialUserPosRef = useRef(null);
   const [initialRegion, setInitialRegion] = useState({
-    latitude: -4.234658,
-    longitude: 122.353003,
-    latitudeDelta: 0.5,
-    longitudeDelta: 0.5,
+    latitude: initialGps?.lat ?? -4.234658,
+    longitude: initialGps?.lon ?? 122.353003,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
   });
+
+  // Sinkronisasi otomatis saat Redux menerima koordinat baru
+  useEffect(() => {
+    if (reduxPos) {
+      setCurrentPos({ latitude: reduxPos.lat, longitude: reduxPos.lon });
+      if (reduxPos.accH) setGpsAccuracy(reduxPos.accH);
+    }
+  }, [reduxPos]);
 
   // View mode: 'input' | 'compass' | 'map'
   const [viewMode, setViewMode] = useState('input');
@@ -289,24 +303,23 @@ const NavigasiKoordinat = ({ navigation }) => {
     };
   }, []);
 
-  // Ambil posisi awal untuk map picker
+  // Ambil posisi awal untuk map picker jika belum ada
   useEffect(() => {
-    Geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setCurrentPos({ latitude, longitude });
-        setGpsAccuracy(position.coords.accuracy);
+    if (!currentPos) {
+      GpsService.startTracking();
+      const p = GpsService.getLastPosition();
+      if (p) {
+        setCurrentPos({ latitude: p.lat, longitude: p.lon });
+        setGpsAccuracy(p.accH);
         setInitialRegion({
-          latitude,
-          longitude,
+          latitude: p.lat,
+          longitude: p.lon,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         });
-      },
-      () => { /* silent fail, use default region */ },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, []);
+      }
+    }
+  }, [currentPos]);
 
   // Hitung jarak & bearing setiap kali posisi atau target berubah saat mode input
   useEffect(() => {

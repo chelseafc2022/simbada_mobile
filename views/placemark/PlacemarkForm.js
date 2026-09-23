@@ -22,6 +22,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import MapView, { Marker } from 'react-native-maps';
 import PlacemarkDB from '../library/PlacemarkDB';
 import ExifWriter from '../library/ExifWriter';
+import GpsService from '../library/GpsService';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -58,6 +59,7 @@ const PlacemarkForm = ({ navigation, route }) => {
   const token = useSelector((state) => state.TOKEN);
   const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
   const profile = useSelector((state) => state.PROFILE);
+  const currentPos = useSelector((state) => state.CURRENT_POSITION);
   const userId = profile?.id || null;
   const serverOpts = { token, urlPlacemark };
   const ownerInfo = route?.params?.ownerInfo || {
@@ -96,9 +98,20 @@ const PlacemarkForm = ({ navigation, route }) => {
     ? { latitude: parseFloat(lat), longitude: parseFloat(lon) }
     : null;
 
-  // Ambil koordinat GPS saat ini
+  // Ambil koordinat GPS saat ini (gunakan posisi aktif jika sudah terkunci)
   const grabGPS = () => {
+    const pos = currentPos || GpsService.getLastPosition();
+    if (pos) {
+      setLat(pos.lat.toFixed(6));
+      setLon(pos.lon.toFixed(6));
+      setAlt(Math.round(pos.alt ?? 0).toString());
+      setAccH(Math.round(pos.accH ?? 0).toString());
+      setCoordSource('gps');
+      return;
+    }
+
     setIsGpsLoading(true);
+    GpsService.startTracking();
     Geolocation.getCurrentPosition(
       ({ coords }) => {
         setLat(coords.latitude.toFixed(6));
@@ -112,7 +125,7 @@ const PlacemarkForm = ({ navigation, route }) => {
         setIsGpsLoading(false);
         Alert.alert('GPS Error', err.message);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
   };
 

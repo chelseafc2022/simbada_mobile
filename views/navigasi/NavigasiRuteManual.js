@@ -9,6 +9,7 @@ import {
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import LinearGradient from 'react-native-linear-gradient';
+import GpsService from '../library/GpsService';
 
 const DEG = Math.PI / 180, R = 6371000;
 const haversine = (la1, lo1, la2, lo2) => {
@@ -21,7 +22,10 @@ const fmtDist = (m) => m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round
 
 const NavigasiRuteManual = ({ navigation }) => {
   const [waypoints, setWaypoints] = useState([]);
-  const [currentPos, setCurrentPos] = useState(null);
+  const initialGps = GpsService.getLastPosition();
+  const [currentPos, setCurrentPos] = useState(
+    initialGps ? { lat: initialGps.lat, lon: initialGps.lon } : null
+  );
   const [activeIdx, setActiveIdx] = useState(0);
   const [isNavMode, setIsNavMode] = useState(false);
   const [distToNext, setDistToNext] = useState(null);
@@ -36,18 +40,27 @@ const NavigasiRuteManual = ({ navigation }) => {
   [waypoints]);
 
   useEffect(() => {
-    Geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const p = { lat: coords.latitude, lon: coords.longitude };
-        setCurrentPos(p);
-        mapRef.current?.animateToRegion({
-          latitude: p.lat, longitude: p.lon,
-          latitudeDelta: 0.01, longitudeDelta: 0.01,
-        });
-      },
-      err => console.warn('[NavRute] GPS init:', err.message),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    const p = GpsService.getLastPosition();
+    if (p) {
+      setCurrentPos({ lat: p.lat, lon: p.lon });
+      mapRef.current?.animateToRegion({
+        latitude: p.lat, longitude: p.lon,
+        latitudeDelta: 0.01, longitudeDelta: 0.01,
+      });
+    } else {
+      Geolocation.getCurrentPosition(
+        ({ coords }) => {
+          const pos = { lat: coords.latitude, lon: coords.longitude };
+          setCurrentPos(pos);
+          mapRef.current?.animateToRegion({
+            latitude: pos.lat, longitude: pos.lon,
+            latitudeDelta: 0.01, longitudeDelta: 0.01,
+          });
+        },
+        err => console.warn('[NavRute] GPS init:', err.message),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+      );
+    }
     return () => {
       if (watchIdRef.current !== null) Geolocation.clearWatch(watchIdRef.current);
     };

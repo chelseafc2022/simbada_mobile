@@ -32,6 +32,8 @@ const getCardinal = (deg) => {
 // Helper: format kecepatan m/s -> km/h
 const fmtSpeed = (ms) => ms != null ? (ms * 3.6).toFixed(1) : '0.0';
 
+import GpsService from '../library/GpsService';
+
 // Helper: format jarak akurasi
 const fmtAcc = (m) => m != null ? `±${Math.round(m)}m` : '±?m';
 
@@ -39,17 +41,19 @@ const fmtAcc = (m) => m != null ? `±${Math.round(m)}m` : '±?m';
 const TelemetriPanel = ({ showBoundsAlert = false, compact = false, onPositionUpdate }) => {
   const dispatch = useDispatch();
   const activeMap = useSelector(s => s.ACTIVE_MAP);
+  const currentPos = useSelector(s => s.CURRENT_POSITION);
+  const globalGpsStatus = useSelector(s => s.GPS_STATUS);
 
-  const [pos, setPos] = useState(null);
+  const initialPos = currentPos || GpsService.getLastPosition();
+  const [pos, setPos] = useState(initialPos);
   const [compass, setCompass] = useState(0);
-  const [gpsStatus, setGpsStatus] = useState('idle'); // idle|acquiring|active|error
+  const [gpsStatus, setGpsStatus] = useState(
+    initialPos || GpsService.hasAcquired() ? 'active' : (globalGpsStatus || 'acquiring')
+  );
   const [outsideBounds, setOutsideBounds] = useState(false);
   const [expanded, setExpanded] = useState(!compact);
 
-  const watchIdRef = useRef(null);
   const sensorSubRef = useRef(null);
-  const lastUpdateRef = useRef(0);
-  const lastPosRef = useRef(null);
 
   // ── Cek posisi vs bounding box peta aktif ──
   const checkBounds = useCallback((lat, lon) => {
@@ -60,66 +64,32 @@ const TelemetriPanel = ({ showBoundsAlert = false, compact = false, onPositionUp
     setOutsideBounds(!inside);
   }, [showBoundsAlert, activeMap]);
 
-  // ── Haversine filter: apakah bergerak >= 1 meter ──
-  const hasMoved = (newLat, newLon) => {
-    if (!lastPosRef.current) return true;
-    const { lat: la, lon: lo } = lastPosRef.current;
-    const R = 6371000;
-    const dLat = ((newLat - la) * Math.PI) / 180;
-    const dLon = ((newLon - lo) * Math.PI) / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-              Math.cos((la * Math.PI) / 180) * Math.cos((newLat * Math.PI) / 180) *
-              Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) >= 1;
-  };
+  // Sinkronisasi posisi langsung dari Redux/GpsService
+  useEffect(() => {
+    if (currentPos) {
+      setPos(currentPos);
+      setGpsStatus('active');
+      checkBounds(currentPos.lat, currentPos.lon);
+      onPositionUpdate?.(currentPos);
+    }
+  }, [currentPos, checkBounds, onPositionUpdate]);
 
   useEffect(() => {
-    setGpsStatus('acquiring');
-    dispatch({ type: 'SET_GPS_STATUS', payload: 'acquiring' });
+    // Pastikan GpsService aktif berjalan
+    GpsService.startTracking();
 
-    watchIdRef.current = Geolocation.watchPosition(
-      (position) => {
-        const now = Date.now();
-        // Throttle: max 1 update/detik
-        if (now - lastUpdateRef.current < 1000) return;
-        lastUpdateRef.current = now;
-
-        const { latitude: lat, longitude: lon, altitude: alt,
-                speed, accuracy: accH, altitudeAccuracy: accV,
-                heading } = position.coords;
-
-        // Deadband: abaikan jika belum bergerak >=1m
-        if (!hasMoved(lat, lon)) return;
-        lastPosRef.current = { lat, lon };
-
-        const newPos = {
-          lat, lon,
-          alt: alt ?? 0,
-          speed: speed ?? 0,
-          accH: accH ?? 0,
-          accV: accV ?? 0,
-          heading: heading ?? compass,
-        };
-
-        setPos(newPos);
+    if (currentPos || GpsService.hasAcquired()) {
+      const p = currentPos || GpsService.getLastPosition();
+      if (p) {
+        setPos(p);
         setGpsStatus('active');
-        dispatch({ type: 'SET_GPS_STATUS', payload: 'active' });
-        dispatch({ type: 'UPDATE_POSITION', payload: newPos });
-        checkBounds(lat, lon);
-        onPositionUpdate?.(newPos);
-      },
-      (err) => {
-        console.warn('[TelemetriPanel] GPS error:', err.message);
-        setGpsStatus('error');
-        dispatch({ type: 'SET_GPS_STATUS', payload: 'error' });
-      },
-      {
-        enableHighAccuracy: true,
-        distanceFilter: 1,
-        interval: 1000,
-        fastestInterval: 500,
+        checkBounds(p.lat, p.lon);
+        onPositionUpdate?.(p);
       }
-    );
+    } else {
+      setGpsStatus('acquiring');
+      dispatch({ type: 'SET_GPS_STATUS', payload: 'acquiring' });
+    }
 
     // Kompas dari magnetometer
     try {
@@ -127,7 +97,6 @@ const TelemetriPanel = ({ showBoundsAlert = false, compact = false, onPositionUp
       sensorSubRef.current = magnetometer.subscribe(({ x, y }) => {
         const h = computeCompassHeading(x, y);
         setCompass(h);
-        // Jika GPS tidak memberikan heading, pakai magnetometer
         setPos(prev => prev && prev.speed < 0.5
           ? { ...prev, heading: h }
           : prev
@@ -138,15 +107,12 @@ const TelemetriPanel = ({ showBoundsAlert = false, compact = false, onPositionUp
     }
 
     return () => {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
       if (sensorSubRef.current?.unsubscribe) {
         sensorSubRef.current.unsubscribe();
         sensorSubRef.current = null;
       }
-      dispatch({ type: 'SET_GPS_STATUS', payload: 'idle' });
+      // PENTING: Jangan matikan GPS global dan jangan set status 'idle'
+      // agar koordinat GPS tetap terkunci saat panel ditutup/dibuka kembali.
     };
   }, []);
 

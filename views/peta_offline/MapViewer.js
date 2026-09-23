@@ -11,9 +11,11 @@ import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TelemetriPanel from '../telemetri/TelemetriPanel';
 
 const MapViewer = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const mapMeta = route?.params?.map ?? null;
   const currentPos = useSelector(s => s.CURRENT_POSITION);
@@ -25,19 +27,29 @@ const MapViewer = ({ navigation, route }) => {
 
   const webviewRef = useRef(null);
 
-  // Kirim GeoTIFF ke WebView setelah loaded
-  const loadGeoTIFF = useCallback(async () => {
+  const isPdf = mapMeta?.path?.toLowerCase().endsWith('.pdf') || mapMeta?.format === 'geopdf';
+
+  // Kirim peta ke WebView setelah loaded
+  const loadMap = useCallback(async () => {
     if (!mapMeta?.path) return;
     try {
       // Validasi file masih ada
       const exists = await RNFS.exists(mapMeta.path);
       if (!exists) {
         setLoadError('File peta tidak ditemukan. Mungkin sudah dihapus.');
+        setIsLoading(false);
         return;
       }
+
       setIsLoading(true);
+      setLoadError(null);
       const base64 = await RNFS.readFile(mapMeta.path, 'base64');
-      const msg = JSON.stringify({ type: 'LOAD_GEOTIFF', base64, name: mapMeta.nama });
+      const isPdfFile = mapMeta.path.toLowerCase().endsWith('.pdf') || mapMeta.format === 'geopdf';
+      const msg = JSON.stringify({
+        type: isPdfFile ? 'LOAD_GEOPDF' : 'LOAD_GEOTIFF',
+        base64,
+        name: mapMeta.nama,
+      });
       webviewRef.current?.injectJavaScript(`handleRNMessage({ data: ${JSON.stringify(msg)} }); true;`);
     } catch (e) {
       setLoadError(`Gagal membaca file: ${e.message}`);
@@ -53,6 +65,11 @@ const MapViewer = ({ navigation, route }) => {
         const bounds = msg.bounds;
         setMapBounds(bounds);
         setIsLoading(false);
+        // Jika posisi GPS sudah tersedia di Redux, kirim langsung ke peta WebView
+        if (currentPos && webviewRef.current) {
+          const posMsg = JSON.stringify({ type: 'UPDATE_POSITION', lat: currentPos.lat, lon: currentPos.lon });
+          webviewRef.current.injectJavaScript(`handleRNMessage({ data: ${JSON.stringify(posMsg)} }); true;`);
+        }
         // Update metadata bounds di storage
         if (mapMeta) {
           const updated = { ...mapMeta, bounds };
@@ -70,7 +87,7 @@ const MapViewer = ({ navigation, route }) => {
         setIsLoading(false);
       }
     } catch {}
-  }, [mapMeta]);
+  }, [mapMeta, currentPos]);
 
   // Update posisi di peta setiap ada update GPS
   useEffect(() => {
@@ -92,7 +109,7 @@ const MapViewer = ({ navigation, route }) => {
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
+      <LinearGradient colors={['#0F172A', '#1E293B']} style={[styles.header, { paddingTop: Math.max(insets.top + 8, 44) }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.back}>‹ Kembali</Text>
         </TouchableOpacity>
@@ -115,7 +132,7 @@ const MapViewer = ({ navigation, route }) => {
           ref={webviewRef}
           source={{ uri: 'file:///android_asset/offline_map.html' }}
           style={styles.webview}
-          onLoad={loadGeoTIFF}
+          onLoad={loadMap}
           onMessage={handleWebViewMessage}
           onError={(e) => setLoadError(e.nativeEvent.description)}
           javaScriptEnabled
@@ -131,7 +148,7 @@ const MapViewer = ({ navigation, route }) => {
         {isLoading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#208DC0" />
-            <Text style={styles.loadingTxt}>Memuat GeoTIFF...</Text>
+            <Text style={styles.loadingTxt}>{isPdf ? 'Memuat GeoPDF...' : 'Memuat GeoTIFF...'}</Text>
           </View>
         )}
 
@@ -139,7 +156,7 @@ const MapViewer = ({ navigation, route }) => {
         {loadError && !isLoading && (
           <View style={styles.errorOverlay}>
             <Text style={styles.errorTxt}>⚠ {loadError}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={loadGeoTIFF}>
+            <TouchableOpacity style={styles.retryBtn} onPress={loadMap}>
               <Text style={styles.retryTxt}>Coba Lagi</Text>
             </TouchableOpacity>
           </View>
@@ -152,8 +169,12 @@ const MapViewer = ({ navigation, route }) => {
       </View>
 
       {/* Panel Telemetri Collapsible */}
-      <View style={styles.telemetriContainer}>
-        <TouchableOpacity onPress={() => setTelemetriVisible(!telemetriVisible)}>
+      <View style={[styles.telemetriContainer, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+        <TouchableOpacity
+          style={styles.telemetriToggleBtn}
+          onPress={() => setTelemetriVisible(!telemetriVisible)}
+          activeOpacity={0.7}
+        >
           <Text style={styles.telemetriToggle}>{telemetriVisible ? '▼ Sembunyikan GPS' : '▲ Tampilkan GPS'}</Text>
         </TouchableOpacity>
         {telemetriVisible && (
@@ -167,7 +188,7 @@ const MapViewer = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0F172A' },
   header: {
-    paddingTop: 50, paddingBottom: 12, paddingHorizontal: 20,
+    paddingBottom: 12, paddingHorizontal: 20,
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   back: { color: '#208DC0', fontSize: 16, fontWeight: '700' },
@@ -198,10 +219,24 @@ const styles = StyleSheet.create({
     elevation: 6, shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8,
   },
   myLocTxt: { fontSize: 22 },
-  telemetriContainer: { maxHeight: 220 },
+  telemetriContainer: {
+    backgroundColor: '#1E293B',
+    maxHeight: 280,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  telemetriToggleBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   telemetriToggle: {
-    textAlign: 'center', color: '#64748B', fontSize: 11, paddingVertical: 6,
-    backgroundColor: '#1E293B', fontWeight: '700', letterSpacing: 0.5,
+    textAlign: 'center',
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
 

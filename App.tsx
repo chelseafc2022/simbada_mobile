@@ -62,6 +62,7 @@ import VersionCheckService from "./views/library/VersionCheckService";
 import OfflineManager from "./views/library/OfflineManager";
 import NotificationService from "./views/library/NotificationService";
 import NavigasiService from "./views/library/NavigasiService";
+import GpsService from "./views/library/GpsService";
 import notifee, { EventType } from "@notifee/react-native";
 
 const Stack = createNativeStackNavigator();
@@ -96,6 +97,9 @@ const AppContent = () => {
     // Inisialisasi NavigasiService dan restore sesi jika ada
     NavigasiService.init();
     NavigasiService.restoreSession();
+
+    // Inisialisasi Singleton GpsService persisten sepanjang aplikasi hidup
+    GpsService.init(dispatch);
 
     // Notifee foreground event handler (misal tombol Hentikan di notifikasi)
     const unsubNotifeeForeground = notifee.onForegroundEvent(async ({ type, detail }) => {

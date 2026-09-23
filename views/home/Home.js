@@ -14,6 +14,7 @@ import {
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import Geolocation from '@react-native-community/geolocation';
+import GpsService from '../library/GpsService';
 
 // Modular Home V2 Components (Modern Government GIS + Field Survey)
 import HomeHeader from './components/HomeHeader';
@@ -67,148 +68,84 @@ const Home = ({ navigation }) => {
   const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
 
   // GPS Sensor & Telemetri State
-  const [isGpsActive, setIsGpsActive] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const watchIdRef = useRef(null);
+  const globalPos = useSelector((state) => state.CURRENT_POSITION);
+  const globalGpsStatus = useSelector((state) => state.GPS_STATUS);
+
+  const initialUserLoc = globalPos
+    ? {
+        latitude: globalPos.lat,
+        longitude: globalPos.lon,
+        accuracy: globalPos.accH,
+      }
+    : null;
+
+  const [isGpsActive, setIsGpsActive] = useState(
+    !!globalPos || globalGpsStatus === 'active' || GpsService.hasAcquired()
+  );
+  const [userLocation, setUserLocation] = useState(initialUserLoc);
   const mapRef = useRef(null);
+
+  // Sinkronisasi posisi GPS langsung dari GpsService / Redux
+  useEffect(() => {
+    if (globalPos) {
+      setUserLocation({
+        latitude: globalPos.lat,
+        longitude: globalPos.lon,
+        accuracy: globalPos.accH,
+      });
+      setIsGpsActive(true);
+    } else if (globalGpsStatus === 'active' || GpsService.hasAcquired()) {
+      setIsGpsActive(true);
+    }
+  }, [globalPos, globalGpsStatus]);
 
   // Cleanup on screen blur
   useFocusEffect(
     useCallback(() => {
-      return () => {
-        // preserve selected state if user returns, but stop active watchers if needed
-      };
+      // Pastikan tracking aktif tanpa reset
+      GpsService.startTracking();
+      return () => {};
     }, [])
   );
 
   // ================================================================
   // 1. GPS & LOCATION TRACKING
   // ================================================================
-  const requestLocationPermission = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Izin Akses Lokasi GPS',
-            message:
-              'SIMBADA memerlukan akses GPS untuk pemetaan posisi di lapangan dan survei batas desa.',
-            buttonNeutral: 'Nanti',
-            buttonNegative: 'Tolak',
-            buttonPositive: 'Izinkan',
-          }
-        );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn(err);
-        return false;
-      }
-    }
-    return true;
-  };
-
   const startGpsTracking = async () => {
-    const hasPermission = await requestLocationPermission();
-    if (!hasPermission) {
-      setIsGpsActive(false);
-      return;
-    }
-
-    Geolocation.getCurrentPosition(
-      (pos) => {
-        setIsGpsActive(true);
-        setUserLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
-      },
-      (error) => {
-        console.log('GPS error:', error.message);
-        setIsGpsActive(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-
-    if (watchIdRef.current !== null) {
-      Geolocation.clearWatch(watchIdRef.current);
-    }
-
-    watchIdRef.current = Geolocation.watchPosition(
-      (pos) => {
-        setIsGpsActive(true);
-        setUserLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
-      },
-      (error) => {
-        console.log('GPS watch error:', error.message);
-        setIsGpsActive(false);
-      },
-      {
-        enableHighAccuracy: true,
-        distanceFilter: 5,
-        interval: 5000,
-        fastestInterval: 2000,
-      }
-    );
+    GpsService.startTracking();
   };
 
   useEffect(() => {
-    if (isFocused) {
-      startGpsTracking();
-    }
-    return () => {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
-  }, [isFocused]);
+    GpsService.startTracking();
+  }, []);
 
   // Center Map to User GPS Location
   const handleCenterLocation = () => {
-    if (userLocation && mapRef.current) {
+    const loc =
+      userLocation ||
+      (globalPos
+        ? {
+            latitude: globalPos.lat,
+            longitude: globalPos.lon,
+            accuracy: globalPos.accH,
+          }
+        : null);
+
+    if (loc && mapRef.current) {
       mapRef.current.animateToRegion(
         {
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         },
         800
       );
     } else {
-      Geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          };
-          setUserLocation(loc);
-          setIsGpsActive(true);
-          if (mapRef.current) {
-            mapRef.current.animateToRegion(
-              {
-                latitude: loc.latitude,
-                longitude: loc.longitude,
-                latitudeDelta: 0.02,
-                longitudeDelta: 0.02,
-              },
-              800
-            );
-          }
-        },
-        () => {
-          Alert.alert(
-            'GPS Belum Aktif',
-            'Pastikan GPS perangkat Anda telah diaktifkan untuk melihat lokasi saat ini.'
-          );
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
+      GpsService.startTracking();
+      Alert.alert(
+        'GPS Belum Terkunci',
+        'Sedang mendeteksi sinyal GPS. Pastikan GPS perangkat Anda telah diaktifkan dan berada di area terbuka.'
       );
     }
   };

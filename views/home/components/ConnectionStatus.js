@@ -1,12 +1,21 @@
 // views/home/components/ConnectionStatus.js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
+import GpsService from '../../library/GpsService';
 
 /**
  * ConnectionStatus SIMBADA V2
  * Status indicator kecil & modern untuk kondisi Jaringan (Online/Offline) dan Sensor GPS.
  */
-const ConnectionStatus = ({ isOnline = true, isGpsActive = false }) => {
+const ConnectionStatus = ({ isOnline = true, isGpsActive: propGpsActive }) => {
+  const globalPos = useSelector((s) => s.CURRENT_POSITION);
+  const globalGpsStatus = useSelector((s) => s.GPS_STATUS);
+  const isGpsActive =
+    propGpsActive ||
+    !!globalPos ||
+    globalGpsStatus === 'active' ||
+    GpsService.hasAcquired();
   return (
     <View style={styles.container}>
       {/* Network Status */}

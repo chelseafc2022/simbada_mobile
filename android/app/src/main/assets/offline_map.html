@@ -11,19 +11,124 @@
   #pos-marker { width:16px; height:16px; background:#208DC0;
     border:3px solid #fff; border-radius:50%; box-shadow:0 0 8px rgba(32,141,192,0.8); }
 </style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+<link rel="stylesheet" href="leaflet.css"/>
+<script src="leaflet.js"></script>
+<script src="geotiff.js"></script>
+<script src="pdf.min.js"></script>
+<script src="pdf.worker.min.js"></script>
 </head>
 <body>
 <div id="status">Menunggu peta...</div>
 <div id="map"></div>
 
 <script>
-var map = L.map('map', { zoomControl:true, attributionControl:false });
+// UTM to LatLng (WGS84) conversion for Konawe Selatan & Indonesia
+function utmToLatLng(easting, northing, zone, south) {
+  var a = 6378137.0;
+  var f = 1 / 298.257223563;
+  var e = Math.sqrt(2 * f - f * f);
+  var e1sq = (e * e) / (1 - e * e);
+  var k0 = 0.9996;
+
+  var x = easting - 500000.0;
+  var y = south ? (northing - 10000000.0) : northing;
+
+  var m = y / k0;
+  var mu = m / (a * (1 - (e * e) / 4 - (3 * Math.pow(e, 4)) / 64 - (5 * Math.pow(e, 6)) / 256));
+
+  var e1 = (1 - Math.sqrt(1 - e * e)) / (1 + Math.sqrt(1 - e * e));
+  var j1 = (3 * e1) / 2 - (27 * Math.pow(e1, 3)) / 32;
+  var j2 = (21 * Math.pow(e1, 2)) / 16 - (55 * Math.pow(e1, 4)) / 32;
+  var j3 = (151 * Math.pow(e1, 3)) / 96;
+  var j4 = (1097 * Math.pow(e1, 4)) / 512;
+
+  var fp = mu + j1 * Math.sin(2 * mu) + j2 * Math.sin(4 * mu) + j3 * Math.sin(6 * mu) + j4 * Math.sin(8 * mu);
+
+  var c1 = e1sq * Math.pow(Math.cos(fp), 2);
+  var t1 = Math.pow(Math.tan(fp), 2);
+  var r1 = (a * (1 - e * e)) / Math.pow(1 - e * e * Math.pow(Math.sin(fp), 2), 1.5);
+  var n1 = a / Math.sqrt(1 - e * e * Math.pow(Math.sin(fp), 2));
+  var d = x / (n1 * k0);
+
+  var q1 = (n1 * Math.tan(fp)) / r1;
+  var q2 = (d * d) / 2;
+  var q3 = ((5 + 3 * t1 + 10 * c1 - 4 * c1 * c1 - 9 * e1sq) * Math.pow(d, 4)) / 24;
+  var q4 = ((61 + 90 * t1 + 298 * c1 + 45 * t1 * t1 - 252 * e1sq - 3 * c1 * c1) * Math.pow(d, 6)) / 720;
+  var lat = fp - q1 * (q2 - q3 + q4);
+
+  var q5 = d;
+  var q6 = ((1 + 2 * t1 + c1) * Math.pow(d, 3)) / 6;
+  var q7 = ((5 - 2 * c1 + 28 * t1 - 3 * c1 * c1 + 8 * e1sq + 24 * t1 * t1) * Math.pow(d, 5)) / 120;
+  var lon = (q5 - q6 + q7) / Math.cos(fp);
+
+  var lonOrigin = (zone - 1) * 6 - 180 + 3;
+  return {
+    lat: (lat * 180) / Math.PI,
+    lon: (lon * 180) / Math.PI + lonOrigin,
+  };
+}
+
+function convertCoord(x, y, geoKeys) {
+  // Sudah berupa derajat Lat/Lon
+  if (Math.abs(x) <= 180 && Math.abs(y) <= 90) {
+    return { lat: y, lon: x };
+  }
+
+  // Web Mercator (EPSG:3857)
+  if (Math.abs(x) > 1000000 && Math.abs(y) < 20037508) {
+    var lon = (x / 20037508.34) * 180;
+    var lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((y / 20037508.34) * Math.PI)) - Math.PI / 2);
+    return { lat: lat, lon: lon };
+  }
+
+  // UTM (Default: Zone 51S untuk Konawe Selatan)
+  var zone = 51;
+  var south = true;
+  if (geoKeys && geoKeys.ProjectedCSTypeGeoKey) {
+    var code = geoKeys.ProjectedCSTypeGeoKey;
+    if (code >= 32701 && code <= 32760) {
+      zone = code - 32700;
+      south = true;
+    } else if (code >= 32601 && code <= 32660) {
+      zone = code - 32600;
+      south = false;
+    }
+  } else {
+    if (y < 5000000 && y >= 0) south = false;
+    else south = true;
+  }
+
+  return utmToLatLng(x, y, zone, south);
+}
+
+// Inisialisasi map dengan optimasi performa Canvas
+var map = L.map('map', {
+  preferCanvas: true,
+  zoomControl: true,
+  attributionControl: false,
+  fadeAnimation: false,
+  zoomAnimation: true,
+});
 var imageOverlay = null;
+var currentBlobUrl = null;
 var posMarker = null;
 var boundsData = null;
+
+// Fallback basemap jika online
+try {
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'', maxZoom:19, opacity:0.3,
+  }).addTo(map);
+} catch(e) {}
+
+map.setView([-4.2, 122.35], 10);
+setStatus('Siap — Import peta GeoTIFF / GeoPDF dari menu');
+
+if (window.pdfjsLib) {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+  } catch(e) {}
+}
 
 // Listener dari React Native
 document.addEventListener('message', handleRNMessage);
@@ -31,8 +136,9 @@ window.addEventListener('message', handleRNMessage);
 
 function handleRNMessage(e) {
   try {
-    var msg = JSON.parse(e.data);
+    var msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
     if (msg.type === 'LOAD_GEOTIFF') loadGeoTIFF(msg.base64, msg.name);
+    if (msg.type === 'LOAD_GEOPDF') loadGeoPDF(msg.base64, msg.name);
     if (msg.type === 'UPDATE_POSITION') updatePosition(msg.lat, msg.lon);
     if (msg.type === 'FLY_TO') map.setView([msg.lat, msg.lon], msg.zoom || 15);
   } catch(err) { console.error('Msg parse error:', err); }
@@ -42,50 +148,330 @@ function setStatus(txt) {
   document.getElementById('status').innerText = txt;
 }
 
+function applyOverlay(url, isBlob, mapName) {
+  if (imageOverlay) {
+    imageOverlay.remove();
+    if (currentBlobUrl) {
+      try { URL.revokeObjectURL(currentBlobUrl); } catch(e) {}
+    }
+  }
+  currentBlobUrl = isBlob ? url : null;
+  var leafBounds = [[boundsData.minLat, boundsData.minLon], [boundsData.maxLat, boundsData.maxLon]];
+  imageOverlay = L.imageOverlay(url, leafBounds, { opacity: 0.95, interactive: false }).addTo(map);
+  map.fitBounds(leafBounds, { padding: [15, 15] });
+  setStatus('Peta: ' + (mapName || 'Aktif'));
+
+  // Kirim bounds ke React Native
+  var msg = JSON.stringify({ type: 'BOUNDS_EXTRACTED', bounds: boundsData });
+  if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+}
+
 async function loadGeoTIFF(base64, name) {
   try {
-    setStatus('Memproses GeoTIFF...');
+    setStatus('Membaca GeoTIFF...');
+
+    // Konversi base64 ke binary
     var binary = atob(base64);
-    var bytes = new Uint8Array(binary.length);
-    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
     var tiff = await GeoTIFF.fromArrayBuffer(bytes.buffer);
     var image = await tiff.getImage();
-    var bbox = image.getBoundingBox();  // [minLon, minLat, maxLon, maxLat]
-    boundsData = { minLon:bbox[0], minLat:bbox[1], maxLon:bbox[2], maxLat:bbox[3] };
+    var bbox = image.getBoundingBox();  // [minX, minY, maxX, maxY]
+    var geoKeys = null;
+    try { geoKeys = image.getGeoKeys(); } catch(e) {}
 
-    var width = image.getWidth(), height = image.getHeight();
-    var rasters = await image.readRasters({ interleave:true });
+    // Konversi batas wilayah (UTM / Web Mercator / WGS84)
+    var sw = convertCoord(bbox[0], bbox[1], geoKeys);
+    var ne = convertCoord(bbox[2], bbox[3], geoKeys);
 
-    // Render ke canvas
+    boundsData = {
+      minLon: Math.min(sw.lon, ne.lon),
+      minLat: Math.min(sw.lat, ne.lat),
+      maxLon: Math.max(sw.lon, ne.lon),
+      maxLat: Math.max(sw.lat, ne.lat),
+    };
+
+    var origWidth = image.getWidth();
+    var origHeight = image.getHeight();
+    var maxDim = 2048; // Batas resolusi aman di RAM HP
+    var targetWidth = origWidth;
+    var targetHeight = origHeight;
+
+    if (Math.max(origWidth, origHeight) > maxDim) {
+      var scale = maxDim / Math.max(origWidth, origHeight);
+      targetWidth = Math.round(origWidth * scale);
+      targetHeight = Math.round(origHeight * scale);
+    }
+
+    setStatus('Mendekode piksel...');
+    var rasters = await image.readRasters({
+      width: targetWidth,
+      height: targetHeight,
+      interleave: true
+    });
+
+    // Render ke canvas dengan akses memori 32-bit (sangat cepat)
     var canvas = document.createElement('canvas');
-    canvas.width = width; canvas.height = height;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
     var ctx = canvas.getContext('2d');
-    var imgData = ctx.createImageData(width, height);
-    var spp = rasters.length / (width * height);
-    for (var px = 0; px < width * height; px++) {
-      var base = px * spp;
-      imgData.data[px * 4]     = spp >= 3 ? rasters[base]   : rasters[base];
-      imgData.data[px * 4 + 1] = spp >= 3 ? rasters[base+1] : rasters[base];
-      imgData.data[px * 4 + 2] = spp >= 3 ? rasters[base+2] : rasters[base];
-      imgData.data[px * 4 + 3] = spp === 4 ? rasters[base+3] : 255;
+    var imgData = ctx.createImageData(targetWidth, targetHeight);
+    var buf32 = new Uint32Array(imgData.data.buffer);
+    var numPixels = targetWidth * targetHeight;
+    var spp = Math.round(rasters.length / numPixels);
+
+    if (spp >= 3) {
+      for (var px = 0; px < numPixels; px++) {
+        var base = px * spp;
+        var r = rasters[base];
+        var g = rasters[base + 1];
+        var b = rasters[base + 2];
+
+        // NODATA / batas luar citra transparan
+        if (r >= 256 || g >= 256 || b >= 256) {
+          buf32[px] = 0;
+        } else {
+          var a = spp === 4 ? rasters[base + 3] : 255;
+          buf32[px] = (a << 24) | (b << 16) | (g << 8) | r;
+        }
+      }
+    } else {
+      // Grayscale
+      for (var px = 0; px < numPixels; px++) {
+        var v = rasters[px * spp];
+        if (v >= 256) {
+          buf32[px] = 0;
+        } else {
+          buf32[px] = (255 << 24) | (v << 16) | (v << 8) | v;
+        }
+      }
     }
     ctx.putImageData(imgData, 0, 0);
-    var dataUrl = canvas.toDataURL('image/png');
 
-    var leafBounds = [[boundsData.minLat, boundsData.minLon], [boundsData.maxLat, boundsData.maxLon]];
-    if (imageOverlay) imageOverlay.remove();
-    imageOverlay = L.imageOverlay(dataUrl, leafBounds).addTo(map);
-    map.fitBounds(leafBounds);
-    setStatus('Peta: ' + (name || 'Aktif'));
-
-    // Kirim bounds ke React Native
-    var msg = JSON.stringify({ type:'BOUNDS_EXTRACTED', bounds: boundsData });
-    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+    // Gunakan WebP / Blob URL untuk performa rendering tinggi
+    if (canvas.toBlob) {
+      canvas.toBlob(function(blob) {
+        if (blob) {
+          applyOverlay(URL.createObjectURL(blob), true, name);
+        } else {
+          applyOverlay(canvas.toDataURL('image/jpeg', 0.85), false, name);
+        }
+        canvas = null;
+        ctx = null;
+        imgData = null;
+        buf32 = null;
+        rasters = null;
+        bytes = null;
+        binary = null;
+        tiff = null;
+        image = null;
+      }, 'image/webp', 0.85);
+    } else {
+      applyOverlay(canvas.toDataURL('image/jpeg', 0.85), false, name);
+      canvas = null;
+      ctx = null;
+      imgData = null;
+      buf32 = null;
+      rasters = null;
+      bytes = null;
+      binary = null;
+      tiff = null;
+      image = null;
+    }
   } catch(err) {
     setStatus('Error: ' + err.message);
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(
       JSON.stringify({ type:'LOAD_ERROR', message: err.message })
+    );
+  }
+}
+
+// ==========================================
+// PARSING & RENDERING GEOPDF (.PDF)
+// ==========================================
+function parseGeoPDFMetadata(binaryStr) {
+  var gpts = null;
+  var bbox = null;
+  var mediaBox = null;
+
+  // 1. Ekstrak /GPTS[...]
+  var gptsMatch = binaryStr.match(/\/GPTS\s*\[([^\]]+)\]/i);
+  if (gptsMatch) {
+    var rawNums = gptsMatch[1].trim().split(/\s+/).map(Number).filter(function(n) { return !isNaN(n); });
+    if (rawNums.length >= 8) {
+      gpts = [];
+      for (var i = 0; i < rawNums.length; i += 2) {
+        var c1 = rawNums[i];
+        var c2 = rawNums[i + 1];
+        if (Math.abs(c1) <= 90 && Math.abs(c2) <= 180) {
+          if (Math.abs(c1) <= 15 && c2 > 50) {
+            gpts.push({ lat: c1, lon: c2 });
+          } else if (c1 > 50 && Math.abs(c2) <= 15) {
+            gpts.push({ lat: c2, lon: c1 });
+          } else {
+            gpts.push({ lat: c1, lon: c2 });
+          }
+        } else {
+          var pt = convertCoord(c1, c2);
+          gpts.push(pt);
+        }
+      }
+    }
+  }
+
+  // 2. Ekstrak /VP dengan /BBox[...] atau /BBox umum
+  var vpMatch = binaryStr.match(/\/VP\s*\[\s*<<[^>]*\/BBox\s*\[([^\]]+)\]/i);
+  var bboxMatch = vpMatch || binaryStr.match(/\/BBox\s*\[([^\]]+)\]/i);
+  if (bboxMatch) {
+    var bNums = bboxMatch[1].trim().split(/\s+/).map(Number).filter(function(n) { return !isNaN(n); });
+    if (bNums.length === 4) {
+      bbox = {
+        minX: Math.min(bNums[0], bNums[2]),
+        maxX: Math.max(bNums[0], bNums[2]),
+        minY: Math.min(bNums[1], bNums[3]),
+        maxY: Math.max(bNums[1], bNums[3])
+      };
+    }
+  }
+
+  // 3. Ekstrak /MediaBox[...]
+  var mediaMatch = binaryStr.match(/\/MediaBox\s*\[([^\]]+)\]/i);
+  if (mediaMatch) {
+    var mNums = mediaMatch[1].trim().split(/\s+/).map(Number).filter(function(n) { return !isNaN(n); });
+    if (mNums.length === 4) {
+      mediaBox = {
+        minX: Math.min(mNums[0], mNums[2]),
+        maxX: Math.max(mNums[0], mNums[2]),
+        minY: Math.min(mNums[1], mNums[3]),
+        maxY: Math.max(mNums[1], mNums[3])
+      };
+    }
+  }
+
+  return { gpts: gpts, bbox: bbox, mediaBox: mediaBox };
+}
+
+async function loadGeoPDF(base64, name) {
+  try {
+    setStatus('Membaca GeoPDF...');
+
+    var binary = atob(base64);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+
+    var geoMeta = parseGeoPDFMetadata(binary);
+    if (!geoMeta.gpts || geoMeta.gpts.length === 0) {
+      throw new Error('File PDF ini tidak memiliki metadata geospasial (GeoPDF / GPTS). Pastikan opsi "Export Geospatial PDF" aktif saat mengekspor dari ArcGIS / QGIS.');
+    }
+
+    var minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    for (var j = 0; j < geoMeta.gpts.length; j++) {
+      var p = geoMeta.gpts[j];
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lon < minLon) minLon = p.lon;
+      if (p.lon > maxLon) maxLon = p.lon;
+    }
+
+    boundsData = {
+      minLon: minLon,
+      minLat: minLat,
+      maxLon: maxLon,
+      maxLat: maxLat
+    };
+
+    setStatus('Mendekode halaman PDF...');
+
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF Engine (pdf.js) belum terinisialisasi.');
+    }
+
+    var loadingTask = pdfjsLib.getDocument({
+      data: bytes,
+      cMapPacked: false,
+      disableFontFace: false
+    });
+
+    var pdfDoc = await loadingTask.promise;
+    var page = await pdfDoc.getPage(1);
+
+    var unscaledViewport = page.getViewport({ scale: 1.0 });
+    var maxDim = 2048;
+    var maxPdfDim = Math.max(unscaledViewport.width, unscaledViewport.height);
+    var scale = Math.min(2.5, maxDim / maxPdfDim);
+    var viewport = page.getViewport({ scale: scale });
+
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    var ctx = canvas.getContext('2d');
+
+    setStatus('Merender visual peta...');
+    var renderContext = {
+      canvasContext: ctx,
+      viewport: viewport
+    };
+    await page.render(renderContext).promise;
+
+    var finalCanvas = canvas;
+
+    // Jika terdapat BBox / Viewport, crop area peta sesuai batas koordinat
+    if (geoMeta.bbox && geoMeta.mediaBox) {
+      var origMediaW = geoMeta.mediaBox.maxX - geoMeta.mediaBox.minX;
+      var origMediaH = geoMeta.mediaBox.maxY - geoMeta.mediaBox.minY;
+
+      if (origMediaW > 0 && origMediaH > 0) {
+        var rx = canvas.width / origMediaW;
+        var ry = canvas.height / origMediaH;
+
+        var cropX = Math.round((geoMeta.bbox.minX - geoMeta.mediaBox.minX) * rx);
+        var cropY = Math.round((geoMeta.mediaBox.maxY - geoMeta.bbox.maxY) * ry);
+        var cropW = Math.round((geoMeta.bbox.maxX - geoMeta.bbox.minX) * rx);
+        var cropH = Math.round((geoMeta.bbox.maxY - geoMeta.bbox.minY) * ry);
+
+        cropX = Math.max(0, Math.min(cropX, canvas.width - 1));
+        cropY = Math.max(0, Math.min(cropY, canvas.height - 1));
+        cropW = Math.min(cropW, canvas.width - cropX);
+        cropH = Math.min(cropH, canvas.height - cropY);
+
+        if (cropW > 100 && cropH > 100) {
+          var cCanvas = document.createElement('canvas');
+          cCanvas.width = cropW;
+          cCanvas.height = cropH;
+          var cCtx = cCanvas.getContext('2d');
+          cCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+          finalCanvas = cCanvas;
+        }
+      }
+    }
+
+    if (finalCanvas.toBlob) {
+      finalCanvas.toBlob(function(blob) {
+        if (blob) {
+          applyOverlay(URL.createObjectURL(blob), true, name);
+        } else {
+          applyOverlay(finalCanvas.toDataURL('image/jpeg', 0.85), false, name);
+        }
+        canvas = null;
+        finalCanvas = null;
+        bytes = null;
+        binary = null;
+      }, 'image/webp', 0.85);
+    } else {
+      applyOverlay(finalCanvas.toDataURL('image/jpeg', 0.85), false, name);
+      canvas = null;
+      finalCanvas = null;
+      bytes = null;
+      binary = null;
+    }
+
+  } catch(err) {
+    setStatus('Error: ' + err.message);
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(
+      JSON.stringify({ type: 'LOAD_ERROR', message: err.message })
     );
   }
 }
@@ -96,14 +482,6 @@ function updatePosition(lat, lon) {
     icon: L.divIcon({ className:'', html:'<div id="pos-marker"></div>', iconSize:[16,16], iconAnchor:[8,8] })
   }).addTo(map);
 }
-
-// Fallback: tampilkan OpenStreetMap jika belum ada GeoTIFF
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution:'', maxZoom:19, opacity:0.3,
-}).addTo(map);
-
-map.setView([-4.2, 122.35], 10);
-setStatus('Siap — Import peta GeoTIFF dari menu');
 </script>
 </body>
 </html>

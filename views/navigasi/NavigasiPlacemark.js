@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import CompassView from './CompassView';
 import PlacemarkDB from '../library/PlacemarkDB';
+import GpsService from '../library/GpsService';
 
 const DEG = Math.PI / 180, RAD = 180 / Math.PI, R = 6371000;
 
@@ -49,12 +50,17 @@ const NavigasiPlacemark = ({ navigation }) => {
       setPlacemarks(list);
       setFiltered(list);
     });
-    // Posisi awal
-    Geolocation.getCurrentPosition(
-      ({ coords }) => setCurrentPos({ lat: coords.latitude, lon: coords.longitude }),
-      err => console.warn('[NavPM] GPS init:', err.message),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    // Posisi awal (gunakan posisi tersimpan jika sudah didapatkan)
+    const lastP = GpsService.getLastPosition();
+    if (lastP) {
+      setCurrentPos({ lat: lastP.lat, lon: lastP.lon });
+    } else {
+      Geolocation.getCurrentPosition(
+        ({ coords }) => setCurrentPos({ lat: coords.latitude, lon: coords.longitude }),
+        err => console.warn('[NavPM] GPS init:', err.message),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+      );
+    }
     // Kompas
     try {
       const { magnetometer } = require('react-native-sensors');
