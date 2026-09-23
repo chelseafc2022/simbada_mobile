@@ -291,7 +291,7 @@ const MapViewer = ({ navigation, route }) => {
     setNavState({ active: false, target: null, distance: null, bearing: null });
   };
 
-  const handleImportGeoJSON = async () => {
+  const handleImportSpatialFile = async () => {
     try {
       const res = await DocumentPicker.pickSingle({
         type: [DocumentPicker.types.allFiles],
@@ -302,7 +302,13 @@ const MapViewer = ({ navigation, route }) => {
       const path = decodeURIComponent(targetUri.replace(/^file:\/\//, ''));
       const content = await RNFS.readFile(path, 'utf8');
 
-      const saved = await OfflineLayerDB.importFromGeoJsonText(content, mapMeta?.id, mapMeta?.nama);
+      const fileName = (res.name || '').toLowerCase();
+      let saved;
+      if (fileName.endsWith('.kml') || content.includes('<kml') || content.includes('<coordinates')) {
+        saved = await OfflineLayerDB.importFromKmlText(content, mapMeta?.id, mapMeta?.nama);
+      } else {
+        saved = await OfflineLayerDB.importFromGeoJsonText(content, mapMeta?.id, mapMeta?.nama);
+      }
       await refreshSavedLayers();
       Alert.alert('Impor Berhasil', `Berhasil mengimpor ${saved.length} objek ke dalam layer peta.`);
     } catch (e) {
@@ -335,7 +341,15 @@ const MapViewer = ({ navigation, route }) => {
     try {
       await OfflineLayerDB.exportToGeoJson(layer);
     } catch (e) {
-      Alert.alert('Gagal Ekspor', e.message);
+      Alert.alert('Gagal Ekspor GeoJSON', e.message);
+    }
+  };
+
+  const handleExportKmlLayer = async (layer) => {
+    try {
+      await OfflineLayerDB.exportToKml(layer);
+    } catch (e) {
+      Alert.alert('Gagal Ekspor KML', e.message);
     }
   };
 
@@ -343,7 +357,15 @@ const MapViewer = ({ navigation, route }) => {
     try {
       await OfflineLayerDB.exportToGeoJson(savedLayers);
     } catch (e) {
-      Alert.alert('Gagal Ekspor', e.message);
+      Alert.alert('Gagal Ekspor GeoJSON', e.message);
+    }
+  };
+
+  const handleExportAllKmlLayers = async () => {
+    try {
+      await OfflineLayerDB.exportToKml(savedLayers);
+    } catch (e) {
+      Alert.alert('Gagal Ekspor KML', e.message);
     }
   };
 
@@ -663,13 +685,18 @@ const MapViewer = ({ navigation, route }) => {
             </View>
 
             <View style={styles.importExportBar}>
-              <TouchableOpacity style={styles.importBtn} onPress={handleImportGeoJSON}>
-                <Text style={styles.importBtnTxt}>📥 Impor GeoJSON</Text>
+              <TouchableOpacity style={styles.importBtn} onPress={handleImportSpatialFile}>
+                <Text style={styles.importBtnTxt}>📥 Impor File</Text>
               </TouchableOpacity>
               {savedLayers.length > 0 && (
-                <TouchableOpacity style={styles.exportAllBtn} onPress={handleExportAllLayers}>
-                  <Text style={styles.exportAllBtnTxt}>📤 Ekspor Semua</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity style={styles.exportAllBtn} onPress={handleExportAllLayers}>
+                    <Text style={styles.exportAllBtnTxt}>📤 GeoJSON</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.exportAllBtn, { backgroundColor: '#0284C7' }]} onPress={handleExportAllKmlLayers}>
+                    <Text style={styles.exportAllBtnTxt}>🗺️ KML</Text>
+                  </TouchableOpacity>
+                </>
               )}
             </View>
 
@@ -701,13 +728,16 @@ const MapViewer = ({ navigation, route }) => {
 
                     <View style={styles.layerActionRow}>
                       <TouchableOpacity style={styles.layerActBtn} onPress={() => handleNavToLayer(item)}>
-                        <Text style={styles.layerActTxt}>🎯 Navigasi</Text>
+                        <Text style={styles.layerActTxt}>🎯 Target</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.layerActBtn} onPress={() => handleExportLayer(item)}>
-                        <Text style={styles.layerActTxt}>📤 Bagikan</Text>
+                        <Text style={styles.layerActTxt}>📤 GeoJSON</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.layerActBtn, { borderColor: '#0284C7' }]} onPress={() => handleExportKmlLayer(item)}>
+                        <Text style={[styles.layerActTxt, { color: '#38BDF8' }]}>🗺️ KML</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.layerActBtn, { borderColor: '#EF4444' }]} onPress={() => handleDeleteLayer(item.id, item.name)}>
-                        <Text style={[styles.layerActTxt, { color: '#EF4444' }]}>🗑️ Hapus</Text>
+                        <Text style={[styles.layerActTxt, { color: '#EF4444' }]}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -946,7 +976,7 @@ const styles = StyleSheet.create({
   layerName: { color: '#fff', fontSize: 14, fontWeight: '800' },
   layerType: { color: '#38BDF8', fontSize: 11, marginTop: 2 },
   layerNotes: { color: '#94A3B8', fontSize: 11, marginTop: 4, fontStyle: 'italic' },
-  layerActionRow: { flexDirection: 'row', gap: 6, marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 8 },
+  layerActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 8 },
   layerActBtn: {
     paddingVertical: 5, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.03)',

@@ -275,6 +275,188 @@ const OfflineLayerDB = {
       throw e;
     }
   },
+
+  /**
+   * Ekspor layer tunggal atau semua layer ke file KML (Google Earth / QGIS / ArcGIS)
+   */
+  async exportToKml(layerOrLayers) {
+    try {
+      const isArray = Array.isArray(layerOrLayers);
+      const layers = isArray ? layerOrLayers : [layerOrLayers];
+      if (!layers.length) throw new Error('Tidak ada data layer untuk diekspor');
+
+      const placemarkNodes = layers.map(l => {
+        const coords = (l.coordinates || []).map(pt => {
+          const lon = pt.lon != null ? pt.lon : pt[1];
+          const lat = pt.lat != null ? pt.lat : pt[0];
+          return `${lon},${lat},0`;
+        });
+
+        if (l.type === 'polygon' && coords.length >= 3) {
+          if (coords[0] !== coords[coords.length - 1]) {
+            coords.push(coords[0]);
+          }
+          const coordStr = coords.join(' ');
+          const desc = `Tipe: Poligon (Lahan)\nLuas: ${l.areaM2 ? l.areaM2.toLocaleString('id-ID') : 0} m² (${l.areaHa || 0} ha)\nKeliling: ${l.perimeterM ? l.perimeterM.toLocaleString('id-ID') : 0} m\n${l.notes || ''}`;
+
+          return `    <Placemark>
+      <name><![CDATA[${l.name || 'Bidang Lahan'}]]></name>
+      <description><![CDATA[${desc}]]></description>
+      <Style>
+        <LineStyle>
+          <color>ffffb606</color>
+          <width>2.5</width>
+        </LineStyle>
+        <PolyStyle>
+          <color>55ffb606</color>
+        </PolyStyle>
+      </Style>
+      <Polygon>
+        <extrude>1</extrude>
+        <altitudeMode>clampToGround</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>${coordStr}</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>`;
+        } else if (coords.length >= 2) {
+          const coordStr = coords.join(' ');
+          const desc = `Tipe: Polyline (Garis/Rute)\nPanjang: ${l.lengthM >= 1000 ? (l.lengthM / 1000).toFixed(2) + ' km' : (l.lengthM || 0) + ' m'}\n${l.notes || ''}`;
+
+          return `    <Placemark>
+      <name><![CDATA[${l.name || 'Jalur Batas'}]]></name>
+      <description><![CDATA[${desc}]]></description>
+      <Style>
+        <LineStyle>
+          <color>ff0b9ef5</color>
+          <width>3.5</width>
+        </LineStyle>
+      </Style>
+      <LineString>
+        <tessellate>1</tessellate>
+        <altitudeMode>clampToGround</altitudeMode>
+        <coordinates>${coordStr}</coordinates>
+      </LineString>
+    </Placemark>`;
+        }
+        return '';
+      }).filter(Boolean).join('\n');
+
+      const kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${isArray ? 'Simbada_Offline_Layers' : sanitizeFilename(layers[0].name)}</name>
+    <description>Hasil digitasi lapangan Peta Offline SIMBADA Mobile</description>
+${placemarkNodes}
+  </Document>
+</kml>`;
+
+      const outDir = `${RNFS.CachesDirectoryPath}/simbada_ekspor`;
+      const exists = await RNFS.exists(outDir);
+      if (!exists) await RNFS.mkdir(outDir);
+
+      const fileName = `${sanitizeFilename(isArray ? 'Semua_Layer' : layers[0].name)}_${moment().format('YYYYMMDD_HHmmss')}.kml`;
+      const filePath = `${outDir}/${fileName}`;
+
+      await RNFS.writeFile(filePath, kmlContent, 'utf8');
+
+      const Share = require('react-native-share').default;
+      await Share.open({
+        url: `file://${filePath}`,
+        type: 'application/vnd.google-earth.kml+xml',
+        title: 'Ekspor Layer KML SIMBADA',
+        subject: fileName,
+      });
+
+      return filePath;
+    } catch (e) {
+      if (e?.message !== 'User did not share') {
+        console.warn('[OfflineLayerDB] exportToKml error:', e);
+        throw e;
+      }
+      return null;
+    }
+  },
+
+  /**
+   * Mengimpor teks KML ke dalam layer tersimpan
+   */
+  async importFromKmlText(kmlText, mapId, mapName) {
+    try {
+      const imported = [];
+      const placemarkRegex = /<Placemark[\s\S]*?<\/Placemark>/gi;
+      let pmMatch;
+
+      while ((pmMatch = placemarkRegex.exec(kmlText)) !== null) {
+        const pmBlock = pmMatch[0];
+        const nameMatch = /<name>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/name>/i.exec(pmBlock);
+        const name = (nameMatch && nameMatch[1].trim()) || `KML Import ${moment().format('DD/MM HH:mm')}`;
+        const descMatch = /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i.exec(pmBlock);
+        const notes = (descMatch && descMatch[1].trim()) || '';
+
+        const isPolygon = /<Polygon\b/i.test(pmBlock);
+        const isLineString = /<LineString\b/i.test(pmBlock);
+
+        const coordMatch = /<coordinates[\s\S]*?>([\s\S]*?)<\/coordinates>/i.exec(pmBlock);
+        if (!coordMatch) continue;
+
+        const rawCoords = coordMatch[1].trim();
+        if (!rawCoords) continue;
+
+        const tuples = rawCoords.split(/\s+/);
+        const coords = [];
+        tuples.forEach(t => {
+          const parts = t.trim().split(',');
+          if (parts.length >= 2) {
+            const lon = parseFloat(parts[0]);
+            const lat = parseFloat(parts[1]);
+            if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+              coords.push({ lat, lon });
+            }
+          }
+        });
+
+        if (isPolygon && coords.length >= 3) {
+          imported.push({
+            name,
+            notes,
+            type: 'polygon',
+            coordinates: coords,
+            mapId,
+            mapName,
+            color: '#06B6D4',
+          });
+        } else if (isLineString && coords.length >= 2) {
+          imported.push({
+            name,
+            notes,
+            type: 'polyline',
+            coordinates: coords,
+            mapId,
+            mapName,
+            color: '#F59E0B',
+          });
+        }
+      }
+
+      if (!imported.length) {
+        throw new Error('Tidak ditemukan objek Polygon atau LineString di dalam file KML.');
+      }
+
+      const savedResults = [];
+      for (const item of imported) {
+        const saved = await this.save(item);
+        savedResults.push(saved);
+      }
+
+      return savedResults;
+    } catch (e) {
+      console.warn('[OfflineLayerDB] importFromKmlText error:', e);
+      throw e;
+    }
+  },
 };
 
 export default OfflineLayerDB;
