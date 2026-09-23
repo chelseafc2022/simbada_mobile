@@ -353,13 +353,11 @@ const MapViewer = ({ navigation, route }) => {
   return (
     <View style={styles.screen}>
       <LinearGradient colors={['#0F172A', '#1E293B']} style={[styles.header, { paddingTop: Math.max(insets.top + 8, 44) }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.back}>‹ Kembali</Text>
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{mapMeta?.nama ?? 'Peta Offline'}</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('PlacemarkForm', {})}>
-          <Text style={styles.addPm}>+ Placemark</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRightSpacer} />
       </LinearGradient>
 
       {/* Banner di luar bounds */}
@@ -685,9 +683,10 @@ const styles = StyleSheet.create({
     paddingBottom: 12, paddingHorizontal: 20,
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
+  backBtn: { paddingVertical: 4 },
   back: { color: '#208DC0', fontSize: 16, fontWeight: '700' },
-  title: { color: '#fff', fontSize: 16, fontWeight: '800', flex: 1 },
-  addPm: { color: '#22C55E', fontSize: 13, fontWeight: '700' },
+  title: { color: '#fff', fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
+  headerRightSpacer: { width: 60 },
   outsideBanner: {
     backgroundColor: '#EF4444', paddingVertical: 6, paddingHorizontal: 16,
     alignItems: 'center',
