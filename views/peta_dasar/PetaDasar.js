@@ -22,6 +22,12 @@ import * as turf from '@turf/turf';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  usePetaDasarAllQuery,
+  useKecamatanQuery,
+  useDesaQuery,
+  usePetadasarKecamatanQuery,
+} from '../library/queries';
 
 // ─── COLOR PALETTE (HOME & MAPPREVIEW COMPLIANT) ─────────────────────────────
 const PRIMARY      = '#0284C7';
@@ -82,16 +88,20 @@ const PetaDasar = ({ navigation }) => {
   const [showLayerModal, setShowLayerModal] = useState(false);
 
   // Data & Filters
-  const [isLoading, setIsLoading]                       = useState(true);
-  const [kecamatanList, setKecamatanList]               = useState([]);
-  const [desaList, setDesaList]                         = useState([]);
-  const [selectedKecamatan, setSelectedKecamatan]       = useState(
+  const [selectedKecamatan, setSelectedKecamatan] = useState(
     status_user === 2 || status_user === 3 ? id_kecamatan_user : ''
   );
-  const [selectedDesa, setSelectedDesa]                 = useState('');
-  const [initialPolygonData, setInitialPolygonData]     = useState([]);
-  const [kecamatanPolygonData, setKecamatanPolygonData] = useState([]);
-  const [desaPolygonData, setDesaPolygonData]           = useState([]);
+  const [selectedDesa, setSelectedDesa] = useState('');
+
+  // TanStack Query for Zero-Reload Caching
+  const { data: initialPolygonData = [], isLoading: isAllPolygonsLoading } = usePetaDasarAllQuery(TOKEN, URL);
+  const { data: kecamatanList = [] } = useKecamatanQuery(TOKEN, URL);
+  const { data: desaList = [] } = useDesaQuery(TOKEN, URL, selectedKecamatan);
+  const { data: rawKecamatanPolygons = [], isLoading: isKecLoading } = usePetadasarKecamatanQuery(
+    TOKEN,
+    URL,
+    selectedKecamatan
+  );
 
   // Detail Modal
   const [detailModalVisible, setDetailModalVisible]       = useState(false);
@@ -109,16 +119,6 @@ const PetaDasar = ({ navigation }) => {
     }).start();
     setIsPanelOpen((v) => !v);
   };
-
-  useFocusEffect(
-    useCallback(() => () => {
-      setInitialPolygonData([]);
-      setKecamatanPolygonData([]);
-      setDesaPolygonData([]);
-      setSelectedDesa('');
-      setSelectedKecamatan('');
-    }, [])
-  );
 
   // Auto-fit bounds helper
   const fitPolygons = useCallback((polygonList) => {
@@ -160,163 +160,55 @@ const PetaDasar = ({ navigation }) => {
     }
   }, []);
 
-  // ── Fetch Initial Polygons ────────────────────────────────────────────────
-  useEffect(() => {
-    let mounted = true;
-    if (status_user === 2 || status_user === 3) {
-      if (id_kecamatan_user) fetchPolygonDataKecamatan(id_kecamatan_user);
-      else setIsLoading(false);
-      return () => {
-        mounted = false;
-      };
-    }
-    const fetchAll = async () => {
-      try {
-        const cached = await AsyncStorage.getItem('@peta_dasar_all_polygon');
-        if (cached && mounted) {
-          setInitialPolygonData(JSON.parse(cached));
-          setIsLoading(false);
-        }
-        const res = await fetch(URL.URL_HOME + 'petadasar', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `kikensbatara ${TOKEN}`,
-          },
-        });
-        const data = await res.json();
-        if (!Array.isArray(data)) return;
-        const fmt = data.map((p) => ({
-          kode_desa: p.lokasi?.kode_desa,
-          nama_desa: p.lokasi?.nama_desa || '',
-          coordinates: (p.lokasi?.coordinat || []).map((c) => ({
-            latitude: parseFloat(c.lat),
-            longitude: parseFloat(c.lng),
-          })),
-        }));
-        if (mounted) {
-          setInitialPolygonData(fmt);
-          try {
-            await AsyncStorage.setItem(
-              '@peta_dasar_all_polygon',
-              JSON.stringify(fmt)
-            );
-          } catch {}
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-    fetchAll();
-    return () => {
-      mounted = false;
-    };
-  }, [TOKEN]);
+  // Memoize polygon parsing for kecamatan
+  const kecamatanPolygonData = useMemo(() => {
+    if (!Array.isArray(rawKecamatanPolygons) || rawKecamatanPolygons.length === 0) return [];
+    return rawKecamatanPolygons.map((p) => ({
+      kode_desa: p.lokasi?.kode_desa,
+      nama_desa: p.lokasi?.nama_desa || '',
+      coordinates: (p.lokasi?.coordinat || [])
+        .map((c) => ({
+          latitude: parseFloat(c.lat || c.latitude),
+          longitude: parseFloat(c.lng || c.longitude),
+        }))
+        .filter((c) => isFinite(c.latitude) && isFinite(c.longitude)),
+    }));
+  }, [rawKecamatanPolygons]);
 
-  // ── Fetch Kecamatan List ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!TOKEN) return;
-    fetch(URL.URL_KECAMATAN + 'kecamatan_all', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `kikensbatara ${TOKEN}`,
-      },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!Array.isArray(data)) return;
-        setKecamatanList(
-          data.map((item) => {
-            const p = String(item.hasil?.no_prop || '0').padStart(2, '0');
-            const k = String(item.hasil?.no_kab || '0').padStart(2, '0');
-            const c = String(item.hasil?.kode || '0').padStart(2, '0');
-            return { id: `${p}.${k}.${c}`, name: item.hasil?.uraian || '' };
-          })
-        );
-      })
-      .catch(console.error);
-  }, [TOKEN]);
-
-  // ── Fetch Desa List ───────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!selectedKecamatan) return;
-    fetch(URL.URL_KECAMATAN + 'desa', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `kikensbatara ${TOKEN}`,
-      },
-      body: JSON.stringify({ kecamatan_id: selectedKecamatan }),
-    })
-      .then((r) => r.json())
-      .then((result) => {
-        if (!Array.isArray(result)) return;
-        setDesaList(
-          result.map((item) => ({
-            id: `${String(item.no_prop || '0').padStart(2, '0')}.${String(
-              item.no_kab || '0'
-            ).padStart(2, '0')}.${String(item.no_kec || '0').padStart(2, '0')}.${String(
-              item.kode || '0'
-            ).padStart(4, '0')}`,
-            name: item.uraian || '',
-          }))
-        );
-      })
-      .catch(console.error);
-  }, [selectedKecamatan]);
-
-  // ── Fetch Polygons for Selected Kecamatan ─────────────────────────────────
-  const fetchPolygonDataKecamatan = async (kecId) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(URL.URL_HOME + 'petadasar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `kikensbatara ${TOKEN}`,
-        },
-        body: JSON.stringify({ kecamatan_id: kecId }),
-      });
-      const data = await res.json();
-      if (!Array.isArray(data)) return;
-      const fmt = data.map((p) => ({
-        kode_desa: p.lokasi?.kode_desa,
-        nama_desa: p.lokasi?.nama_desa || '',
-        coordinates: (p.lokasi?.coordinat || []).map((c) => ({
-          latitude: parseFloat(c.lat),
-          longitude: parseFloat(c.lng),
-        })),
-      }));
-      setKecamatanPolygonData(fmt);
-      if (fmt.length > 0) fitPolygons(fmt);
-    } catch (e) {
-      Alert.alert('Error', 'Gagal memuat polygon kecamatan');
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filterPolygonByDesa = (desaId) => {
-    const filtered = kecamatanPolygonData.filter(
-      (p) => p.kode_desa === desaId || desaId.endsWith(`.${p.kode_desa}`)
+  // Memoize polygon filter by desa
+  const desaPolygonData = useMemo(() => {
+    if (!selectedDesa || !kecamatanPolygonData.length) return [];
+    return kecamatanPolygonData.filter(
+      (p) => p.kode_desa === selectedDesa || selectedDesa.endsWith(`.${p.kode_desa}`)
     );
-    setDesaPolygonData(filtered.length ? filtered : []);
-    if (!filtered.length) {
-      Alert.alert('Info', 'Tidak ada polygon untuk desa yang dipilih');
-    } else {
-      fitPolygons(filtered);
-    }
-  };
+  }, [selectedDesa, kecamatanPolygonData]);
 
   const activePolygons = useMemo(() => {
-    if (selectedDesa) return desaPolygonData;
-    if (selectedKecamatan) return kecamatanPolygonData;
+    if (selectedDesa && desaPolygonData.length > 0) return desaPolygonData;
+    if (selectedKecamatan && kecamatanPolygonData.length > 0) return kecamatanPolygonData;
     return initialPolygonData;
   }, [selectedDesa, selectedKecamatan, desaPolygonData, kecamatanPolygonData, initialPolygonData]);
+
+  const isLoading = isAllPolygonsLoading || (selectedKecamatan ? isKecLoading : false);
+
+  // Auto zoom bounds whenever activePolygons change
+  useEffect(() => {
+    if (selectedDesa && desaPolygonData.length > 0) {
+      fitPolygons(desaPolygonData);
+    } else if (selectedKecamatan && kecamatanPolygonData.length > 0) {
+      fitPolygons(kecamatanPolygonData);
+    } else if (initialPolygonData.length > 0) {
+      fitPolygons(initialPolygonData);
+    }
+  }, [selectedDesa, desaPolygonData, selectedKecamatan, kecamatanPolygonData, initialPolygonData.length]);
+
+  const filterPolygonByDesa = (val) => {
+    setSelectedDesa(val);
+  };
+
+  const fetchPolygonDataKecamatan = (kecId) => {
+    setSelectedKecamatan(kecId);
+  };
 
   const panelMaxHeight = panelAnim.interpolate({
     inputRange: [0, 1],

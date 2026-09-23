@@ -1,5 +1,5 @@
 // views/home/components/MapPreview.js
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -124,6 +124,46 @@ const MapPreview = ({
     ? `${polygons.length} Desa Terpetakan`
     : '12 Desa • 2.91 km²';
 
+  // Memoize polygon parsing so rawCoords coordinate parsing doesn't run on every parent render or GPS tick
+  const parsedPolygons = useMemo(() => {
+    if (!Array.isArray(polygons)) return [];
+    return polygons
+      .map((polygon, index) => {
+        const rawCoords = polygon?.lokasi?.coordinat;
+        if (!Array.isArray(rawCoords) || rawCoords.length < 3) return null;
+
+        const coords = rawCoords
+          .map((c) => {
+            if (!c) return null;
+            const lat =
+              c.latitude != null ? parseFloat(c.latitude) : parseFloat(c.lat);
+            const lng =
+              c.longitude != null ? parseFloat(c.longitude) : parseFloat(c.lng);
+            if (
+              isFinite(lat) &&
+              isFinite(lng) &&
+              !isNaN(lat) &&
+              !isNaN(lng)
+            ) {
+              return { latitude: lat, longitude: lng };
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+        if (coords.length < 3) return null;
+
+        return {
+          polygon,
+          index,
+          id: polygon.des_kel_id || `idx-${index}`,
+          nama_desa: polygon.lokasi?.nama_desa || '',
+          coords,
+        };
+      })
+      .filter(Boolean);
+  }, [polygons]);
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.mapContainer}>
@@ -148,43 +188,18 @@ const MapPreview = ({
             showsCompass={false}
             toolbarEnabled={false}
           >
-            {/* Poligon Batas Wilayah Desa / Kecamatan */}
-            {polygons?.map((polygon, index) => {
-              const rawCoords = polygon?.lokasi?.coordinat;
-              if (!Array.isArray(rawCoords) || rawCoords.length < 3) return null;
-
-              const coords = rawCoords
-                .map((c) => {
-                  if (!c) return null;
-                  const lat =
-                    c.latitude != null ? parseFloat(c.latitude) : parseFloat(c.lat);
-                  const lng =
-                    c.longitude != null ? parseFloat(c.longitude) : parseFloat(c.lng);
-                  if (
-                    isFinite(lat) &&
-                    isFinite(lng) &&
-                    !isNaN(lat) &&
-                    !isNaN(lng)
-                  ) {
-                    return { latitude: lat, longitude: lng };
-                  }
-                  return null;
-                })
-                .filter(Boolean);
-
-              if (coords.length < 3) return null;
-
+            {/* Poligon Batas Wilayah Desa / Kecamatan (Memoized) */}
+            {parsedPolygons.map(({ polygon, index, id, nama_desa, coords }) => {
               const isSelected =
                 activePolygon &&
                 ((activePolygon.des_kel_id &&
                   activePolygon.des_kel_id === polygon.des_kel_id) ||
                   (activePolygon.lokasi?.nama_desa &&
-                    activePolygon.lokasi?.nama_desa ===
-                      polygon.lokasi?.nama_desa));
+                    activePolygon.lokasi?.nama_desa === nama_desa));
 
               return (
                 <Polygon
-                  key={`poly-${polygon.des_kel_id || index}-${isSelected ? 'sel' : 'unsel'}`}
+                  key={`poly-${id}-${isSelected ? 'sel' : 'unsel'}`}
                   coordinates={coords}
                   strokeColor={isSelected ? '#00E5FF' : '#FBBF24'} // Highlight Cyan atau Garis Batas Emas/Kuning
                   fillColor={
@@ -851,4 +866,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MapPreview;
+export default React.memo(MapPreview);

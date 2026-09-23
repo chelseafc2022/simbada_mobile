@@ -1,5 +1,5 @@
 // import pustaka
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import FastImage from 'react-native-fast-image';
 import { useSelector } from 'react-redux';
 import { useIsFocused } from '@react-navigation/native';
 import moment from 'moment';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMonitoringListQuery, useDesaUsulanQuery } from '../library/queries';
 import TabBar from '../components/TabBar';
 import AppHeader from '../components/AppHeader';
 import NavigasiService from '../library/NavigasiService';
@@ -45,12 +47,9 @@ const Monitoring = ({ navigation }) => {
   const activeNavigation = useSelector((state) => state.ACTIVE_NAVIGATION);
   const offlineQueueCount = useSelector((state) => state.OFFLINE_QUEUE_COUNT);
 
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // State untuk Operator Kabupaten (Verifikasi & Monitoring Seluruh Wilayah)
-  const [dataMonitoring, setDataMonitoring] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('ALL'); // ALL, 1 (Menunggu), 2 (Ditolak), 3 (Disetujui)
   const [page, setPage] = useState(1);
@@ -59,9 +58,6 @@ const Monitoring = ({ navigation }) => {
   const [placemarkCount, setPlacemarkCount] = useState(0);
   const [trackCount, setTrackCount] = useState(0);
   const [hasActiveTrack, setHasActiveTrack] = useState(false);
-  const [desaUsulanList, setDesaUsulanList] = useState([]);
-  const [filteredDesaUsulan, setFilteredDesaUsulan] = useState([]);
-  const [desaUsulanLoading, setDesaUsulanLoading] = useState(false);
   const [desaActiveFilter, setDesaActiveFilter] = useState('ALL');
 
   const userStatus = profile?.profile?.status ? String(profile.profile.status) : '1';
@@ -80,165 +76,88 @@ const Monitoring = ({ navigation }) => {
     '';
 
   // ================================================================
-  // 1. DATA FETCHING UNTUK OPERATOR KABUPATEN
+  // 1. TANSTACK QUERY INTEGRATION (INSTANT CACHING & FAST RENDER)
   // ================================================================
-  const getView = async (refresh = false) => {
-    if (!token) return;
-    try {
-      if (refresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
+  const {
+    data: dataMonitoring = [],
+    isLoading: isMonitoringLoading,
+    refetch: refetchMonitoring,
+  } = useMonitoringListQuery(token, url, profile, userStatus, page);
 
-      const idKecamatanUser = profile?.profile?.id_kecamatan;
-      const requestBody = {
-        data_ke: page,
-        cari_value: '',
-        id: profile?.id,
-        status: userStatus,
-        ...(userStatus === '3' && { id_kecamatan: idKecamatanUser }),
-      };
+  const {
+    data: desaUsulanList = [],
+    isLoading: isDesaLoading,
+    refetch: refetchDesa,
+  } = useDesaUsulanQuery(token, url, profile, userStatus);
 
-      const response = await fetch(url.URL_LIST_MONITORING + 'viewmonitornative', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `kikensbatara ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
+  const isLoading = isOperatorDesa ? isDesaLoading : isMonitoringLoading;
 
-      const result = await response.json();
-
-      if (response.ok && Array.isArray(result) && result[0]?.data1) {
-        const rawList = result[0].data1 || [];
-        setDataMonitoring(rawList);
-        applyFilterAndSearch(rawList, searchQuery, activeFilter);
-      } else {
-        setDataMonitoring([]);
-        setFilteredData([]);
-      }
-    } catch (error) {
-      console.error('Fetch Error Monitoring:', error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  // ================================================================
-  // 2. DATA FETCHING UNTUK OPERATOR DESA
-  // ================================================================
-  const fetchDesaActivity = async (refresh = false) => {
-    try {
-      if (refresh) setIsRefreshing(true);
-      else setDesaUsulanLoading(true);
-
-      // 1. Ambil jumlah placemark & tracks offline lokal
-      try {
-        const pList = await PlacemarkDB.getAll();
-        setPlacemarkCount(pList ? pList.length : 0);
-      } catch (e) {}
-
-      try {
-        const tList = await TrackDB.getAllTracks();
-        setTrackCount(tList ? tList.length : 0);
-        setHasActiveTrack(TrackDB.hasActiveSession ? TrackDB.hasActiveSession() : false);
-      } catch (e) {}
-
-      // 2. Ambil riwayat usulan batas milik desa bersangkutan
-      if (token && url?.URL_ADD_ZONA) {
-        const idDesaUser = 
-          (typeof profile?.profile?.id_desa === 'object' ? profile?.profile?.id_desa?.id : profile?.profile?.id_desa) ||
-          (typeof profile?.profile?.des_kel_id === 'object' ? profile?.profile?.des_kel_id?.id : profile?.profile?.des_kel_id) ||
-          (typeof profile?.profile?.id_des_kel === 'object' ? profile?.profile?.id_des_kel?.id : profile?.profile?.id_des_kel);
-        const requestBody = {
-          data_ke: 1,
-          cari_value: '',
-          id: profile?.id,
-          status: userStatus,
-          ...(idDesaUser && { id_des_kel: idDesaUser }),
-        };
-
-        const response = await fetch(url.URL_ADD_ZONA + 'viewUsulanNative', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `kikensbatara ${token}`,
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        const result = await response.json();
-        if (response.ok && Array.isArray(result) && result[0]?.data1) {
-          const raw = result[0].data1 || [];
-          setDesaUsulanList(raw);
-          applyDesaFilter(raw, desaActiveFilter);
-        } else {
-          setDesaUsulanList([]);
-          setFilteredDesaUsulan([]);
-        }
-      }
-    } catch (err) {
-      console.warn('[Monitoring] Error fetchDesaActivity:', err);
-    } finally {
-      setDesaUsulanLoading(false);
-      setIsRefreshing(false);
-      setIsLoading(false);
-    }
-  };
-
+  // Sinkronisasi data offline lokal (PlacemarkDB & TrackDB)
   useEffect(() => {
-    if (isFocused) {
-      if (isOperatorDesa) {
-        fetchDesaActivity();
-      } else {
-        getView();
-      }
+    if (isOperatorDesa) {
+      PlacemarkDB.getAll().then((p) => setPlacemarkCount(p ? p.length : 0)).catch(() => {});
+      TrackDB.getAllTracks().then((t) => {
+        setTrackCount(t ? t.length : 0);
+        setHasActiveTrack(TrackDB.hasActiveSession ? TrackDB.hasActiveSession() : false);
+      }).catch(() => {});
     }
   }, [isFocused, isOperatorDesa]);
 
+  // Pull to refresh manual
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await Promise.all([
+      refetchMonitoring(),
+      refetchDesa(),
+      isOperatorDesa
+        ? PlacemarkDB.getAll().then((p) => setPlacemarkCount(p ? p.length : 0)).catch(() => {})
+        : Promise.resolve(),
+      isOperatorDesa
+        ? TrackDB.getAllTracks().then((t) => {
+            setTrackCount(t ? t.length : 0);
+            setHasActiveTrack(TrackDB.hasActiveSession ? TrackDB.hasActiveSession() : false);
+          }).catch(() => {})
+        : Promise.resolve(),
+    ]);
+    setIsRefreshing(false);
+  }, [refetchMonitoring, refetchDesa, isOperatorDesa]);
+
   // ================================================================
-  // 3. FILTER & SEARCH LOGIC
+  // 2. REACTIVE FILTER & SEARCH (INSTANT MEMOIZED)
   // ================================================================
-  const applyFilterAndSearch = (sourceData, query, statusFilter) => {
-    let result = sourceData;
-    if (statusFilter !== 'ALL') {
-      result = result.filter((item) => String(item.status_pengajuan) === String(statusFilter));
+  const filteredData = useMemo(() => {
+    let result = dataMonitoring;
+    if (activeFilter !== 'ALL') {
+      result = result.filter((item) => String(item.status_pengajuan) === String(activeFilter));
     }
-    if (query.trim() !== '') {
-      const q = query.toLowerCase().trim();
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (item) =>
           (item.nama_des_kel && item.nama_des_kel.toLowerCase().includes(q)) ||
           (item.nama_kecamatan && item.nama_kecamatan.toLowerCase().includes(q))
       );
     }
-    setFilteredData(result);
-  };
+    return result;
+  }, [dataMonitoring, activeFilter, searchQuery]);
+
+  const filteredDesaUsulan = useMemo(() => {
+    if (desaActiveFilter === 'ALL') return desaUsulanList;
+    return desaUsulanList.filter(
+      (item) => String(item.status_pengajuan ?? item.status) === String(desaActiveFilter)
+    );
+  }, [desaUsulanList, desaActiveFilter]);
 
   const handleSearch = (text) => {
     setSearchQuery(text);
-    applyFilterAndSearch(dataMonitoring, text, activeFilter);
   };
 
   const handleFilterChange = (status) => {
     setActiveFilter(status);
-    applyFilterAndSearch(dataMonitoring, searchQuery, status);
-  };
-
-  const applyDesaFilter = (sourceData, statusFilter) => {
-    let result = sourceData;
-    if (statusFilter !== 'ALL') {
-      result = result.filter((item) => String(item.status_pengajuan) === String(statusFilter));
-    }
-    setFilteredDesaUsulan(result);
   };
 
   const handleDesaFilterChange = (status) => {
     setDesaActiveFilter(status);
-    applyDesaFilter(desaUsulanList, status);
   };
 
   // Hentikan navigasi latar belakang
@@ -319,7 +238,7 @@ const Monitoring = ({ navigation }) => {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={() => fetchDesaActivity(true)}
+              onRefresh={onRefresh}
               colors={['#0284C7']}
               tintColor="#0284C7"
             />
@@ -664,7 +583,7 @@ const Monitoring = ({ navigation }) => {
               refreshControl={
                 <RefreshControl
                   refreshing={isRefreshing}
-                  onRefresh={() => getView(true)}
+                  onRefresh={onRefresh}
                   colors={['#0284C7']}
                   tintColor="#0284C7"
                 />

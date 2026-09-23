@@ -10,8 +10,9 @@ import {
 import DocumentPicker from 'react-native-document-picker';
 import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
+import { useImportedMapsQuery } from '../library/queries';
 import { uuidv4 } from '../library/uuid';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,16 +32,10 @@ const fmtSize = (bytes) => {
 const MapImporter = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
-  const [maps, setMaps] = useState([]);
+  const queryClient = useQueryClient();
+  const { data: maps = [] } = useImportedMapsQuery();
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState('');
-
-  const loadMaps = useCallback(async () => {
-    const raw = await AsyncStorage.getItem(KEY_MAPS);
-    setMaps(raw ? JSON.parse(raw) : []);
-  }, []);
-
-  useFocusEffect(useCallback(() => { loadMaps(); }, []));
 
   const handleImport = async () => {
     try {
@@ -117,7 +112,7 @@ const MapImporter = ({ navigation }) => {
 
       setImporting(false);
       setImportStatus('');
-      loadMaps();
+      queryClient.invalidateQueries({ queryKey: ['imported_maps'] });
       Alert.alert(
         '✅ Peta Diimpor',
         `"${mapMeta.nama}" berhasil ditambahkan.\nBuka di MapViewer untuk memuat.`,
@@ -146,7 +141,7 @@ const MapImporter = ({ navigation }) => {
         const raw = await AsyncStorage.getItem(KEY_MAPS);
         const list = raw ? JSON.parse(raw).filter(m => m.id !== map.id) : [];
         await AsyncStorage.setItem(KEY_MAPS, JSON.stringify(list));
-        loadMaps();
+        queryClient.invalidateQueries({ queryKey: ['imported_maps'] });
       }},
       { text: 'Batal', style: 'cancel' },
     ]);

@@ -17,10 +17,12 @@ import { useSelector } from 'react-redux';
 import { useIsFocused } from '@react-navigation/native';
 import moment from 'moment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQueryClient } from '@tanstack/react-query';
 import TabBar from '../components/TabBar';
 import AppHeader from '../components/AppHeader';
 
 const Usulan = ({ navigation, route }) => {
+  const queryClient = useQueryClient();
   const isFocused = useIsFocused();
   const TOKEN = useSelector((state) => state.TOKEN);
   const PROFILE = useSelector((state) => state.PROFILE);
@@ -128,6 +130,9 @@ const Usulan = ({ navigation, route }) => {
                 SET_USULAN((prev) => prev.filter((u) => u.id !== item.id));
                 const cacheKey = `@usulan_cache_${PROFILE?.id || 'user'}`;
                 await AsyncStorage.removeItem(cacheKey);
+                queryClient.invalidateQueries({ queryKey: ['desa_usulan'] });
+                queryClient.invalidateQueries({ queryKey: ['recent_activities'] });
+                queryClient.invalidateQueries({ queryKey: ['monitoring_list'] });
               } else {
                 Alert.alert('Gagal', 'Tidak dapat menghapus data usulan dari server.');
               }

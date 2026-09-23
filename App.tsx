@@ -9,6 +9,8 @@ import React, { useEffect, useState } from 'react';
 
 import { store } from './views/redux';
 import { Provider, useDispatch, useSelector } from 'react-redux';
+import { QueryClientProvider } from '@tanstack/react-query';
+import queryClient from './views/library/queryClient';
 import {SafeAreaView,ScrollView,StyleSheet,Text,TouchableOpacity,useColorScheme,View,} from 'react-native';
 
 import {Colors} from 'react-native/Libraries/NewAppScreen';
@@ -208,7 +210,9 @@ function App(): React.JSX.Element {
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <Provider store={store}>
-        <AppContent />
+        <QueryClientProvider client={queryClient}>
+          <AppContent />
+        </QueryClientProvider>
       </Provider>
     </SafeAreaProvider>
   );
