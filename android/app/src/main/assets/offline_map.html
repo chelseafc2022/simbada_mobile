@@ -10,6 +10,31 @@
     border-radius:20px; font-size:12px; font-family:monospace; }
   #pos-marker { width:16px; height:16px; background:#208DC0;
     border:3px solid #fff; border-radius:50%; box-shadow:0 0 8px rgba(32,141,192,0.8); }
+  .nav-target-wrapper { position: relative; width: 36px; height: 36px; }
+  .nav-target-pulse {
+    position: absolute; top: 0; left: 0; width: 36px; height: 36px;
+    border-radius: 50%; background: rgba(239, 68, 68, 0.45);
+    animation: navPulse 1.5s infinite ease-out;
+  }
+  @keyframes navPulse {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  .nav-target-core {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+  }
+  .custom-popup .leaflet-popup-content-wrapper {
+    background: #1E293B; color: #F8FAFC; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  }
+  .custom-popup .leaflet-popup-tip { background: #1E293B; }
+  .popup-btn {
+    display: block; width: 100%; margin-top: 8px; background: #06B6D4; color: #fff;
+    font-weight: bold; font-size: 11px; padding: 7px 12px; border-radius: 6px;
+    border: none; cursor: pointer; text-align: center;
+  }
+  .popup-btn:active { background: #0891B2; }
 </style>
 <link rel="stylesheet" href="leaflet.css"/>
 <script src="leaflet.js"></script>
@@ -141,6 +166,13 @@ function handleRNMessage(e) {
     if (msg.type === 'LOAD_GEOPDF') loadGeoPDF(msg.base64, msg.name);
     if (msg.type === 'UPDATE_POSITION') updatePosition(msg.lat, msg.lon);
     if (msg.type === 'FLY_TO') map.setView([msg.lat, msg.lon], msg.zoom || 15);
+    if (msg.type === 'SET_DRAW_MODE') setDrawMode(msg.mode);
+    if (msg.type === 'ADD_GPS_POINT') addGpsPoint(msg.lat, msg.lon);
+    if (msg.type === 'UNDO_POINT') undoPoint();
+    if (msg.type === 'CLEAR_DRAWING') clearActiveDrawing();
+    if (msg.type === 'SET_NAV_TARGET') setNavTarget(msg.lat, msg.lon);
+    if (msg.type === 'STOP_NAV') stopNavigation();
+    if (msg.type === 'LOAD_LAYERS') loadLayers(msg.layers);
   } catch(err) { console.error('Msg parse error:', err); }
 }
 
@@ -476,11 +508,342 @@ async function loadGeoPDF(base64, name) {
   }
 }
 
+var drawMode = 'NONE'; // 'NONE' | 'POLYGON' | 'POLYLINE' | 'NAV_TARGET'
+var activePoints = []; // array of { lat: number, lon: number, marker: L.CircleMarker }
+var activeShape = null; // L.Polygon or L.Polyline
+var savedLayersGroup = L.layerGroup().addTo(map);
+var navGroup = L.layerGroup().addTo(map);
+var navTarget = null; // { lat: number, lon: number }
+var navLine = null; // L.Polyline
+var navMarker = null; // L.Marker
+var userPos = null; // { lat: number, lon: number }
+
 function updatePosition(lat, lon) {
+  userPos = { lat: lat, lon: lon };
   if (posMarker) posMarker.remove();
   posMarker = L.marker([lat, lon], {
     icon: L.divIcon({ className:'', html:'<div id="pos-marker"></div>', iconSize:[16,16], iconAnchor:[8,8] })
   }).addTo(map);
+
+  if (navTarget) {
+    updateNavLine();
+  }
+}
+
+// -------------------------------------------------------------
+// GEODESIC & SPHERICAL CALCULATIONS (WGS84)
+// -------------------------------------------------------------
+function calcHaversineDistance(lat1, lon1, lat2, lon2) {
+  var R = 6378137;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function calcBearing(lat1, lon1, lat2, lon2) {
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+  var x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+          Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+  var brng = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  return Math.round(brng);
+}
+
+function calcPolygonMetrics(points) {
+  if (!points || points.length < 3) {
+    return { areaM2: 0, areaHa: 0, perimeterM: 0 };
+  }
+  var R = 6378137;
+  var totalArea = 0;
+  var totalPerim = 0;
+  var len = points.length;
+  for (var i = 0; i < len; i++) {
+    var p1 = points[i];
+    var p2 = points[(i + 1) % len];
+    var lat1 = p1.lat * Math.PI / 180;
+    var lat2 = p2.lat * Math.PI / 180;
+    var lon1 = p1.lon * Math.PI / 180;
+    var lon2 = p2.lon * Math.PI / 180;
+    totalArea += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+    totalPerim += calcHaversineDistance(p1.lat, p1.lon, p2.lat, p2.lon);
+  }
+  var areaM2 = Math.abs(totalArea * R * R / 2.0);
+  var areaHa = areaM2 / 10000.0;
+  return {
+    areaM2: Math.round(areaM2 * 100) / 100,
+    areaHa: Math.round(areaHa * 10000) / 10000,
+    perimeterM: Math.round(totalPerim * 10) / 10
+  };
+}
+
+function calcPolylineMetrics(points) {
+  if (!points || points.length < 2) return { lengthM: 0 };
+  var len = 0;
+  for (var i = 0; i < points.length - 1; i++) {
+    len += calcHaversineDistance(points[i].lat, points[i].lon, points[i + 1].lat, points[i + 1].lon);
+  }
+  return { lengthM: Math.round(len * 10) / 10 };
+}
+
+// -------------------------------------------------------------
+// MAP CLICK & DRAWING
+// -------------------------------------------------------------
+map.on('click', function(e) {
+  var lat = e.latlng.lat;
+  var lon = e.latlng.lng;
+  if (drawMode === 'POLYGON' || drawMode === 'POLYLINE') {
+    addVertex(lat, lon);
+  } else if (drawMode === 'NAV_TARGET') {
+    setNavTarget(lat, lon);
+  }
+});
+
+function setDrawMode(mode) {
+  drawMode = mode || 'NONE';
+  if (drawMode === 'NONE') {
+    clearActiveDrawing();
+  }
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'MODE_CHANGED',
+      mode: drawMode
+    }));
+  }
+}
+
+function addVertex(lat, lon) {
+  var markerColor = drawMode === 'POLYGON' ? '#06B6D4' : '#F59E0B';
+  var vMarker = L.circleMarker([lat, lon], {
+    radius: 6,
+    color: markerColor,
+    fillColor: '#FFFFFF',
+    fillOpacity: 1,
+    weight: 2
+  }).addTo(map);
+
+  activePoints.push({ lat: lat, lon: lon, marker: vMarker });
+
+  var latLngs = activePoints.map(function(p) { return [p.lat, p.lon]; });
+
+  if (drawMode === 'POLYGON') {
+    if (!activeShape) {
+      activeShape = L.polygon(latLngs, {
+        color: '#06B6D4',
+        fillColor: '#06B6D4',
+        fillOpacity: 0.35,
+        weight: 3
+      }).addTo(map);
+    } else {
+      activeShape.setLatLngs(latLngs);
+    }
+    var metrics = calcPolygonMetrics(activePoints);
+    sendDrawingUpdate('POLYGON', metrics);
+  } else if (drawMode === 'POLYLINE') {
+    if (!activeShape) {
+      activeShape = L.polyline(latLngs, {
+        color: '#F59E0B',
+        weight: 4,
+        dashArray: '6, 6'
+      }).addTo(map);
+    } else {
+      activeShape.setLatLngs(latLngs);
+    }
+    var metrics = calcPolylineMetrics(activePoints);
+    sendDrawingUpdate('POLYLINE', metrics);
+  }
+}
+
+function addGpsPoint(lat, lon) {
+  if (typeof lat === 'number' && typeof lon === 'number') {
+    addVertex(lat, lon);
+  } else if (userPos) {
+    addVertex(userPos.lat, userPos.lon);
+  }
+}
+
+function undoPoint() {
+  if (!activePoints.length) return;
+  var last = activePoints.pop();
+  if (last && last.marker) last.marker.remove();
+
+  var latLngs = activePoints.map(function(p) { return [p.lat, p.lon]; });
+  if (activeShape) {
+    if (activePoints.length === 0) {
+      activeShape.remove();
+      activeShape = null;
+    } else {
+      activeShape.setLatLngs(latLngs);
+    }
+  }
+
+  if (drawMode === 'POLYGON') {
+    var metrics = calcPolygonMetrics(activePoints);
+    sendDrawingUpdate('POLYGON', metrics);
+  } else if (drawMode === 'POLYLINE') {
+    var metrics = calcPolylineMetrics(activePoints);
+    sendDrawingUpdate('POLYLINE', metrics);
+  }
+}
+
+function clearActiveDrawing() {
+  for (var i = 0; i < activePoints.length; i++) {
+    if (activePoints[i].marker) activePoints[i].marker.remove();
+  }
+  activePoints = [];
+  if (activeShape) {
+    activeShape.remove();
+    activeShape = null;
+  }
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'DRAWING_CLEARED'
+    }));
+  }
+}
+
+function sendDrawingUpdate(mode, metrics) {
+  var coords = activePoints.map(function(p) { return { lat: p.lat, lon: p.lon }; });
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'DRAWING_UPDATE',
+      mode: mode,
+      pointsCount: activePoints.length,
+      coordinates: coords,
+      areaM2: metrics.areaM2 || 0,
+      areaHa: metrics.areaHa || 0,
+      perimeterM: metrics.perimeterM || 0,
+      lengthM: metrics.lengthM || 0
+    }));
+  }
+}
+
+// -------------------------------------------------------------
+// NAVIGATION TO TARGET POINT
+// -------------------------------------------------------------
+function setNavTarget(lat, lon) {
+  navTarget = { lat: lat, lon: lon };
+  navGroup.clearLayers();
+
+  var targetIcon = L.divIcon({
+    className: 'nav-target-wrapper',
+    html: '<div class="nav-target-pulse"></div><div class="nav-target-core">🎯</div>',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
+  });
+
+  navMarker = L.marker([lat, lon], { icon: targetIcon }).addTo(navGroup);
+  updateNavLine();
+}
+
+function updateNavLine() {
+  if (!navTarget) return;
+
+  var dist = null;
+  var bearing = null;
+
+  if (userPos) {
+    var latLngs = [[userPos.lat, userPos.lon], [navTarget.lat, navTarget.lon]];
+    if (!navLine) {
+      navLine = L.polyline(latLngs, {
+        color: '#10B981',
+        weight: 4,
+        dashArray: '8, 8',
+        opacity: 0.95
+      }).addTo(navGroup);
+    } else {
+      navLine.setLatLngs(latLngs);
+    }
+
+    dist = Math.round(calcHaversineDistance(userPos.lat, userPos.lon, navTarget.lat, navTarget.lon));
+    bearing = calcBearing(userPos.lat, userPos.lon, navTarget.lat, navTarget.lon);
+  }
+
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'NAV_UPDATE',
+      target: navTarget,
+      distance: dist,
+      bearing: bearing
+    }));
+  }
+}
+
+function stopNavigation() {
+  navTarget = null;
+  navGroup.clearLayers();
+  navLine = null;
+  navMarker = null;
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'NAV_STOPPED'
+    }));
+  }
+}
+
+// -------------------------------------------------------------
+// SAVED LAYERS (POLYGONS & POLYLINES) OVERLAY
+// -------------------------------------------------------------
+function loadLayers(layers) {
+  savedLayersGroup.clearLayers();
+  if (!Array.isArray(layers)) return;
+
+  layers.forEach(function(l) {
+    if (!l.visible) return;
+    var coords = (l.coordinates || []).map(function(c) { return [c.lat, c.lon]; });
+    if (!coords.length) return;
+
+    if (l.type === 'polygon' && coords.length >= 3) {
+      var poly = L.polygon(coords, {
+        color: l.color || '#06B6D4',
+        fillColor: l.color || '#06B6D4',
+        fillOpacity: 0.25,
+        weight: 2.5
+      }).addTo(savedLayersGroup);
+
+      // Centroid untuk navigasi
+      var latSum = 0, lonSum = 0;
+      for (var i = 0; i < coords.length; i++) {
+        latSum += coords[i][0];
+        lonSum += coords[i][1];
+      }
+      var cLat = latSum / coords.length;
+      var cLon = lonSum / coords.length;
+
+      var popupHtml = '<div style="font-family:sans-serif;font-size:13px;line-height:1.5;">' +
+        '<b style="font-size:14px;color:#38BDF8;">' + (l.name || 'Bidang Poligon') + '</b><br/>' +
+        (l.notes ? '<span style="color:#94A3B8;">' + l.notes + '</span><br/>' : '') +
+        '<div style="margin-top:6px;padding:6px;background:rgba(255,255,255,0.05);border-radius:6px;">' +
+        '📐 Luas: <b>' + (l.areaM2 ? l.areaM2.toLocaleString('id-ID') : '0') + ' m²</b> (' + (l.areaHa || 0) + ' ha)<br/>' +
+        '📏 Keliling: <b>' + (l.perimeterM ? l.perimeterM.toLocaleString('id-ID') : '0') + ' m</b>' +
+        '</div>' +
+        '<button onclick="setNavTarget(' + cLat + ',' + cLon + ')" class="popup-btn">🎯 Navigasi ke Titik Tengah</button>' +
+        '</div>';
+
+      poly.bindPopup(popupHtml, { className: 'custom-popup' });
+    } else if (l.type === 'polyline' && coords.length >= 2) {
+      var line = L.polyline(coords, {
+        color: l.color || '#F59E0B',
+        weight: 3.5,
+        dashArray: '5, 5'
+      }).addTo(savedLayersGroup);
+
+      var p1 = coords[0];
+      var popupHtml = '<div style="font-family:sans-serif;font-size:13px;line-height:1.5;">' +
+        '<b style="font-size:14px;color:#FBBF24;">' + (l.name || 'Garis Polyline') + '</b><br/>' +
+        (l.notes ? '<span style="color:#94A3B8;">' + l.notes + '</span><br/>' : '') +
+        '<div style="margin-top:6px;padding:6px;background:rgba(255,255,255,0.05);border-radius:6px;">' +
+        '📏 Panjang: <b>' + (l.lengthM >= 1000 ? (l.lengthM / 1000).toFixed(2) + ' km' : (l.lengthM || 0) + ' m') + '</b>' +
+        '</div>' +
+        '<button onclick="setNavTarget(' + p1[0] + ',' + p1[1] + ')" class="popup-btn">🎯 Navigasi ke Titik Awal</button>' +
+        '</div>';
+
+      line.bindPopup(popupHtml, { className: 'custom-popup' });
+    }
+  });
 }
 </script>
 </body>
