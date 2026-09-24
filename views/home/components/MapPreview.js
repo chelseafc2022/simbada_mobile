@@ -144,6 +144,9 @@ const MapContent = React.memo(({
   showPlacemarks,
   placemarks,
   navTarget,
+  navIsTracking,
+  navTargetName,
+  navDistance,
   currentNavPos,
   handleMapPress,
   handlePolygonPress,
@@ -261,10 +264,16 @@ const MapContent = React.memo(({
         );
       })}
 
-      {/* Navigasi: Rute Titik Putus-Putus & Marker Target 🎯 */}
-      {navTarget && isValidCoord(navTarget) && (
+      {/* Navigasi: Rute Titik Putus-Putus & Marker Target 🎯 HANYA JIKA NAVIGASI AKTIF */}
+      {navIsTracking && navTarget && isValidCoord(navTarget) && (
         <>
-          <Marker coordinate={navTarget} title="Target Navigasi" anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false}>
+          <Marker
+            coordinate={navTarget}
+            title={navTargetName || "Target Navigasi"}
+            description={navDistance ? `Jarak: ${fmtM(Math.round(navDistance))}` : 'Target Navigasi'}
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
+          >
             <View style={styles.navTargetPin}>
               <Text style={styles.navTargetEmoji}>🎯</Text>
             </View>
@@ -273,7 +282,7 @@ const MapContent = React.memo(({
             <Polyline
               coordinates={[currentNavPos, navTarget]}
               strokeColor={C_NAV_ACCENT}
-              strokeWidth={3}
+              strokeWidth={3.5}
               lineDashPattern={[8, 6]}
               zIndex={6}
             />
@@ -370,12 +379,22 @@ const MapPreview = ({
             return prev;
           });
         }
+        if (s.targetLat && s.targetLng) {
+          setNavTargetLat(s.targetLat.toFixed(6));
+          setNavTargetLng(s.targetLng.toFixed(6));
+          if (s.targetName) setNavTargetName(s.targetName);
+        }
         // Filter deadband agar re-render tidak meledak
         setNavDistance((prev) => (Math.abs((prev || 0) - (s.distance || 0)) > 0.5 ? s.distance || 0 : prev));
         setNavBearing((prev) => (Math.abs((prev || 0) - (s.bearing || 0)) > 0.5 ? s.bearing || 0 : prev));
         setNavHeading((prev) => (Math.abs((prev || 0) - (s.heading || 0)) > 1.5 ? s.heading || 0 : prev));
       } else {
-        setNavIsTracking((prev) => (prev ? false : prev));
+        setNavIsTracking(false);
+        setNavTargetLat('');
+        setNavTargetLng('');
+        setNavTargetName('');
+        setNavDistance(0);
+        setNavBearing(0);
       }
     });
 
@@ -423,8 +442,15 @@ const MapPreview = ({
   };
 
   const stopNavigation = async () => {
-    await NavigasiService.stopNavigation();
+    try {
+      await NavigasiService.stopNavigation();
+    } catch (e) {}
     setNavIsTracking(false);
+    setNavTargetLat('');
+    setNavTargetLng('');
+    setNavTargetName('');
+    setNavDistance(0);
+    setNavBearing(0);
   };
 
   // Smart Overlay: Sembunyikan peta dasar jika desa tersebut sudah ada di peta final
@@ -639,7 +665,10 @@ const MapPreview = ({
     drawPoints,
     showPlacemarks,
     placemarks,
-    navTarget: parsedNavTarget,
+    navIsTracking,
+    navTarget: navIsTracking ? parsedNavTarget : null,
+    navTargetName: navIsTracking ? navTargetName : '',
+    navDistance: navIsTracking ? navDistance : 0,
     currentNavPos: navCurrentPos,
     handleMapPress,
     handlePolygonPress,
@@ -801,19 +830,59 @@ const MapPreview = ({
           </View>
         )}
 
-        {/* NAVIGASI MINI BADGE */}
+        {/* BANNER NAVIGASI SEDANG BERLANGSUNG (INLINE MAP) */}
         {navIsTracking && parsedNavTarget && (
-          <TouchableOpacity style={styles.navBadge} onPress={() => setShowNavPanel(true)} activeOpacity={0.85}>
-            <Text style={styles.navBadgeIcon}>🧭</Text>
-            <View>
-              <Text style={styles.navBadgeDist}>{fmtM(Math.round(navDistance))}</Text>
-              <Text style={styles.navBadgeDir}>{getDir(navBearing)} · {Math.round(navBearing)}°</Text>
+          <View style={styles.activeNavBanner}>
+            <TouchableOpacity
+              style={styles.activeNavContent}
+              onPress={() => setShowNavPanel(true)}
+              activeOpacity={0.88}
+            >
+              <View style={styles.activeNavHeaderRow}>
+                <View style={styles.activeNavPulseDot} />
+                <Text style={styles.activeNavBadgeTitle}>NAVIGASI AKTIF</Text>
+                <Text style={styles.activeNavTargetName} numberOfLines={1}>
+                  {navTargetName || `Target (${parsedNavTarget.latitude.toFixed(4)}, ${parsedNavTarget.longitude.toFixed(4)})`}
+                </Text>
+              </View>
+              <View style={styles.activeNavMetricsRow}>
+                <View style={styles.activeNavMetricItem}>
+                  <Text style={styles.activeNavMetricVal}>{fmtM(Math.round(navDistance))}</Text>
+                  <Text style={styles.activeNavMetricLbl}>Jarak</Text>
+                </View>
+                <View style={styles.activeNavDivider} />
+                <View style={styles.activeNavMetricItem}>
+                  <Text style={styles.activeNavMetricVal}>{Math.round(navBearing)}° {getDir(navBearing)}</Text>
+                  <Text style={styles.activeNavMetricLbl}>Arah</Text>
+                </View>
+                <View style={styles.activeNavDivider} />
+                <View style={styles.activeNavMetricItem}>
+                  <Text style={styles.activeNavMetricVal}>~{Math.max(1, Math.round(navDistance / 75))} mnt</Text>
+                  <Text style={styles.activeNavMetricLbl}>Waktu</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.activeNavActionCol}>
+              <TouchableOpacity
+                style={styles.activeNavCompassBtn}
+                onPress={() => setShowNavPanel(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.activeNavCompassTxt}>🧭 Kompas</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.activeNavStopBtn}
+                onPress={stopNavigation}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.activeNavStopTxt}>⏹ Hentikan</Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         )}
 
-        {/* INFO WILAYAH (BOTTOM-LEFT) */}
-        {bottomCardTitle && (
+        {/* INFO WILAYAH (BOTTOM-LEFT) — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+        {!navIsTracking && bottomCardTitle && (
           <TouchableOpacity
             style={styles.bottomLeftCard}
             onPress={() => { if (onDetailPolygonPress) onDetailPolygonPress(activePolygon || { nama: bottomCardTitle }); }}
@@ -827,8 +896,8 @@ const MapPreview = ({
           </TouchableOpacity>
         )}
 
-        {/* LEGENDA */}
-        {(parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
+        {/* LEGENDA — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+        {!navIsTracking && (parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
           <View style={styles.legendCard}>
             {parsedFinalPolygons.length > 0 && (
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_FINAL_STROKE }]} /><Text style={styles.legendText}>Final ({parsedFinalPolygons.length})</Text></View>
@@ -842,15 +911,17 @@ const MapPreview = ({
           </View>
         )}
 
-        {/* SCALE BAR */}
-        <View style={styles.scaleBarContainer}>
-          <Text style={styles.scaleText}>0      5      10 km</Text>
-          <View style={styles.scaleRuler}>
-            <View style={styles.rulerSegmentWhite} />
-            <View style={styles.rulerSegmentBlack} />
-            <View style={styles.rulerSegmentWhite} />
+        {/* SCALE BAR — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+        {!navIsTracking && (
+          <View style={styles.scaleBarContainer}>
+            <Text style={styles.scaleText}>0      5      10 km</Text>
+            <View style={styles.scaleRuler}>
+              <View style={styles.rulerSegmentWhite} />
+              <View style={styles.rulerSegmentBlack} />
+              <View style={styles.rulerSegmentWhite} />
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -964,18 +1035,71 @@ const MapPreview = ({
             </View>
           )}
 
-          {/* Scale Bar Fullscreen */}
-          <View style={[styles.scaleBarContainer, { bottom: 30 }]}>
-            <Text style={styles.scaleText}>0      5      10 km</Text>
-            <View style={styles.scaleRuler}>
-              <View style={styles.rulerSegmentWhite} />
-              <View style={styles.rulerSegmentBlack} />
-              <View style={styles.rulerSegmentWhite} />
+          {/* BANNER NAVIGASI SEDANG BERLANGSUNG (FULLSCREEN MAP) */}
+          {navIsTracking && parsedNavTarget && (
+            <View style={[styles.activeNavBanner, styles.activeNavBannerFs]}>
+              <TouchableOpacity
+                style={styles.activeNavContent}
+                onPress={() => setShowNavPanel(true)}
+                activeOpacity={0.88}
+              >
+                <View style={styles.activeNavHeaderRow}>
+                  <View style={styles.activeNavPulseDot} />
+                  <Text style={styles.activeNavBadgeTitle}>NAVIGASI AKTIF</Text>
+                  <Text style={styles.activeNavTargetName} numberOfLines={1}>
+                    {navTargetName || `Target (${parsedNavTarget.latitude.toFixed(4)}, ${parsedNavTarget.longitude.toFixed(4)})`}
+                  </Text>
+                </View>
+                <View style={styles.activeNavMetricsRow}>
+                  <View style={styles.activeNavMetricItem}>
+                    <Text style={styles.activeNavMetricVal}>{fmtM(Math.round(navDistance))}</Text>
+                    <Text style={styles.activeNavMetricLbl}>Jarak</Text>
+                  </View>
+                  <View style={styles.activeNavDivider} />
+                  <View style={styles.activeNavMetricItem}>
+                    <Text style={styles.activeNavMetricVal}>{Math.round(navBearing)}° {getDir(navBearing)}</Text>
+                    <Text style={styles.activeNavMetricLbl}>Arah</Text>
+                  </View>
+                  <View style={styles.activeNavDivider} />
+                  <View style={styles.activeNavMetricItem}>
+                    <Text style={styles.activeNavMetricVal}>~{Math.max(1, Math.round(navDistance / 75))} mnt</Text>
+                    <Text style={styles.activeNavMetricLbl}>Waktu</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+              <View style={styles.activeNavActionCol}>
+                <TouchableOpacity
+                  style={styles.activeNavCompassBtn}
+                  onPress={() => setShowNavPanel(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.activeNavCompassTxt}>🧭 Kompas</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.activeNavStopBtn}
+                  onPress={stopNavigation}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.activeNavStopTxt}>⏹ Hentikan</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* Bottom Card Fullscreen */}
-          {bottomCardTitle && (
+          {/* Scale Bar Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+          {!navIsTracking && (
+            <View style={[styles.scaleBarContainer, { bottom: 30 }]}>
+              <Text style={styles.scaleText}>0      5      10 km</Text>
+              <View style={styles.scaleRuler}>
+                <View style={styles.rulerSegmentWhite} />
+                <View style={styles.rulerSegmentBlack} />
+                <View style={styles.rulerSegmentWhite} />
+              </View>
+            </View>
+          )}
+
+          {/* Bottom Card Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+          {!navIsTracking && bottomCardTitle && (
             <TouchableOpacity style={[styles.bottomLeftCard, { bottom: 30 }]} onPress={() => { if (onDetailPolygonPress) onDetailPolygonPress(activePolygon); }} activeOpacity={0.88}>
               <View style={styles.bottomCardContent}>
                 <Text style={styles.bottomCardTitle} numberOfLines={1}>{bottomCardTitle}</Text>
@@ -985,8 +1109,8 @@ const MapPreview = ({
             </TouchableOpacity>
           )}
 
-          {/* Legenda Fullscreen */}
-          {(parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
+          {/* Legenda Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+          {!navIsTracking && (parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
             <View style={[styles.legendCard, { bottom: 30, right: 80 }]}>
               {parsedFinalPolygons.length > 0 && <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_FINAL_STROKE }]} /><Text style={styles.legendText}>Final ({parsedFinalPolygons.length})</Text></View>}
               {parsedDasarPolygons.length > 0 && <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_DASAR_STROKE }]} /><Text style={styles.legendText}>Dasar ({parsedDasarPolygons.length})</Text></View>}
@@ -1292,18 +1416,117 @@ const styles = StyleSheet.create({
   drawHintText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   drawPointDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C_DRAW_STROKE, borderWidth: 2, borderColor: '#FFFFFF' },
 
-  // NAV BADGE (mini indikator saat navigasi aktif di peta)
-  navBadge: {
-    position: 'absolute', bottom: 65, left: 12, zIndex: 20,
-    backgroundColor: 'rgba(14,165,233,0.95)', borderRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 7,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-    shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 4,
+  // ACTIVE NAVIGATION FLOATING BANNER
+  activeNavBanner: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 25,
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 8,
   },
-  navBadgeIcon: { fontSize: 16 },
-  navBadgeDist: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  navBadgeDir: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600', marginTop: 1 },
+  activeNavBannerFs: {
+    bottom: Platform.OS === 'ios' ? 34 : 20,
+    left: 14,
+    right: 14,
+  },
+  activeNavContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  activeNavHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  activeNavPulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginRight: 6,
+  },
+  activeNavBadgeTitle: {
+    color: '#38BDF8',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    marginRight: 6,
+  },
+  activeNavTargetName: {
+    color: '#F8FAFC',
+    fontSize: 11,
+    fontWeight: '700',
+    flex: 1,
+  },
+  activeNavMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activeNavMetricItem: {
+    alignItems: 'center',
+  },
+  activeNavMetricVal: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  activeNavMetricLbl: {
+    color: '#94A3B8',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  activeNavDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginHorizontal: 8,
+  },
+  activeNavActionCol: {
+    flexDirection: 'column',
+    gap: 4,
+    justifyContent: 'center',
+  },
+  activeNavCompassBtn: {
+    backgroundColor: 'rgba(2,132,199,0.3)',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+  },
+  activeNavCompassTxt: {
+    color: '#38BDF8',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  activeNavStopBtn: {
+    backgroundColor: 'rgba(239,68,68,0.25)',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  activeNavStopTxt: {
+    color: '#FCA5A5',
+    fontSize: 10,
+    fontWeight: '800',
+  },
 
   placemarkBubble: {
     width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFFFFF',
