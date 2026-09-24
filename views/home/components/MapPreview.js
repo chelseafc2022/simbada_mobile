@@ -830,54 +830,32 @@ const MapPreview = ({
           </View>
         )}
 
-        {/* BANNER NAVIGASI SEDANG BERLANGSUNG (INLINE MAP) */}
+        {/* BADGE NAVIGASI RINGKAS (INLINE MAP — TIDAK MENUTUPI TOMBOL KANAN) */}
         {navIsTracking && parsedNavTarget && (
-          <View style={styles.activeNavBanner}>
+          <View style={styles.inlineNavCard}>
             <TouchableOpacity
-              style={styles.activeNavContent}
+              style={styles.inlineNavContent}
               onPress={() => setShowNavPanel(true)}
-              activeOpacity={0.88}
+              activeOpacity={0.85}
             >
-              <View style={styles.activeNavHeaderRow}>
+              <View style={styles.inlineNavTopRow}>
                 <View style={styles.activeNavPulseDot} />
-                <Text style={styles.activeNavBadgeTitle}>NAVIGASI AKTIF</Text>
-                <Text style={styles.activeNavTargetName} numberOfLines={1}>
-                  {navTargetName || `Target (${parsedNavTarget.latitude.toFixed(4)}, ${parsedNavTarget.longitude.toFixed(4)})`}
-                </Text>
+                <Text style={styles.inlineNavTitle}>NAVIGASI AKTIF</Text>
+                <Text style={styles.inlineNavDist}>{fmtM(Math.round(navDistance))}</Text>
+                <Text style={styles.inlineNavDir}>({getDir(navBearing)})</Text>
               </View>
-              <View style={styles.activeNavMetricsRow}>
-                <View style={styles.activeNavMetricItem}>
-                  <Text style={styles.activeNavMetricVal}>{fmtM(Math.round(navDistance))}</Text>
-                  <Text style={styles.activeNavMetricLbl}>Jarak</Text>
-                </View>
-                <View style={styles.activeNavDivider} />
-                <View style={styles.activeNavMetricItem}>
-                  <Text style={styles.activeNavMetricVal}>{Math.round(navBearing)}° {getDir(navBearing)}</Text>
-                  <Text style={styles.activeNavMetricLbl}>Arah</Text>
-                </View>
-                <View style={styles.activeNavDivider} />
-                <View style={styles.activeNavMetricItem}>
-                  <Text style={styles.activeNavMetricVal}>~{Math.max(1, Math.round(navDistance / 75))} mnt</Text>
-                  <Text style={styles.activeNavMetricLbl}>Waktu</Text>
-                </View>
-              </View>
+              <Text style={styles.inlineNavSub} numberOfLines={1}>
+                {navTargetName || `Target (${parsedNavTarget.latitude.toFixed(4)}, ${parsedNavTarget.longitude.toFixed(4)})`}
+              </Text>
             </TouchableOpacity>
-            <View style={styles.activeNavActionCol}>
-              <TouchableOpacity
-                style={styles.activeNavCompassBtn}
-                onPress={() => setShowNavPanel(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.activeNavCompassTxt}>🧭 Kompas</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.activeNavStopBtn}
-                onPress={stopNavigation}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.activeNavStopTxt}>⏹ Hentikan</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.inlineNavStopBtn}
+              onPress={stopNavigation}
+              activeOpacity={0.8}
+              accessibilityLabel="Hentikan Navigasi"
+            >
+              <Text style={styles.inlineNavStopTxt}>⏹</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1416,7 +1394,75 @@ const styles = StyleSheet.create({
   drawHintText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   drawPointDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C_DRAW_STROKE, borderWidth: 2, borderColor: '#FFFFFF' },
 
-  // ACTIVE NAVIGATION FLOATING BANNER
+  // INLINE COMPACT NAVIGATION BADGE (MAKS 70% AGAR TOMBOL KANAN TIDAK TERTUTUP)
+  inlineNavCard: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    maxWidth: '70%',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 25,
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  inlineNavContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  inlineNavTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  inlineNavTitle: {
+    color: '#38BDF8',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  inlineNavDist: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  inlineNavDir: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  inlineNavSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  inlineNavStopBtn: {
+    backgroundColor: 'rgba(239,68,68,0.25)',
+    borderRadius: 8,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  inlineNavStopTxt: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  // FULLSCREEN FLOATING BANNER (DI ATAS BOTTOM BAR HP)
   activeNavBanner: {
     position: 'absolute',
     bottom: 10,
@@ -1438,7 +1484,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   activeNavBannerFs: {
-    bottom: Platform.OS === 'ios' ? 34 : 20,
+    bottom: Platform.OS === 'android' ? 68 : 44,
     left: 14,
     right: 14,
   },
