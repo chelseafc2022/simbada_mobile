@@ -18,8 +18,10 @@ import GpsService from '../library/GpsService';
 import {
   useKecamatanQuery,
   usePetaFinalCountQuery,
+  usePetaFinalAllQuery,
   usePetadasarKecamatanQuery,
   useRecentActivitiesQuery,
+  useAllPlacemarksQuery,
 } from '../library/queries';
 
 // Modular Home V2 Components (Modern Government GIS + Field Survey)
@@ -71,6 +73,11 @@ const Home = ({ navigation }) => {
   const { data: DATA_FINAL = 0, isLoading: isFinalLoading } = usePetaFinalCountQuery(TOKEN, URL);
   const { data: rawPetadasar = [], isLoading: isPolygonLoading } = usePetadasarKecamatanQuery(TOKEN, URL, selectedKecamatan);
   const { data: rawActivities = [], isLoading: isActivitiesLoading } = useRecentActivitiesQuery(TOKEN, URL, PROFILE);
+  // Peta final semua desa (untuk smart overlay: sembunyikan peta dasar jika ada peta final)
+  const { data: petaFinalAll = [] } = usePetaFinalAllQuery(TOKEN, URL);
+  // Placemark milik sendiri + publik
+  const userId = PROFILE?.id || null;
+  const { data: allPlacemarks = [] } = useAllPlacemarksQuery(userId);
 
   // Memoize formatted polygons untuk menghindari hitung ulang luas & filter koordinat
   const petadasar = useMemo(() => {
@@ -426,6 +433,8 @@ const Home = ({ navigation }) => {
         <MapPreview
           mapRef={mapRef}
           polygons={petadasar}
+          petaFinalAll={petaFinalAll}
+          placemarks={allPlacemarks}
           isLoading={isPolygonLoading}
           selectedKecamatanName={currentKecamatanName}
           userLocation={userLocation}

@@ -425,3 +425,20 @@ export const useImportedMapsQuery = () => {
     staleTime: 10 * 60 * 1000,
   });
 };
+
+// ── 11. Query Semua Placemark (Milik User + Publik) untuk peta Home ──────────
+export const useAllPlacemarksQuery = (userId) => {
+  return useQuery({
+    queryKey: ['all_placemarks', userId],
+    queryFn: async () => {
+      try {
+        const all = await PlacemarkDB.getAllWithPublic(userId);
+        return Array.isArray(all) ? all : [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: Boolean(userId),
+    staleTime: 2 * 60 * 1000,
+  });
+};
