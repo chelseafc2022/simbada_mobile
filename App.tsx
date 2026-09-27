@@ -11,11 +11,7 @@ import { store } from './views/redux';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from './views/library/queryClient';
-import {SafeAreaView,ScrollView,StyleSheet,Text,TouchableOpacity,useColorScheme,View,} from 'react-native';
-
-import {Colors} from 'react-native/Libraries/NewAppScreen';
-
-import { NavigationContainer, createStaticNavigation, useNavigation } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -24,6 +20,7 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 // === Existing Screens ===
 import Home from "./views/home/Home";
 import Login from "./views/auth/Login";
+import GuestMap from "./views/guest/GuestMap";
 import Monitoring from "./views/monitoring/Monitoring";
 import Zona from "./views/monitoring/Zona";
 import Perbandingan from "./views/monitoring/Perbandingan";
@@ -139,13 +136,14 @@ const AppContent = () => {
       if (unsubNotif) unsubNotif();
       if (unsubNotifeeForeground) unsubNotifeeForeground();
     };
-  }, []);
+  }, [dispatch]);
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {/* Auth */}
+        {/* Auth & Guest */}
         <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="GuestMap" component={GuestMap} />
         <Stack.Screen name="Home" component={Home} />
         
         {/* Monitoring */}
@@ -205,8 +203,6 @@ const AppContent = () => {
 };
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <Provider store={store}>
@@ -217,9 +213,5 @@ function App(): React.JSX.Element {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  
-});
 
 export default App;

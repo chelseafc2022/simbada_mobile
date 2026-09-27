@@ -22,6 +22,7 @@ const initialState = {
         URL_APP: URL,
         URL_APPX: URLX,
         LOGIN_URL: URL + "auth/login",
+        GUEST_URL: URL + "auth/guest",
         URL_LIST_MONITORING : URL + "api/v1/monitoring/",
         URL_HOME : URL + "api/v1/web_home/",
         URL_KECAMATAN : URL + "api/v1/petadasarnew/",
@@ -37,6 +38,7 @@ const initialState = {
 
 
     AUTH_STAT : false,
+    IS_GUEST  : false,
     TOKEN   : '',
     PROFILE: null,
 
@@ -68,11 +70,19 @@ const initialState = {
 const reducer = (state = initialState, action = {}) => {
   switch (action.type) {
     case 'SET_TOKEN':
-      return { ...state, TOKEN: action.payload, AUTH_STAT: true };
+      return { ...state, TOKEN: action.payload, AUTH_STAT: true, IS_GUEST: false };
     case 'SET_PROFILE':
       return { ...state, PROFILE: action.payload };
+    case 'SET_GUEST_MODE':
+      return {
+        ...state,
+        TOKEN: action.payload?.token || state.TOKEN,
+        PROFILE: action.payload?.profile || { nama: 'Pengunjung (Tamu)', status: 99, role: 'guest' },
+        IS_GUEST: true,
+        AUTH_STAT: true,
+      };
     case 'RESET_AUTH':
-      return { ...state, TOKEN: '', PROFILE: null, AUTH_STAT: false };
+      return { ...state, TOKEN: '', PROFILE: null, AUTH_STAT: false, IS_GUEST: false };
     // === Action baru untuk modul upgrade ===
     case 'SET_ONLINE_STATUS':
       return { ...state, IS_ONLINE: action.payload };
@@ -117,24 +127,13 @@ const saveLocations = async (locations) => {
 // Ambil lokasi dari AsyncStorage
 const getLocations = async () => {
   try {
-      const locations = await AsyncStorage.getItem('locations');
-      return locations != null ? JSON.parse(locations) : [];
+    const locations = await AsyncStorage.getItem('locations');
+    return locations != null ? JSON.parse(locations) : [];
   } catch (error) {
-      console.error("Error getting locations", error);
-      return [];
+    console.error('Error getting locations', error);
+    return [];
   }
 };
-const handleLogin = async (token, profile) => {
-    try {
-      await AsyncStorage.setItem('TOKEN', token);
-      await AsyncStorage.setItem('PROFILE', JSON.stringify(profile));
-  
-      dispatch({ type: 'SET_TOKEN', payload: token });
-      dispatch({ type: 'SET_PROFILE', payload: profile });
-    } catch (error) {
-      console.error('Gagal menyimpan data:', error);
-    }
-  };
 
-
-export default reducer
+export { saveLocations, getLocations };
+export default reducer;

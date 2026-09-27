@@ -153,6 +153,50 @@ const Login = ({ navigation }) => {
     });
   };
 
+  const enterGuestMode = async () => {
+    try {
+      SET_LOADING('guest');
+      const guestUrl =
+        URL?.GUEST_URL ||
+        (URL?.LOGIN_URL
+          ? URL.LOGIN_URL.replace('login', 'guest')
+          : 'http://192.168.1.7:5073/auth/guest');
+
+      let guestToken = 'guest_temp_token';
+      let guestProfile = { nama: 'Pengunjung (Tamu)', status: 99, role: 'guest' };
+
+      try {
+        const net = await NetInfo.fetch();
+        if (net.isConnected) {
+          const res = await fetch(guestUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.token) {
+              guestToken = data.token;
+              guestProfile = data.profile || guestProfile;
+            }
+          }
+        }
+      } catch (err) {
+        console.log('[Login] Guest fetch fallback:', err);
+      }
+
+      dispatch({
+        type: 'SET_GUEST_MODE',
+        payload: { token: guestToken, profile: guestProfile },
+      });
+
+      SET_LOADING('false');
+      navigation.navigate('GuestMap');
+    } catch (e) {
+      SET_LOADING('false');
+      navigation.navigate('GuestMap');
+    }
+  };
+
   const checkToken = async () => {
     const token = await AsyncStorage.getItem('TOKEN');
     const lastLogin = await AsyncStorage.getItem('LAST_LOGIN');
@@ -244,6 +288,7 @@ const Login = ({ navigation }) => {
 
   useEffect(() => {
     storeAccount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused]);
 
   return (
@@ -409,6 +454,41 @@ const Login = ({ navigation }) => {
                 </View>
               )}
             </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Pembatas / Divider Atau */}
+          <View style={ui.dividerRow}>
+            <View style={ui.dividerLine} />
+            <Text style={ui.dividerText}>ATAU</Text>
+            <View style={ui.dividerLine} />
+          </View>
+
+          {/* Tombol CTA Mode Tamu (Guest) */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={enterGuestMode}
+            disabled={LOADING === 'true' || LOADING === 'guest'}
+            style={ui.guestBtn}
+          >
+            {LOADING === 'guest' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                <ActivityIndicator size="small" color="#0284C7" style={{ marginRight: 8 }} />
+                <Text style={ui.guestBtnText}>Mempersiapkan Peta...</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={ui.guestIconBox}>
+                    <Icon name="map-outline" size={18} color="#0284C7" />
+                  </View>
+                  <View>
+                    <Text style={ui.guestBtnTitle}>Mode Tamu (Guest)</Text>
+                    <Text style={ui.guestBtnSub}>Hanya Peta Dasar & Peta Final</Text>
+                  </View>
+                </View>
+                <Icon name="chevron-forward" size={18} color="#0284C7" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -634,6 +714,63 @@ const ui = RNStyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+
+  // DIVIDER
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1,
+  },
+
+  // GUEST BUTTON
+  guestBtn: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#BAE6FD',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  guestIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  guestBtnTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0369A1',
+  },
+  guestBtnSub: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  guestBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0284C7',
   },
 
   // FOOTER
