@@ -46,9 +46,9 @@ import TabBar from '../components/TabBar';
  * Dioptimalkan dengan TanStack Query untuk caching instan tanpa load/render berulang.
  */
 const Home = ({ navigation }) => {
-  const Route = (routeName) => {
+  const Route = useCallback((routeName) => {
     navigation.navigate(routeName);
-  };
+  }, [navigation]);
 
   const queryClient = useQueryClient();
 
@@ -343,7 +343,7 @@ const Home = ({ navigation }) => {
       time: formatActivityTime(act.rawTime),
       onPress: () => Route(act.screen || 'Monitoring'),
     }));
-  }, [rawActivities]);
+  }, [rawActivities, Route]);
 
   // Pull-to-refresh: invalidate TanStack Query cache
   const onRefresh = useCallback(async () => {
@@ -408,7 +408,13 @@ const Home = ({ navigation }) => {
       />
 
       {/* 2. CONNECTION & GPS STATUS INDICATOR */}
-      <ConnectionStatus isOnline={IS_ONLINE} isGpsActive={isGpsActive} />
+      <ConnectionStatus
+        isOnline={IS_ONLINE}
+        isGpsActive={isGpsActive}
+        activePolygon={activePolygon}
+        petaFinalAll={petaFinalAll}
+        navigation={navigation}
+      />
 
       {/* MAIN VERTICAL SCROLL CONTENT */}
       <ScrollView
