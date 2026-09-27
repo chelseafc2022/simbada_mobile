@@ -1,6 +1,5 @@
-// views/home/components/ConnectionStatus.js
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
 import GpsService from '../../library/GpsService';
 
@@ -165,133 +164,139 @@ const ConnectionStatus = ({
   };
 
   return (
-    <View style={styles.outerContainer}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.container}
+    <View style={styles.container}>
+      {/* Network Status */}
+      <View
+        style={[
+          styles.statusPill,
+          isOnline ? styles.onlinePill : styles.offlinePill,
+        ]}
       >
-        {/* Network Status */}
         <View
           style={[
-            styles.statusPill,
-            isOnline ? styles.onlinePill : styles.offlinePill,
+            styles.dot,
+            isOnline ? styles.dotOnline : styles.dotOffline,
+          ]}
+        />
+        <Text
+          style={[
+            styles.statusText,
+            isOnline ? styles.textOnline : styles.textOffline,
           ]}
         >
-          <View
-            style={[
-              styles.dot,
-              isOnline ? styles.dotOnline : styles.dotOffline,
-            ]}
-          />
-          <Text
-            style={[
-              styles.statusText,
-              isOnline ? styles.textOnline : styles.textOffline,
-            ]}
-          >
-            {isOnline ? 'Online' : 'Offline'}
-          </Text>
-        </View>
+          {isOnline ? 'Online' : 'Offline'}
+        </Text>
+      </View>
 
-        {/* GPS Status */}
+      {/* GPS Status */}
+      <View
+        style={[
+          styles.statusPill,
+          isGpsActive ? styles.gpsActivePill : styles.gpsInactivePill,
+        ]}
+      >
         <View
           style={[
-            styles.statusPill,
-            isGpsActive ? styles.gpsActivePill : styles.gpsInactivePill,
+            styles.dot,
+            isGpsActive ? styles.dotGpsActive : styles.dotGpsInactive,
+          ]}
+        />
+        <Text
+          style={[
+            styles.statusText,
+            isGpsActive ? styles.textGpsActive : styles.textGpsInactive,
           ]}
         >
-          <View
-            style={[
-              styles.dot,
-              isGpsActive ? styles.dotGpsActive : styles.dotGpsInactive,
-            ]}
-          />
-          <Text
-            style={[
-              styles.statusText,
-              isGpsActive ? styles.textGpsActive : styles.textGpsInactive,
-            ]}
-          >
-            {isGpsActive ? 'GPS Aktif' : 'GPS Tidak Aktif'}
-          </Text>
-        </View>
+          {isGpsActive ? 'GPS Aktif' : 'GPS Off'}
+        </Text>
+      </View>
 
-        {/* Badge Status Peta Final Desa */}
-        <TouchableOpacity
+      {/* Badge Status Peta Final Desa (Flex 1 agar mengisi sisa lebar 100%) */}
+      <TouchableOpacity
+        style={[
+          styles.finalPill,
+          finalStatus.hasFinal === true
+            ? styles.finalAdaPill
+            : finalStatus.hasFinal === false
+            ? styles.finalBelumPill
+            : styles.finalNeutralPill,
+        ]}
+        onPress={handlePressPetaFinal}
+        activeOpacity={0.75}
+      >
+        <View
           style={[
-            styles.statusPill,
+            styles.dot,
             finalStatus.hasFinal === true
-              ? styles.finalAdaPill
+              ? styles.dotFinalAda
               : finalStatus.hasFinal === false
-              ? styles.finalBelumPill
-              : styles.finalNeutralPill,
+              ? styles.dotFinalBelum
+              : styles.dotFinalNeutral,
           ]}
-          onPress={handlePressPetaFinal}
-          activeOpacity={0.75}
-        >
-          <View
-            style={[
-              styles.dot,
-              finalStatus.hasFinal === true
-                ? styles.dotFinalAda
-                : finalStatus.hasFinal === false
-                ? styles.dotFinalBelum
-                : styles.dotFinalNeutral,
-            ]}
-          />
-          <Text
-            style={[
-              styles.statusText,
-              finalStatus.hasFinal === true
-                ? styles.textFinalAda
-                : finalStatus.hasFinal === false
-                ? styles.textFinalBelum
-                : styles.textFinalNeutral,
-            ]}
-            numberOfLines={1}
-          >
-            {finalStatus.hasFinal === true
-              ? `Peta Final: Ada${desaInfo?.name ? ` (${desaInfo.name})` : ''}`
+        />
+        <Text
+          style={[
+            styles.statusText,
+            finalStatus.hasFinal === true
+              ? styles.textFinalAda
               : finalStatus.hasFinal === false
-              ? `Peta Final: Belum Ada${desaInfo?.name ? ` (${desaInfo.name})` : ''}`
-              : `Peta Final: ${finalStatus.count} Desa`}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+              ? styles.textFinalBelum
+              : styles.textFinalNeutral,
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {finalStatus.hasFinal === true
+            ? `Final: Ada${desaInfo?.name ? ` • ${desaInfo.name}` : ''}`
+            : finalStatus.hasFinal === false
+            ? `Belum Ada Final${desaInfo?.name ? ` • ${desaInfo.name}` : ''}`
+            : `Peta Final (${finalStatus.count})`}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    backgroundColor: '#F5F7FA',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E2E8F0',
-  },
   container: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E2E8F0',
+    gap: 6,
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-    borderRadius: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 14,
     borderWidth: 1,
+    flexShrink: 0,
+  },
+  finalPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    minWidth: 0,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginRight: 4,
+    flexShrink: 0,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
 
