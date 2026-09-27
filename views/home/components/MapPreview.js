@@ -231,12 +231,12 @@ const MapContent = React.memo(({
         </Marker>
       )}
 
-      {/* Drawing: Polygon / Polyline */}
+      {/* Drawing: Polygon / Polyline (Garis Solid Tanpa Putus) */}
+      {drawPoints.length >= 2 && (
+        <Polyline coordinates={drawPoints} strokeColor={C_DRAW_STROKE} strokeWidth={2.5} zIndex={5} />
+      )}
       {drawMode === 'POLYGON' && drawPoints.length >= 3 && (
         <Polygon coordinates={drawPoints} strokeColor={C_DRAW_STROKE} fillColor={C_DRAW_FILL} strokeWidth={2.5} zIndex={5} />
-      )}
-      {drawMode === 'POLYLINE' && drawPoints.length >= 2 && (
-        <Polyline coordinates={drawPoints} strokeColor={C_DRAW_STROKE} strokeWidth={2.5} zIndex={5} />
       )}
       {drawPoints.map((pt, i) => (
         <Marker

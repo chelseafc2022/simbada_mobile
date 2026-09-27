@@ -981,7 +981,6 @@ const MetodeText = ({ navigation, route }) => {
                                             strokeColor="rgba(245, 158, 11, 0.7)"
                                             fillColor="rgba(245, 158, 11, 0.08)"
                                             strokeWidth={2}
-                                            lineDashPattern={[6, 6]}
                                             zIndex={1}
                                         />
                                     )}
@@ -991,20 +990,18 @@ const MetodeText = ({ navigation, route }) => {
                                             coordinates={ring}
                                             strokeColor="rgba(245, 158, 11, 0.7)"
                                             strokeWidth={2}
-                                            lineDashPattern={[6, 6]}
                                             zIndex={1}
                                         />
                                     )}
                                 </React.Fragment>
                             ))}
 
-                            {/* Garis Polyline Penghubung Usulan Final */}
+                            {/* Garis Polyline Penghubung Usulan Final (Garis Solid Tanpa Putus) */}
                             {polygonCoords.length >= 2 && (
                                 <Polyline
                                     coordinates={polygonCoords}
                                     strokeColor="#0284C7"
                                     strokeWidth={3}
-                                    lineDashPattern={isDrawMode ? [6, 4] : undefined}
                                     zIndex={2}
                                 />
                             )}

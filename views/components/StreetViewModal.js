@@ -276,7 +276,7 @@ const StreetViewModal = ({
         });
       });
 
-      // 2. Garis Batas Polygon / Polyline (Interpolasi Titik Geodesic di 360°)
+      // 2. Garis Batas Polygon / Polyline (Interpolasi Geodesic Padat Tanpa Putus di 360°)
       if (polygonData.length >= 2 && window.google.maps.geometry) {
         var numEdges = isPolyline ? polygonData.length - 1 : polygonData.length;
         for (var i = 0; i < numEdges; i++) {
@@ -287,28 +287,33 @@ const StreetViewModal = ({
           var p1 = new google.maps.LatLng(start.lat, start.lng);
           var p2 = new google.maps.LatLng(end.lat, end.lng);
           var dist = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
-          var steps = Math.min(35, Math.max(1, Math.round(dist / 12)));
-          for (var s = 1; s < steps; s++) {
-            var interp = google.maps.geometry.spherical.interpolate(p1, p2, s / steps);
+          
+          // Interval rapat agar lingkaran saling bertumpuk (overlap) membentuk garis solid tanpa putus
+          var stepMeters = Math.max(0.7, Math.min(2.5, dist / 140));
+          var steps = Math.min(240, Math.max(2, Math.round(dist / stepMeters)));
+
+          for (var s = 0; s <= steps; s++) {
+            var interp = (s === 0) ? p1 : ((s === steps) ? p2 : google.maps.geometry.spherical.interpolate(p1, p2, s / steps));
             new google.maps.Marker({
               position: interp,
               map: pano,
+              optimized: true,
+              clickable: false,
               icon: {
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 4.5,
+                scale: 5.5,
                 fillColor: strokeHex,
-                fillOpacity: 0.95,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 1.5
+                fillOpacity: 1,
+                strokeColor: strokeHex,
+                strokeWeight: 0
               },
-              clickable: false,
               title: isPolyline ? 'Garis Batas' : 'Garis Batas Spasial'
             });
           }
         }
       }
 
-      // 3. Garis Batas Peta Dasar Desa (Samar-samar Oranye/Emas sebagai Referensi)
+      // 3. Garis Batas Peta Dasar Desa (Garis Padat Berkelanjutan Samar Emas)
       if (petaDasarData && petaDasarData.length >= 2 && window.google.maps.geometry) {
         for (var pd = 0; pd < petaDasarData.length; pd++) {
           var sPd = petaDasarData[pd];
@@ -318,21 +323,24 @@ const StreetViewModal = ({
           var p1Pd = new google.maps.LatLng(sPd.lat, sPd.lng);
           var p2Pd = new google.maps.LatLng(ePd.lat, ePd.lng);
           var distPd = google.maps.geometry.spherical.computeDistanceBetween(p1Pd, p2Pd);
-          var stepsPd = Math.min(25, Math.max(1, Math.round(distPd / 18)));
-          for (var sp = 1; sp < stepsPd; sp++) {
-            var interpPd = google.maps.geometry.spherical.interpolate(p1Pd, p2Pd, sp / stepsPd);
+          var stepMetersPd = Math.max(1.0, Math.min(3.0, distPd / 120));
+          var stepsPd = Math.min(200, Math.max(2, Math.round(distPd / stepMetersPd)));
+
+          for (var sp = 0; sp <= stepsPd; sp++) {
+            var interpPd = (sp === 0) ? p1Pd : ((sp === stepsPd) ? p2Pd : google.maps.geometry.spherical.interpolate(p1Pd, p2Pd, sp / stepsPd));
             new google.maps.Marker({
               position: interpPd,
               map: pano,
+              optimized: true,
+              clickable: false,
               icon: {
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 3,
+                scale: 3.5,
                 fillColor: '#F59E0B',
-                fillOpacity: 0.5,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 0.8
+                fillOpacity: 0.65,
+                strokeColor: '#F59E0B',
+                strokeWeight: 0
               },
-              clickable: false,
               title: 'Peta Dasar Desa (Samar)'
             });
           }
@@ -589,7 +597,6 @@ const StreetViewModal = ({
                                         strokeColor="rgba(245, 158, 11, 0.7)"
                                         fillColor="rgba(245, 158, 11, 0.08)"
                                         strokeWidth={2}
-                                        lineDashPattern={[6, 6]}
                                     />
                                 )}
                                 {petaDasarPoints.length >= 2 && (
@@ -597,7 +604,6 @@ const StreetViewModal = ({
                                         coordinates={petaDasarPoints}
                                         strokeColor="rgba(245, 158, 11, 0.7)"
                                         strokeWidth={2}
-                                        lineDashPattern={[6, 6]}
                                     />
                                 )}
 
