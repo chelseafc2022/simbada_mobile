@@ -27,6 +27,9 @@ const StreetViewModal = ({
     coordinate,
     polygonCoords = [],
     petaDasarCoords = [],
+    isPolyline = false,
+    lineColor = '#0284C7',
+    fillColor = 'rgba(2, 132, 199, 0.28)',
     title = 'Street View Batas Wilayah',
 }) => {
     const [viewLayout, setViewLayout] = useState('split'); // 'split' | 'pano' | 'map'
@@ -161,6 +164,8 @@ const StreetViewModal = ({
     var petaDasarData = ${petaDasarJson};
     var centerLat = ${centerLat};
     var centerLng = ${centerLng};
+    var isPolyline = ${isPolyline ? 'true' : 'false'};
+    var strokeHex = "${lineColor || '#0284C7'}";
     var panorama = null;
     var svService = null;
 
@@ -271,12 +276,13 @@ const StreetViewModal = ({
         });
       });
 
-      // 2. Garis Batas Polygon (Interpolasi Titik Geodesic di 360°)
+      // 2. Garis Batas Polygon / Polyline (Interpolasi Titik Geodesic di 360°)
       if (polygonData.length >= 2 && window.google.maps.geometry) {
-        for (var i = 0; i < polygonData.length; i++) {
+        var numEdges = isPolyline ? polygonData.length - 1 : polygonData.length;
+        for (var i = 0; i < numEdges; i++) {
           var start = polygonData[i];
           var end = polygonData[(i + 1) % polygonData.length];
-          if (polygonData.length === 2 && i === 1) break;
+          if (!isPolyline && polygonData.length === 2 && i === 1) break;
 
           var p1 = new google.maps.LatLng(start.lat, start.lng);
           var p2 = new google.maps.LatLng(end.lat, end.lng);
@@ -290,13 +296,13 @@ const StreetViewModal = ({
               icon: {
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: 4.5,
-                fillColor: '#0284C7',
+                fillColor: strokeHex,
                 fillOpacity: 0.95,
                 strokeColor: '#FFFFFF',
                 strokeWeight: 1.5
               },
               clickable: false,
-              title: 'Garis Batas Spasial'
+              title: isPolyline ? 'Garis Batas' : 'Garis Batas Spasial'
             });
           }
         }
@@ -383,7 +389,7 @@ const StreetViewModal = ({
   <script src="https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=geometry&callback=initApp" async defer></script>
 </body>
 </html>`;
-    }, [normalizedPolygon, petaDasarPoints, centerLat, centerLng]);
+    }, [normalizedPolygon, petaDasarPoints, centerLat, centerLng, isPolyline, lineColor]);
 
     // Handle pesan dari WebView ke React Native
     const handleWebViewMessage = useCallback((event) => {
@@ -595,19 +601,19 @@ const StreetViewModal = ({
                                     />
                                 )}
 
-                                {/* Area Polygon Batas Desa (Usulan Final) */}
-                                {polygonPoints.length >= 3 && (
+                                {/* Area Polygon / Garis Batas Desa */}
+                                {!isPolyline && polygonPoints.length >= 3 && (
                                     <Polygon
                                         coordinates={polygonPoints}
-                                        strokeColor="#0284C7"
-                                        fillColor="rgba(2, 132, 199, 0.28)"
+                                        strokeColor={lineColor || "#0284C7"}
+                                        fillColor={fillColor || "rgba(2, 132, 199, 0.28)"}
                                         strokeWidth={3}
                                     />
                                 )}
                                 {polygonPoints.length >= 2 && (
                                     <Polyline
                                         coordinates={polygonPoints}
-                                        strokeColor="#0284C7"
+                                        strokeColor={lineColor || "#0284C7"}
                                         strokeWidth={3}
                                     />
                                 )}

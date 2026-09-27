@@ -30,6 +30,7 @@ import { useSelector } from 'react-redux';
 import NavigasiService from '../../library/NavigasiService';
 import GpsService from '../../library/GpsService';
 import CompassView from '../../navigasi/CompassView';
+import StreetViewModal from '../../components/StreetViewModal';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -141,6 +142,7 @@ const MapContent = React.memo(({
   calloutLabel,
   drawMode,
   drawPoints,
+  onPointPress,
   showPlacemarks,
   placemarks,
   navTarget,
@@ -237,7 +239,18 @@ const MapContent = React.memo(({
         <Polyline coordinates={drawPoints} strokeColor={C_DRAW_STROKE} strokeWidth={2.5} zIndex={5} />
       )}
       {drawPoints.map((pt, i) => (
-        <Marker key={`dpt-${i}`} coordinate={pt} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+        <Marker
+          key={`dpt-${i}`}
+          coordinate={pt}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
+          onPress={(e) => {
+            if (onPointPress) {
+              e.stopPropagation?.();
+              onPointPress(pt, i);
+            }
+          }}
+        >
           <View style={styles.drawPointDot} />
         </Marker>
       ))}
@@ -331,6 +344,12 @@ const MapPreview = ({
   const [showPlacemarks, setShowPlacemarks] = useState(true);
   const [showFinal, setShowFinal] = useState(true);
 
+  // State Street View 360°
+  const [showStreetView, setShowStreetView] = useState(false);
+  const [streetViewCoord, setStreetViewCoord] = useState(null);
+  const [streetViewTitle, setStreetViewTitle] = useState('Street View 360°');
+  const [isPegmanMode, setIsPegmanMode] = useState(false);
+
   // State Navigasi
   const [showNavPanel, setShowNavPanel] = useState(false);
   const [navTargetLat, setNavTargetLat] = useState('');
@@ -412,7 +431,7 @@ const MapPreview = ({
       setNavDistance(calcNavDistance(pos.latitude, pos.longitude, lat2, lng2));
       setNavBearing(calcNavBearing(pos.latitude, pos.longitude, lat2, lng2));
     }
-  }, [navTargetLat, navTargetLng, navCurrentPos?.latitude, navCurrentPos?.longitude, userLocation?.latitude, userLocation?.longitude]);
+  }, [navTargetLat, navTargetLng, navCurrentPos, userLocation]);
 
   const parsedNavTarget = useMemo(() => {
     const lat = parseFloat(navTargetLat);
@@ -527,10 +546,36 @@ const MapPreview = ({
     [activeFinalPolygons]
   );
 
-  // Penanganan Tap pada Peta (Bekerja mulus untuk Mode Gambar & Mode Pilih Koordinat)
+  // Buka Google Street View 360°
+  const openStreetView = useCallback((coord, title = 'Street View 360°') => {
+    let targetCoord = coord;
+    if (!targetCoord) {
+      if (drawPoints.length > 0) {
+        targetCoord = drawPoints[drawPoints.length - 1];
+      } else if (userLocation) {
+        targetCoord = userLocation;
+      }
+    }
+    if (!targetCoord) {
+      Alert.alert('Koordinat Belum Ada', 'Tentukan atau gambar titik polygon/garis terlebih dahulu di peta.');
+      return;
+    }
+    setStreetViewCoord(targetCoord);
+    setStreetViewTitle(title);
+    setShowStreetView(true);
+  }, [drawPoints, userLocation]);
+
+  // Penanganan Tap pada Peta (Bekerja mulus untuk Mode Gambar, Mode Pilih Koordinat, dan Street View)
   const handleMapPress = useCallback((e) => {
     const coord = e.nativeEvent?.coordinate;
     if (!coord) return;
+
+    // 0. Jika dalam mode Pegman (Street View Tap)
+    if (isPegmanMode) {
+      openStreetView(coord, `Street View (${coord.latitude.toFixed(6)}, ${coord.longitude.toFixed(6)})`);
+      setIsPegmanMode(false);
+      return;
+    }
 
     // 1. Jika dalam mode memilih koordinat tujuan navigasi dari peta
     if (navPickMode) {
@@ -555,7 +600,7 @@ const MapPreview = ({
         return next;
       });
     }
-  }, [navPickMode, drawMode]);
+  }, [isPegmanMode, openStreetView, navPickMode, drawMode]);
 
   const startDraw = (mode) => {
     setDrawMode(mode);
@@ -663,6 +708,9 @@ const MapPreview = ({
     calloutLabel,
     drawMode,
     drawPoints,
+    onPointPress: (pt, i) => {
+      openStreetView(pt, `Street View Titik ${i + 1} (${drawMode === 'POLYGON' ? 'Polygon' : 'Garis'})`);
+    },
     showPlacemarks,
     placemarks,
     navIsTracking,
@@ -779,6 +827,33 @@ const MapPreview = ({
           >
             <Text style={styles.navToolIcon}>🧭</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.controlCircleBtn, isPegmanMode && styles.controlCircleActiveStreet]}
+            onPress={() => {
+              if (drawPoints.length > 0) {
+                const target = drawPoints[drawPoints.length - 1];
+                openStreetView(
+                  target,
+                  `Street View ${drawMode === 'POLYGON' ? 'Polygon' : 'Garis'} (${drawPoints.length} Titik)`
+                );
+              } else {
+                setIsPegmanMode((v) => {
+                  const n = !v;
+                  if (n) {
+                    Alert.alert(
+                      'Mode Street View 360° Aktif',
+                      'Ketuk titik mana saja di peta untuk melihat citra 360° Street View.'
+                    );
+                  }
+                  return n;
+                });
+              }
+            }}
+            activeOpacity={0.75}
+            accessibilityLabel="Street View 360"
+          >
+            <Text style={styles.navToolIcon}>🚶‍♂️</Text>
+          </TouchableOpacity>
         </View>
 
         {/* TOOLBAR GAMBAR INLINE */}
@@ -792,6 +867,19 @@ const MapPreview = ({
             </TouchableOpacity>
             {drawPoints.length > 0 && (
               <>
+                <TouchableOpacity
+                  style={styles.drawBtnStreet}
+                  onPress={() => {
+                    const target = drawPoints[drawPoints.length - 1];
+                    openStreetView(
+                      target,
+                      `Street View ${drawMode === 'POLYGON' ? 'Polygon' : 'Garis'} (${drawPoints.length} Titik)`
+                    );
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.drawBtnText, { color: '#B45309' }]}>🚶‍♂️ Street</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.drawBtnUndo} onPress={undoLastPoint} activeOpacity={0.8}><Text style={styles.drawBtnText}>↩ Undo</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadKml} activeOpacity={0.8}><Text style={styles.drawBtnText}>📥 KML</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadExcel} activeOpacity={0.8}><Text style={styles.drawBtnText}>📊 Excel</Text></TouchableOpacity>
@@ -825,6 +913,16 @@ const MapPreview = ({
           <View style={styles.navPickHint}>
             <Text style={styles.navPickHintText}>🎯 Tap peta untuk memilih titik tujuan navigasi</Text>
             <TouchableOpacity onPress={() => { setNavPickMode(false); setShowNavPanel(true); }} style={styles.navPickCancel}>
+              <Text style={styles.navPickCancelTxt}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* HINT PEAGMAN STREET VIEW INLINE */}
+        {isPegmanMode && (
+          <View style={[styles.navPickHint, { backgroundColor: '#F59E0B' }]}>
+            <Text style={styles.navPickHintText}>🚶‍♂️ Ketuk peta untuk membuka Street View 360°</Text>
+            <TouchableOpacity onPress={() => setIsPegmanMode(false)} style={styles.navPickCancel}>
               <Text style={styles.navPickCancelTxt}>Batal</Text>
             </TouchableOpacity>
           </View>
@@ -962,6 +1060,33 @@ const MapPreview = ({
             <TouchableOpacity style={[styles.controlCircleBtn, navIsTracking && styles.controlCircleNav]} onPress={() => setShowNavPanel(true)} activeOpacity={0.75}>
               <Text style={styles.navToolIcon}>🧭</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlCircleBtn, isPegmanMode && styles.controlCircleActiveStreet]}
+              onPress={() => {
+                if (drawPoints.length > 0) {
+                  const target = drawPoints[drawPoints.length - 1];
+                  openStreetView(
+                    target,
+                    `Street View ${drawMode === 'POLYGON' ? 'Polygon' : 'Garis'} (${drawPoints.length} Titik)`
+                  );
+                } else {
+                  setIsPegmanMode((v) => {
+                    const n = !v;
+                    if (n) {
+                      Alert.alert(
+                        'Mode Street View 360° Aktif',
+                        'Ketuk titik mana saja di peta untuk melihat citra 360° Street View.'
+                      );
+                    }
+                    return n;
+                  });
+                }
+              }}
+              activeOpacity={0.75}
+              accessibilityLabel="Street View 360"
+            >
+              <Text style={styles.navToolIcon}>🚶‍♂️</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Toolbar Gambar Fullscreen */}
@@ -975,6 +1100,19 @@ const MapPreview = ({
               </TouchableOpacity>
               {drawPoints.length > 0 && (
                 <>
+                  <TouchableOpacity
+                    style={styles.drawBtnStreet}
+                    onPress={() => {
+                      const target = drawPoints[drawPoints.length - 1];
+                      openStreetView(
+                        target,
+                        `Street View ${drawMode === 'POLYGON' ? 'Polygon' : 'Garis'} (${drawPoints.length} Titik)`
+                      );
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.drawBtnText, { color: '#B45309' }]}>🚶‍♂️ Street</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.drawBtnUndo} onPress={undoLastPoint} activeOpacity={0.8}><Text style={styles.drawBtnText}>↩ Undo</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadKml} activeOpacity={0.8}><Text style={styles.drawBtnText}>📥 KML</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadExcel} activeOpacity={0.8}><Text style={styles.drawBtnText}>📊 Excel</Text></TouchableOpacity>
@@ -1008,6 +1146,16 @@ const MapPreview = ({
             <View style={styles.navPickHint}>
               <Text style={styles.navPickHintText}>🎯 Tap peta untuk memilih titik tujuan navigasi</Text>
               <TouchableOpacity onPress={() => { setNavPickMode(false); setShowNavPanel(true); }} style={styles.navPickCancel}>
+                <Text style={styles.navPickCancelTxt}>Batal</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Hint Street View Fullscreen */}
+          {isPegmanMode && (
+            <View style={[styles.navPickHint, { backgroundColor: '#F59E0B' }]}>
+              <Text style={styles.navPickHintText}>🚶‍♂️ Ketuk peta untuk membuka Street View 360°</Text>
+              <TouchableOpacity onPress={() => setIsPegmanMode(false)} style={styles.navPickCancel}>
                 <Text style={styles.navPickCancelTxt}>Batal</Text>
               </TouchableOpacity>
             </View>
@@ -1292,6 +1440,19 @@ const MapPreview = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* MODAL GOOGLE STREET VIEW 360 */}
+      <StreetViewModal
+        visible={showStreetView}
+        coordinate={streetViewCoord}
+        polygonCoords={drawPoints}
+        petaDasarCoords={activePolygon?.lokasi?.coordinat || (parsedDasarPolygons[0]?.coords) || []}
+        isPolyline={drawMode === 'POLYLINE'}
+        lineColor={C_DRAW_STROKE}
+        fillColor={C_DRAW_FILL}
+        title={streetViewTitle || (drawMode === 'POLYGON' ? 'Street View Gambar Polygon' : 'Street View Gambar Garis')}
+        onClose={() => setShowStreetView(false)}
+      />
     </View>
   );
 };
@@ -1353,6 +1514,7 @@ const styles = StyleSheet.create({
   },
   controlCircleAccent: { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' },
   controlCircleActive: { backgroundColor: '#FFF7ED', borderColor: C_DRAW_STROKE },
+  controlCircleActiveStreet: { backgroundColor: '#F59E0B', borderColor: '#D97706' },
   controlCircleDim: { opacity: 0.45 },
   controlCircleNav: { backgroundColor: '#F0F9FF', borderColor: C_NAV_ACCENT },
   northCompassWrap: { alignItems: 'center', justifyContent: 'center' },
@@ -1371,6 +1533,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 1 }, shadowRadius: 3,
   },
   drawBtnActive: { backgroundColor: '#FFF7ED', borderColor: C_DRAW_STROKE },
+  drawBtnStreet: { backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#FCD34D', elevation: 2 },
   drawBtnUndo: { backgroundColor: '#F0F9FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#BAE6FD', elevation: 2 },
   drawBtnDownload: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#6EE7B7', elevation: 2 },
   drawBtnClear: { backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', elevation: 2 },
