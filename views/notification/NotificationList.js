@@ -18,6 +18,7 @@ import {
 import AppHeader from '../components/AppHeader';
 import { useSelector, useDispatch } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import NotificationService from '../library/NotificationService';
 import moment from 'moment';
 
@@ -34,6 +35,8 @@ const NotificationList = ({ navigation }) => {
   const TOKEN = useSelector(state => state.TOKEN);
   const URL = useSelector(state => state.URL);
 
+  const PROFILE = useSelector(state => state.PROFILE);
+
   // State
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,14 +48,27 @@ const NotificationList = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
-    }, [])
+    }, [PROFILE, TOKEN])
   );
+
+  const getActiveUserId = async () => {
+    if (PROFILE?.id) return PROFILE.id;
+    if (PROFILE?.username) return PROFILE.username;
+    try {
+      const u = await AsyncStorage.getItem('USERNAME');
+      if (u) return u;
+      const uid = await AsyncStorage.getItem('ID');
+      if (uid) return uid;
+    } catch (e) {}
+    return '';
+  };
 
   const loadNotifications = async () => {
     setIsLoading(true);
     try {
-      // Coba fetch dari server terlebih dahulu
-      const notifs = await NotificationService.fetchFromServer(URL, TOKEN);
+      const userId = await getActiveUserId();
+      // Coba fetch dari server terlebih dahulu (In-App Notification Center)
+      const notifs = await NotificationService.fetchFromServer(URL, TOKEN, userId);
       setNotifications(notifs);
       
       const count = await NotificationService.getUnreadCount();
@@ -77,8 +93,20 @@ const NotificationList = ({ navigation }) => {
    * Handle tap notifikasi
    */
   const handleNotifPress = async (notif) => {
-    // Mark as read
+    // Mark as read lokal
     await NotificationService.markAsRead(notif.id);
+
+    // Sync mark read ke backend jika ada koneksi
+    try {
+      fetch(URL.URL_PENGGUNA + 'notifications/read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'kikensbatara ' + TOKEN,
+        },
+        body: JSON.stringify({ id: notif.id }),
+      }).catch(() => {});
+    } catch (e) {}
     
     // Update count
     const count = await NotificationService.getUnreadCount();
@@ -97,6 +125,20 @@ const NotificationList = ({ navigation }) => {
    */
   const handleMarkAllRead = async () => {
     await NotificationService.markAllAsRead();
+
+    // Sync mark all read ke backend
+    try {
+      const userId = await getActiveUserId();
+      fetch(URL.URL_PENGGUNA + 'notifications/read-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'kikensbatara ' + TOKEN,
+        },
+        body: JSON.stringify({ userId }),
+      }).catch(() => {});
+    } catch (e) {}
+
     await loadNotifications();
   };
 

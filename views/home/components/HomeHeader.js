@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
@@ -43,12 +44,7 @@ const HomeHeader = ({ notificationCount = 0, onNotificationPress, onProfilePress
           activeOpacity={0.7}
           accessibilityLabel="Daftar Notifikasi"
         >
-          <FastImage
-            source={require('../../assets/img/lampiran-icon.png')}
-            style={styles.bellIcon}
-            resizeMode={FastImage.resizeMode.contain}
-            tintColor="#142033"
-          />
+          <Icon name="notifications-outline" size={22} color="#1E293B" />
           {notificationCount > 0 && (
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>
@@ -57,6 +53,7 @@ const HomeHeader = ({ notificationCount = 0, onNotificationPress, onProfilePress
             </View>
           )}
         </TouchableOpacity>
+
 
         {/* User Profile */}
         <TouchableOpacity

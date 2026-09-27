@@ -90,6 +90,7 @@ const Monitoring = ({ navigation }) => {
     refetch: refetchDesa,
   } = useDesaUsulanQuery(token, url, profile, userStatus);
 
+  const desaUsulanLoading = isDesaLoading;
   const isLoading = isOperatorDesa ? isDesaLoading : isMonitoringLoading;
 
   // Sinkronisasi data offline lokal (PlacemarkDB & TrackDB)

@@ -11,6 +11,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, Platform } from 'react-native';
+import notifee, { AndroidImportance } from '@notifee/react-native';
+
 
 const NOTIF_STORAGE_KEY = 'NOTIFICATIONS_LIST';
 const FCM_TOKEN_KEY = 'FCM_DEVICE_TOKEN';
@@ -177,23 +179,47 @@ const setupForegroundHandler = (onNotificationReceived) => {
     const unsubscribe = messaging().onMessage(async remoteMessage => {
       console.log('[NotificationService] Foreground message:', remoteMessage);
 
+      const title = remoteMessage.notification?.title || remoteMessage.data?.title || 'Pemberitahuan SIMBADA';
+      const body = remoteMessage.notification?.body || remoteMessage.data?.body || '';
+      const type = remoteMessage.data?.type || 'info';
+
       const notif = await addNotification({
-        title: remoteMessage.notification?.title,
-        body: remoteMessage.notification?.body,
-        type: remoteMessage.data?.type || 'info',
-        data: remoteMessage.data,
+        title,
+        body,
+        type,
+        data: remoteMessage.data || {},
       });
+
+      // Tampilkan banner heads-up notifikasi via Notifee
+      try {
+        const channelId = await notifee.createChannel({
+          id: 'simbada_alerts',
+          name: 'Pemberitahuan SIMBADA',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+
+        await notifee.displayNotification({
+          title,
+          body,
+          data: remoteMessage.data || {},
+          android: {
+            channelId,
+            smallIcon: 'ic_launcher',
+            pressAction: {
+              id: 'default',
+            },
+          },
+        });
+      } catch (notifeeErr) {
+        console.warn('[NotificationService] Notifee display error fallback to Alert:', notifeeErr);
+        Alert.alert(title, body, [{ text: 'OK' }]);
+      }
 
       if (onNotificationReceived) {
         onNotificationReceived(notif);
       }
-
-      // Tampilkan alert sebagai fallback untuk foreground
-      Alert.alert(
-        notif.title,
-        notif.body,
-        [{ text: 'OK' }]
-      );
     });
 
     return unsubscribe;
@@ -215,8 +241,8 @@ const handleNotificationPress = (notification, navigation) => {
     case 'verifikasi':
     case 'revisi':
       // Navigasi ke detail usulan
-      if (notification.data?.usulan_id) {
-        navigation.navigate('LihatUsulan', { id: notification.data.usulan_id });
+      if (notification.data?.id || notification.data?.usulan_id) {
+        navigation.navigate('LihatUsulan', { id: notification.data?.id || notification.data?.usulan_id });
       } else {
         navigation.navigate('Usulan');
       }
@@ -232,15 +258,18 @@ const handleNotificationPress = (notification, navigation) => {
   }
 
   // Mark as read
-  markAsRead(notification.id);
+  if (notification.id) {
+    markAsRead(notification.id);
+  }
 };
 
 /**
- * Fetch notifikasi dari backend (jika endpoint tersedia)
+ * Fetch notifikasi dari backend (In-App Notification Center)
  */
-const fetchFromServer = async (URL, TOKEN) => {
+const fetchFromServer = async (URL, TOKEN, userId) => {
   try {
-    const response = await fetch(URL.URL_PENGGUNA + 'notifications', {
+    const url = URL.URL_PENGGUNA + 'notifications' + (userId ? `?userId=${encodeURIComponent(userId)}` : '');
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -249,31 +278,52 @@ const fetchFromServer = async (URL, TOKEN) => {
     });
 
     if (response.ok) {
-      const data = await response.json();
-      // Merge dengan notifikasi lokal
-      const localNotifs = await getNotifications();
-      const serverNotifs = data.map(n => ({
-        id: n._id || n.id,
+      const resJson = await response.json();
+      const rawList = resJson.data && Array.isArray(resJson.data) ? resJson.data : (Array.isArray(resJson) ? resJson : []);
+      
+      const serverNotifs = rawList.map(n => ({
+        id: String(n._key || n._id || n.id || n.createdAt),
         title: n.title,
         body: n.body || n.message,
         type: n.type || 'info',
         data: n.data || {},
-        isRead: n.isRead || false,
-        receivedAt: n.createdAt || n.receivedAt,
+        isRead: Boolean(n.isRead),
+        receivedAt: n.createdAt ? new Date(Number(n.createdAt)).toISOString() : new Date().toISOString(),
       }));
 
-      // Gabungkan, hindari duplikat berdasarkan id
-      const existingIds = new Set(localNotifs.map(n => n.id));
-      const newNotifs = serverNotifs.filter(n => !existingIds.has(n.id));
-      const merged = [...newNotifs, ...localNotifs].sort(
+      // Gabungkan notifikasi server dan lokal dengan cerdas
+      const localNotifs = await getNotifications();
+      const map = new Map();
+
+      // Masukkan lokal terlebih dahulu
+      localNotifs.forEach(item => {
+        if (item && item.id) map.set(item.id, item);
+      });
+
+      // Override / timpa dengan data terbaru dari server
+      serverNotifs.forEach(item => {
+        if (item && item.id) {
+          const localItem = map.get(item.id) || {};
+          map.set(item.id, {
+            ...localItem,
+            ...item,
+            // Jika sudah dibaca di lokal, pertahankan status terbaca
+            isRead: item.isRead || localItem.isRead || false,
+          });
+        }
+      });
+
+      const merged = Array.from(map.values()).sort(
         (a, b) => new Date(b.receivedAt) - new Date(a.receivedAt)
       );
 
       await saveNotifications(merged.slice(0, 100));
       return merged;
+    } else {
+      console.log('[NotificationService] Fetch returned status:', response.status);
     }
   } catch (error) {
-    console.log('[NotificationService] Fetch from server failed (endpoint may not exist yet)');
+    console.log('[NotificationService] Fetch from server error:', error?.message);
   }
   return await getNotifications();
 };

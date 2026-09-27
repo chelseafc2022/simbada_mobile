@@ -2,8 +2,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
-var URL = 'https://server-simbada.konaweselatankab.go.id/'; 
-var URLX = 'https://server-simbada.konaweselatankab.go.id/'; 
+// Server Lokal (Development)
+var URL = 'http://192.168.1.7:5073/'; 
+var URLX = 'http://192.168.1.7:5073/'; 
+
+// Server Production:
+// var URL = 'https://server-simbada.konaweselatankab.go.id/'; 
+// var URLX = 'https://server-simbada.konaweselatankab.go.id/'; 
+
 
 
 
