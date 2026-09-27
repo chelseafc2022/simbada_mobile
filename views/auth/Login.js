@@ -158,9 +158,7 @@ const Login = ({ navigation }) => {
       SET_LOADING('guest');
       const guestUrl =
         URL?.GUEST_URL ||
-        (URL?.LOGIN_URL
-          ? URL.LOGIN_URL.replace('login', 'guest')
-          : 'http://192.168.1.7:5073/auth/guest');
+        (URL?.URL_APP ? `${URL.URL_APP}auth/guest` : null);
 
       let guestToken = 'guest_temp_token';
       let guestProfile = { nama: 'Pengunjung (Tamu)', status: 99, role: 'guest' };
