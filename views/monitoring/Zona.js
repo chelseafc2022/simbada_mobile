@@ -20,7 +20,76 @@ import TabBar from '../components/TabBar';
 import { useSelector } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 import PdfWebViewModal from '../usulan_peta/PdfWebViewModal';
+import StreetViewModal from '../components/StreetViewModal';
+
+const handleDownloadExcelCoords = (coords, label = 'Batas_Wilayah') => {
+    if (!coords || coords.length === 0) {
+        Alert.alert('Perhatian', 'Belum ada titik koordinat yang dapat diunduh.');
+        return;
+    }
+
+    Alert.alert(
+        'Unduh Format EXCEL',
+        `Unduh ${coords.length} titik koordinat batas wilayah ke berkas:`,
+        [
+            {
+                text: '📊 Microsoft Excel (.xls)',
+                onPress: async () => {
+                    try {
+                        const rows = coords.map((c, i) => {
+                            const lat = c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : '');
+                            const lng = c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : '');
+                            const bg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+                            return `    <tr style="background-color: ${bg};"><td style="padding: 8px 24px; border: 1px solid #CBD5E1; text-align: center; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">${lat}</td><td style="padding: 8px 24px; border: 1px solid #CBD5E1; text-align: center; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">${lng}</td></tr>`;
+                        }).join('\n');
+                        const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"><style>.excel-title { font-family: Calibri, Arial, sans-serif; font-size: 13pt; font-weight: bold; color: #334155; padding: 6px 0; } table { border-collapse: collapse; margin-top: 4px; } th { background-color: #BAE6FD; color: #0369A1; font-family: Calibri, Arial, sans-serif; font-weight: bold; font-size: 11pt; text-align: center; padding: 10px 24px; border: 1px solid #7DD3FC; }</style></head><body><div class="excel-title">Format EXCEL</div><table><thead><tr><th>lat</th><th>lng</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+                        const fileName = `Format_EXCEL_${label}_${Date.now()}`;
+                        const path = `${RNFS.CachesDirectoryPath}/${fileName}.xls`;
+                        await RNFS.writeFile(path, html, 'utf8');
+                        await Share.open({
+                            url: `file://${path}`,
+                            type: 'application/vnd.ms-excel',
+                            title: 'Format EXCEL Batas Wilayah',
+                        });
+                    } catch (e) {
+                        if (e?.message && e.message !== 'User did not share') {
+                            Alert.alert('Gagal', e.message);
+                        }
+                    }
+                }
+            },
+            {
+                text: '📑 File CSV (.csv)',
+                onPress: async () => {
+                    try {
+                        const lines = ['lat,lng'];
+                        coords.forEach((c) => {
+                            const lat = c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : '');
+                            const lng = c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : '');
+                            lines.push(`${lat},${lng}`);
+                        });
+                        const fileName = `Format_EXCEL_${label}_${Date.now()}`;
+                        const path = `${RNFS.CachesDirectoryPath}/${fileName}.csv`;
+                        await RNFS.writeFile(path, lines.join('\r\n'), 'utf8');
+                        await Share.open({
+                            url: `file://${path}`,
+                            type: 'text/csv',
+                            title: 'Format CSV Batas Wilayah',
+                        });
+                    } catch (e) {
+                        if (e?.message && e.message !== 'User did not share') {
+                            Alert.alert('Gagal', e.message);
+                        }
+                    }
+                }
+            },
+            { text: 'Batal', style: 'cancel' }
+        ]
+    );
+};
 
 const { width } = Dimensions.get('window');
 
@@ -74,6 +143,11 @@ const Zona = ({ navigation, route }) => {
     const [isPolygonReady, setIsPolygonReady] = useState(false);
     const [mapType, setMapType] = useState('hybrid');
     const [showLayerModal, setShowLayerModal] = useState(false);
+
+    // Street View State
+    const [streetViewVisible, setStreetViewVisible] = useState(false);
+    const [streetViewCoord, setStreetViewCoord] = useState(null);
+    const [streetViewTitle, setStreetViewTitle] = useState('Street View 360°');
     const mapRef = useRef(null);
 
     const handleZoomIn = () => {
@@ -288,6 +362,7 @@ const Zona = ({ navigation, route }) => {
         useCallback(() => {
             getPetaPengajuan();
             getPetaDasar();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [id_des_kel])
     );
    
@@ -519,6 +594,22 @@ const Zona = ({ navigation, route }) => {
                             >
                                 <Text style={localStyles.fullMapText}>⛶ Layar Penuh</Text>
                             </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (detailData.lokasi && detailData.lokasi.length > 0) {
+                                        setStreetViewCoord(detailData.lokasi[0]);
+                                        setStreetViewTitle(`Batas Desa ${detailData.nama_des_kel || ''}`);
+                                        setStreetViewVisible(true);
+                                    } else {
+                                        Alert.alert('Perhatian', 'Belum ada titik koordinat untuk melihat Street View.');
+                                    }
+                                }}
+                                style={[localStyles.fullMapButton, { backgroundColor: '#F59E0B', marginLeft: 6 }]}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={localStyles.fullMapText}>🚶‍♂️ Street View</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
@@ -614,6 +705,28 @@ const Zona = ({ navigation, route }) => {
                             </View>
                         )}
                     </View>
+
+                    {/* Tombol Unduh Format EXCEL */}
+                    {detailData.lokasi && detailData.lokasi.length > 0 && (
+                        <TouchableOpacity
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#10B981',
+                                paddingVertical: 10,
+                                paddingHorizontal: 16,
+                                borderRadius: 8,
+                                marginTop: 10,
+                            }}
+                            onPress={() => handleDownloadExcelCoords(detailData.lokasi, detailData.nama_des_kel || 'Batas_Desa')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>
+                                📊 Unduh Format EXCEL ({detailData.lokasi.length} Titik Koordinat)
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* KARTU 3: DETAIL PEMOHON */}
@@ -720,7 +833,7 @@ const Zona = ({ navigation, route }) => {
                                             ) : (
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                                                     <View style={localStyles.noPhotoBadge}>
-                                                        <Text style={localStyles.noPhotoText}>Tanpa Foto (Excel)</Text>
+                                                        <Text style={localStyles.noPhotoText}>Tanpa Foto (Opsional)</Text>
                                                     </View>
                                                 </View>
                                             )}
@@ -899,6 +1012,15 @@ const Zona = ({ navigation, route }) => {
                     </View>
                 </TouchableOpacity>
             </Modal>
+
+            {/* MODAL STREET VIEW 360 */}
+            <StreetViewModal
+                visible={streetViewVisible}
+                coordinate={streetViewCoord}
+                polygonCoords={petaPengajuan[0]?.coordinates || []}
+                title={streetViewTitle}
+                onClose={() => setStreetViewVisible(false)}
+            />
 
             <TabBar />
         </View>

@@ -16,8 +16,76 @@ import FastImage from 'react-native-fast-image';
 import TabBar from '../components/TabBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSelector } from 'react-redux';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 import { parseGeoFileFromUri, downsampleCoordinates } from '../library/GeoFileParser';
 import TrackDB from '../library/TrackDB';
+
+const handleDownloadExcelCoords = (coords, label = 'Batas_Wilayah') => {
+    if (!coords || coords.length === 0) {
+        Alert.alert('Perhatian', 'Belum ada titik koordinat yang dapat diunduh.');
+        return;
+    }
+
+    Alert.alert(
+        'Unduh Format EXCEL',
+        `Unduh ${coords.length} titik koordinat batas wilayah ke berkas:`,
+        [
+            {
+                text: '📊 Microsoft Excel (.xls)',
+                onPress: async () => {
+                    try {
+                        const rows = coords.map((c, i) => {
+                            const lat = c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : '');
+                            const lng = c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : '');
+                            const bg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+                            return `    <tr style="background-color: ${bg};"><td style="padding: 8px 24px; border: 1px solid #CBD5E1; text-align: center; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">${lat}</td><td style="padding: 8px 24px; border: 1px solid #CBD5E1; text-align: center; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">${lng}</td></tr>`;
+                        }).join('\n');
+                        const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"><style>.excel-title { font-family: Calibri, Arial, sans-serif; font-size: 13pt; font-weight: bold; color: #334155; padding: 6px 0; } table { border-collapse: collapse; margin-top: 4px; } th { background-color: #BAE6FD; color: #0369A1; font-family: Calibri, Arial, sans-serif; font-weight: bold; font-size: 11pt; text-align: center; padding: 10px 24px; border: 1px solid #7DD3FC; }</style></head><body><div class="excel-title">Format EXCEL</div><table><thead><tr><th>lat</th><th>lng</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+                        const fileName = `Format_EXCEL_${label}_${Date.now()}`;
+                        const path = `${RNFS.CachesDirectoryPath}/${fileName}.xls`;
+                        await RNFS.writeFile(path, html, 'utf8');
+                        await Share.open({
+                            url: `file://${path}`,
+                            type: 'application/vnd.ms-excel',
+                            title: 'Format EXCEL Batas Wilayah',
+                        });
+                    } catch (e) {
+                        if (e?.message && e.message !== 'User did not share') {
+                            Alert.alert('Gagal', e.message);
+                        }
+                    }
+                }
+            },
+            {
+                text: '📑 File CSV (.csv)',
+                onPress: async () => {
+                    try {
+                        const lines = ['lat,lng'];
+                        coords.forEach((c) => {
+                            const lat = c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : '');
+                            const lng = c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : '');
+                            lines.push(`${lat},${lng}`);
+                        });
+                        const fileName = `Format_EXCEL_${label}_${Date.now()}`;
+                        const path = `${RNFS.CachesDirectoryPath}/${fileName}.csv`;
+                        await RNFS.writeFile(path, lines.join('\r\n'), 'utf8');
+                        await Share.open({
+                            url: `file://${path}`,
+                            type: 'text/csv',
+                            title: 'Format CSV Batas Wilayah',
+                        });
+                    } catch (e) {
+                        if (e?.message && e.message !== 'User did not share') {
+                            Alert.alert('Gagal', e.message);
+                        }
+                    }
+                }
+            },
+            { text: 'Batal', style: 'cancel' }
+        ]
+    );
+};
 
 const EditUsulan = ({ route, navigation }) => {
     const {
@@ -424,6 +492,9 @@ const EditUsulan = ({ route, navigation }) => {
                                     ]}
                                     onPress={() => navigation.navigate('MetodeText', { 
                                         lokasiAwal: form.lokasi || [],
+                                        des_kel_id: form.id_des_kel || id_des_kel,
+                                        kecamatan_id: form.id_kecamatan || id_kecamatan,
+                                        nama_des_kel: form.nama_des_kel || nama_des_kel,
                                         onLokasiUpdate: (updatedLokasi) => {
                                             setForm(prev => ({
                                                 ...prev,
@@ -501,6 +572,9 @@ const EditUsulan = ({ route, navigation }) => {
                                             const targetScreen = form.tipe === 'polyline' ? 'MetodePolyline' : 'MetodeText';
                                             navigation.navigate(targetScreen, { 
                                                 lokasiAwal: form.lokasi || [],
+                                                des_kel_id: form.id_des_kel || id_des_kel,
+                                                kecamatan_id: form.id_kecamatan || id_kecamatan,
+                                                nama_des_kel: form.nama_des_kel || nama_des_kel,
                                                 onLokasiUpdate: (updatedLokasi) => {
                                                     setForm(prev => ({
                                                         ...prev,
@@ -513,7 +587,17 @@ const EditUsulan = ({ route, navigation }) => {
                                         activeOpacity={0.8}
                                     >
                                         <Text style={localStyles.reviewLocationBtnText}>
-                                            👁️ Tinjau / Edit Titik Koordinat & Foto di Peta
+                                            👁️ Tinjau / Edit Titik Koordinat di Peta
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => handleDownloadExcelCoords(form.lokasi, form.nama_des_kel || 'Batas_Desa')}
+                                        style={[localStyles.reviewLocationBtn, { backgroundColor: '#10B981', marginTop: 8 }]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={localStyles.reviewLocationBtnText}>
+                                            📊 Unduh Format EXCEL (lat, lng)
                                         </Text>
                                     </TouchableOpacity>
                                 </View>

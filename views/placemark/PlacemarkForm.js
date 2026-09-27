@@ -73,16 +73,16 @@ const PlacemarkForm = ({ navigation, route }) => {
   const readOnly = route?.params?.readOnly === true; // Mode baca (placemark orang lain)
   const isEdit = !!editData && !readOnly;
 
-  const [judul, setJudul] = useState(editData?.judul ?? '');
-  const [deskripsi, setDeskripsi] = useState(editData?.deskripsi ?? '');
-  const [simbol, setSimbol] = useState(editData?.simbol ?? 'pin_merah');
-  const [lat, setLat] = useState(editData?.lat?.toString() ?? '');
-  const [lon, setLon] = useState(editData?.lon?.toString() ?? '');
+  const [judul, setJudul] = useState(editData?.judul ?? route?.params?.judul ?? '');
+  const [deskripsi, setDeskripsi] = useState(editData?.deskripsi ?? route?.params?.deskripsi ?? '');
+  const [simbol, setSimbol] = useState(editData?.simbol ?? route?.params?.simbol ?? 'pin_merah');
+  const [lat, setLat] = useState(editData?.lat?.toString() ?? route?.params?.lat?.toString() ?? '');
+  const [lon, setLon] = useState(editData?.lon?.toString() ?? route?.params?.lon?.toString() ?? route?.params?.lng?.toString() ?? '');
   const [alt, setAlt] = useState(editData?.alt?.toString() ?? '0');
   const [accH, setAccH] = useState(editData?.accH?.toString() ?? '0');
-  const [coordSource, setCoordSource] = useState(editData?.coordSource ?? 'gps');
-  const [foto, setFoto] = useState(editData?.foto ?? []);
-  const [isPublic, setIsPublic] = useState(editData?.isPublic ?? false);
+  const [coordSource, setCoordSource] = useState(editData?.coordSource ?? (route?.params?.lat ? 'map' : 'gps'));
+  const [foto, setFoto] = useState(editData?.foto ?? (route?.params?.photoUri ? [{ uri: route.params.photoUri, timestamp: new Date().toISOString() }] : []));
+  const [isPublic, setIsPublic] = useState(editData?.isPublic ?? true);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -129,9 +129,12 @@ const PlacemarkForm = ({ navigation, route }) => {
     );
   };
 
-  // Auto-grab GPS saat form baru dibuka
+  // Auto-grab GPS saat form baru dibuka jika belum ada koordinat
   useEffect(() => {
-    if (!isEdit && !readOnly) grabGPS();
+    if (!isEdit && !readOnly && !route?.params?.lat && !route?.params?.lon && !route?.params?.lng) {
+      grabGPS();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Buka Map Picker modal
@@ -214,7 +217,10 @@ const PlacemarkForm = ({ navigation, route }) => {
       const count = await PlacemarkDB.getCount(userId);
       dispatch({ type: 'SET_PLACEMARK_COUNT', payload: count });
       Alert.alert('✅ Tersimpan', `Placemark "${judul.trim()}" berhasil disimpan.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: () => {
+          if (route?.params?.onSaved) route.params.onSaved();
+          navigation.goBack();
+        }},
       ]);
     } catch (e) {
       Alert.alert('Error', e.message);

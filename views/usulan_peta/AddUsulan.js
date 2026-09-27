@@ -11,11 +11,79 @@ import { Picker } from '@react-native-picker/picker';
 // import { LokasiContext } from '../library/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 import OfflineManager from '../library/OfflineManager';
 import { parseGeoFileFromUri, downsampleCoordinates } from '../library/GeoFileParser';
 import TrackDB from '../library/TrackDB';
 
 import { Assets } from '@react-navigation/elements';
+
+const handleDownloadExcelCoords = (coords, label = 'Batas_Wilayah') => {
+    if (!coords || coords.length === 0) {
+        Alert.alert('Perhatian', 'Belum ada titik koordinat yang dapat diunduh.');
+        return;
+    }
+
+    Alert.alert(
+        'Unduh Format EXCEL',
+        `Unduh ${coords.length} titik koordinat batas wilayah ke berkas:`,
+        [
+            {
+                text: '📊 Microsoft Excel (.xls)',
+                onPress: async () => {
+                    try {
+                        const rows = coords.map((c, i) => {
+                            const lat = c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : '');
+                            const lng = c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : '');
+                            const bg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+                            return `    <tr style="background-color: ${bg};"><td style="padding: 8px 24px; border: 1px solid #CBD5E1; text-align: center; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">${lat}</td><td style="padding: 8px 24px; border: 1px solid #CBD5E1; text-align: center; font-family: Calibri, Arial, sans-serif; font-size: 11pt;">${lng}</td></tr>`;
+                        }).join('\n');
+                        const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"><style>.excel-title { font-family: Calibri, Arial, sans-serif; font-size: 13pt; font-weight: bold; color: #334155; padding: 6px 0; } table { border-collapse: collapse; margin-top: 4px; } th { background-color: #BAE6FD; color: #0369A1; font-family: Calibri, Arial, sans-serif; font-weight: bold; font-size: 11pt; text-align: center; padding: 10px 24px; border: 1px solid #7DD3FC; }</style></head><body><div class="excel-title">Format EXCEL</div><table><thead><tr><th>lat</th><th>lng</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+                        const fileName = `Format_EXCEL_${label}_${Date.now()}`;
+                        const path = `${RNFS.CachesDirectoryPath}/${fileName}.xls`;
+                        await RNFS.writeFile(path, html, 'utf8');
+                        await Share.open({
+                            url: `file://${path}`,
+                            type: 'application/vnd.ms-excel',
+                            title: 'Format EXCEL Batas Wilayah',
+                        });
+                    } catch (e) {
+                        if (e?.message && e.message !== 'User did not share') {
+                            Alert.alert('Gagal', e.message);
+                        }
+                    }
+                }
+            },
+            {
+                text: '📑 File CSV (.csv)',
+                onPress: async () => {
+                    try {
+                        const lines = ['lat,lng'];
+                        coords.forEach((c) => {
+                            const lat = c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : '');
+                            const lng = c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : '');
+                            lines.push(`${lat},${lng}`);
+                        });
+                        const fileName = `Format_EXCEL_${label}_${Date.now()}`;
+                        const path = `${RNFS.CachesDirectoryPath}/${fileName}.csv`;
+                        await RNFS.writeFile(path, lines.join('\r\n'), 'utf8');
+                        await Share.open({
+                            url: `file://${path}`,
+                            type: 'text/csv',
+                            title: 'Format CSV Batas Wilayah',
+                        });
+                    } catch (e) {
+                        if (e?.message && e.message !== 'User did not share') {
+                            Alert.alert('Gagal', e.message);
+                        }
+                    }
+                }
+            },
+            { text: 'Batal', style: 'cancel' }
+        ]
+    );
+};
 
 // create a component
 const AddUsulan = ({navigation}) => {
@@ -108,6 +176,7 @@ const AddUsulan = ({navigation}) => {
             };
             loadKecamatan();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
     
       const getKecamatan = async () => {
@@ -555,15 +624,24 @@ const AddUsulan = ({navigation}) => {
             formData.append("no_telp", form.no_telp);
             formData.append("status_pengajuan", form.status_pengajuan || 1); // Default ke status 1
             if (form.file) {
-                formData.append("file", form.file); // Pastikan file adalah objek hasil DocumentPicker
+                if (typeof form.file === 'object' && form.file.uri) {
+                    formData.append("file", {
+                        uri: form.file.uri,
+                        name: form.file.name || 'dokumen_usulan.pdf',
+                        type: form.file.type || 'application/pdf',
+                    });
+                } else if (typeof form.file === 'string' && form.file.trim().length > 0) {
+                    formData.append("file", form.file);
+                }
             }
 
-            // Tambahkan file foto patok untuk setiap titik koordinat ke FormData
+            // Tambahkan file foto patok untuk setiap titik koordinat ke FormData jika file lokal ada
             if (Array.isArray(form.lokasi)) {
                 form.lokasi.forEach((item, index) => {
-                    if (item.photo_uri) {
+                    const uri = item.photo_uri;
+                    if (uri && typeof uri === 'string' && (uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('/'))) {
                         formData.append(`foto_patok_${index}`, {
-                            uri: item.photo_uri,
+                            uri: uri,
                             type: 'image/jpeg',
                             name: `patok_${index}_${Date.now()}.jpg`,
                         });
@@ -631,18 +709,25 @@ const AddUsulan = ({navigation}) => {
                     ],
                     { cancelable: false }
                 );
-            }
-            
-            
-            
-            else {
-                const errorText = await response.text();
-                console.error("Error Response Body:", errorText);
-                throw new Error(`Failed to submit data. Status: ${response.status}`);
+            } else {
+                let errorMsg = `Status server: ${response.status}`;
+                try {
+                    const errorText = await response.text();
+                    console.error("Error Response Body:", errorText);
+                    const parsed = JSON.parse(errorText);
+                    if (parsed && (parsed.message || parsed.error)) {
+                        errorMsg = parsed.message || parsed.error;
+                    } else if (errorText) {
+                        errorMsg = errorText;
+                    }
+                } catch (e) {
+                    // ignore json parse error
+                }
+                throw new Error(errorMsg);
             }
         } catch (error) {
             console.error("Error submitting data:", error.message);
-            Alert.alert("Error", "Gagal mengirim data. Silakan coba lagi.");
+            Alert.alert("Gagal Mengajukan Usulan", error.message || "Gagal mengirim data ke server. Silakan coba lagi.");
         }
     };
     
@@ -845,6 +930,9 @@ const AddUsulan = ({navigation}) => {
                             style={[localStyles.methodButton, { backgroundColor: '#208DC0' }]} 
                             onPress={() => navigation.navigate('MetodeText', { 
                                 lokasiAwal: form.lokasi || [],
+                                des_kel_id: form.des_kel_id || PROFILE?.profile?.id_desa || PROFILE?.profile?.id_kelurahan,
+                                kecamatan_id: form.kecamatan_id || PROFILE?.profile?.id_kecamatan,
+                                nama_des_kel: form.nama_des_kel || PROFILE?.profile?.nama_desa || PROFILE?.profile?.nama_kelurahan,
                                 onLokasiUpdate: (updatedLokasi) => {
                                     SET_FORM((prevForm) => ({
                                         ...prevForm,
@@ -902,6 +990,9 @@ const AddUsulan = ({navigation}) => {
                             <TouchableOpacity
                                 onPress={() => navigation.navigate('MetodeText', { 
                                     lokasiAwal: form.lokasi || [],
+                                    des_kel_id: form.des_kel_id || PROFILE?.profile?.id_desa || PROFILE?.profile?.id_kelurahan,
+                                    kecamatan_id: form.kecamatan_id || PROFILE?.profile?.id_kecamatan,
+                                    nama_des_kel: form.nama_des_kel || PROFILE?.profile?.nama_desa || PROFILE?.profile?.nama_kelurahan,
                                     onLokasiUpdate: (updatedLokasi) => {
                                         SET_FORM((prevForm) => ({
                                             ...prevForm,
@@ -910,10 +1001,18 @@ const AddUsulan = ({navigation}) => {
                                         }));
                                     }
                                 })}
-                                style={{ marginTop: 8, backgroundColor: '#208DC0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                                style={{ marginTop: 8, backgroundColor: '#208DC0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center' }}
                                 activeOpacity={0.8}
                             >
-                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>👁️ Tinjau / Tambah Foto Patok di Peta</Text>
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>👁️ Tinjau / Edit Titik Koordinat di Peta</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => handleDownloadExcelCoords(form.lokasi, form.nama_des_kel || 'Batas_Desa')}
+                                style={{ marginTop: 6, backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center' }}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>📊 Unduh Format EXCEL (lat, lng)</Text>
                             </TouchableOpacity>
                         </View>
                     )}

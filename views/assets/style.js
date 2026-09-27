@@ -1,6 +1,6 @@
 import {StyleSheet, Platform, StatusBar} from 'react-native';
 
-const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 20;
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 24;
 
 export default StyleSheet.create({
     
@@ -32,7 +32,7 @@ export default StyleSheet.create({
       flexDirection: 'row',
       paddingHorizontal: 15,
       paddingBottom: 15,
-      paddingTop: Platform.OS === 'android' ? (STATUS_BAR_HEIGHT + 10) : 20,
+      paddingTop: Platform.OS === 'android' ? (STATUS_BAR_HEIGHT + 14) : 44,
       alignItems: 'center',
       backgroundColor: '#ffffff',
       elevation: 5,
@@ -113,17 +113,6 @@ export default StyleSheet.create({
         alignSelf : 'center',
         justifyContent : 'center',
     },
-
-    metodeText : {
-        backgroundColor : '#26A69A',
-        marginTop : 10,
-        // marginLeft : 20,
-        width : '20%',
-        height : 30,
-        borderRadius : 10,
-        // alignSelf : 'left',
-        // justifyContent : 'center',
-    },
    
     metodeText : {
         backgroundColor : '#26A69A',
@@ -167,7 +156,6 @@ export default StyleSheet.create({
 
     batas : {
         flex : 1,
-        flexDirection: 'column',
         borderWidth : 1,
         borderColor : '#208DC0',
         marginTop : 10,
@@ -181,7 +169,6 @@ export default StyleSheet.create({
     
     batasUser : {
         flex : 1,
-        flexDirection: 'column',
         // borderWidth : 1,
         borderColor : '#E7EBEB',
         // marginTop :,
@@ -378,11 +365,6 @@ export default StyleSheet.create({
         paddingHorizontal: 10,
         elevation:1
     },
-
-    backIcon: {
-      width: 20,
-      height: 20,
-  },
 
   searchInput: {
     height: 40,
