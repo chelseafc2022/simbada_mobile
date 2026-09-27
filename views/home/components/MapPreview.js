@@ -758,28 +758,29 @@ const MapPreview = ({
           </View>
         </View>
 
-        {/* TOP-RIGHT: TOMBOL LAYER */}
-        <TouchableOpacity style={styles.layerSelectorBtn} onPress={() => setShowLayerModal(true)} activeOpacity={0.8}>
-          <FastImage
-            source={require('../../assets/img/gis_pirate-map.png')}
-            style={styles.layerIcon}
-            resizeMode={FastImage.resizeMode.contain}
-            tintColor={C_PRIMARY}
-          />
-          <Text style={styles.layerText}>Layer</Text>
-          <Text style={styles.layerChevron}>⌵</Text>
-        </TouchableOpacity>
+        {/* TOP-RIGHT: TOMBOL LAYER & LAYAR PENUH (BERDAMPINGAN RAPI) */}
+        <View style={styles.topRightActionsRow}>
+          <TouchableOpacity style={styles.layerSelectorBtn} onPress={() => setShowLayerModal(true)} activeOpacity={0.8}>
+            <FastImage
+              source={require('../../assets/img/gis_pirate-map.png')}
+              style={styles.layerIcon}
+              resizeMode={FastImage.resizeMode.contain}
+              tintColor={C_PRIMARY}
+            />
+            <Text style={styles.layerText}>Layer</Text>
+            <Text style={styles.layerChevron}>⌵</Text>
+          </TouchableOpacity>
 
-        {/* TOMBOL LAYAR PENUH */}
-        <TouchableOpacity
-          style={styles.fullscreenBtn}
-          onPress={() => setShowFullscreen(true)}
-          activeOpacity={0.8}
-          accessibilityLabel="Layar Penuh"
-        >
-          <Text style={styles.fullscreenIcon}>⛶</Text>
-          <Text style={styles.fullscreenLabel}>Layar Penuh</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.fullscreenBtn}
+            onPress={() => setShowFullscreen(true)}
+            activeOpacity={0.8}
+            accessibilityLabel="Layar Penuh"
+          >
+            <Text style={styles.fullscreenIcon}>⛶</Text>
+            <Text style={styles.fullscreenLabel}>Penuh</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* RIGHT CONTROLS INLINE */}
         <View style={styles.rightControlsStack}>
@@ -856,17 +857,19 @@ const MapPreview = ({
           </TouchableOpacity>
         </View>
 
-        {/* TOOLBAR GAMBAR INLINE */}
+        {/* TOOLBAR GAMBAR INLINE (KOMPAK & RAPI) */}
         {showDrawToolbar && (
           <View style={styles.drawToolbar}>
-            <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYGON' && styles.drawBtnActive]} onPress={() => startDraw('POLYGON')} activeOpacity={0.8}>
-              <Text style={styles.drawBtnText}>⬡ Polygon</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYLINE' && styles.drawBtnActive]} onPress={() => startDraw('POLYLINE')} activeOpacity={0.8}>
-              <Text style={styles.drawBtnText}>〰 Garis</Text>
-            </TouchableOpacity>
+            <View style={styles.drawModeRow}>
+              <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYGON' && styles.drawBtnActive]} onPress={() => startDraw('POLYGON')} activeOpacity={0.8}>
+                <Text style={[styles.drawBtnText, drawMode === 'POLYGON' && styles.drawBtnTextActive]}>⬡ Polygon</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYLINE' && styles.drawBtnActive]} onPress={() => startDraw('POLYLINE')} activeOpacity={0.8}>
+                <Text style={[styles.drawBtnText, drawMode === 'POLYLINE' && styles.drawBtnTextActive]}>〰 Garis</Text>
+              </TouchableOpacity>
+            </View>
             {drawPoints.length > 0 && (
-              <>
+              <View style={styles.drawActionsWrap}>
                 <TouchableOpacity
                   style={styles.drawBtnStreet}
                   onPress={() => {
@@ -878,52 +881,61 @@ const MapPreview = ({
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.drawBtnText, { color: '#B45309' }]}>🚶‍♂️ Street</Text>
+                  <Text style={styles.drawBtnStreetText}>🚶‍♂️ Street</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.drawBtnUndo} onPress={undoLastPoint} activeOpacity={0.8}><Text style={styles.drawBtnText}>↩ Undo</Text></TouchableOpacity>
-                <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadKml} activeOpacity={0.8}><Text style={styles.drawBtnText}>📥 KML</Text></TouchableOpacity>
-                <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadExcel} activeOpacity={0.8}><Text style={styles.drawBtnText}>📊 Excel</Text></TouchableOpacity>
-                <TouchableOpacity style={styles.drawBtnClear} onPress={clearDraw} activeOpacity={0.8}><Text style={styles.drawBtnText}>✕ Hapus</Text></TouchableOpacity>
-              </>
+                <TouchableOpacity style={styles.drawBtnUndo} onPress={undoLastPoint} activeOpacity={0.8}>
+                  <Text style={styles.drawBtnText}>↩ Undo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadKml} activeOpacity={0.8}>
+                  <Text style={styles.drawBtnText}>📥 KML</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadExcel} activeOpacity={0.8}>
+                  <Text style={styles.drawBtnText}>📊 XLS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.drawBtnClear} onPress={clearDraw} activeOpacity={0.8}>
+                  <Text style={styles.drawBtnClearText}>✕ Hapus</Text>
+                </TouchableOpacity>
+              </View>
             )}
-          </View>
-        )}
-
-        {/* METRIK GAMBAR INLINE */}
-        {drawMode !== 'NONE' && drawPoints.length >= 2 && (
-          <View style={styles.metricsCard}>
-            {drawMode === 'POLYGON' && drawPoints.length >= 3 ? (
-              <><Text style={styles.metricsValue}>{drawMetrics.m2.toLocaleString()} m²</Text><Text style={styles.metricsLabel}>{drawMetrics.ha} Ha</Text></>
-            ) : (
-              <><Text style={styles.metricsValue}>{fmtM(drawMetrics.lengthM)}</Text><Text style={styles.metricsLabel}>Panjang</Text></>
+            {drawMode !== 'NONE' && drawPoints.length >= 2 && (
+              <View style={styles.metricsBadge}>
+                <Text style={styles.metricsBadgeText}>
+                  {drawMode === 'POLYGON' && drawPoints.length >= 3 ? (
+                    `📏 ${drawMetrics.m2.toLocaleString()} m² (${drawMetrics.ha} Ha) · ${drawPoints.length} titik`
+                  ) : (
+                    `📏 ${fmtM(drawMetrics.lengthM)} · ${drawPoints.length} titik`
+                  )}
+                </Text>
+              </View>
             )}
-            <Text style={styles.metricsPoints}>{drawPoints.length} titik</Text>
           </View>
         )}
 
         {/* HINT DRAW INLINE */}
-        {drawMode !== 'NONE' && (
-          <View style={styles.drawHintBanner}>
-            <Text style={styles.drawHintText}>{drawMode === 'POLYGON' ? '⬡ Tap peta untuk menambah titik polygon' : '〰 Tap peta untuk menambah titik garis'}</Text>
+        {drawMode !== 'NONE' && drawPoints.length < 2 && (
+          <View style={styles.topHintPill}>
+            <Text style={styles.topHintText}>
+              {drawMode === 'POLYGON' ? '⬡ Ketuk peta untuk menambah titik polygon' : '〰 Ketuk peta untuk menambah titik garis'}
+            </Text>
           </View>
         )}
 
         {/* HINT PILIH TARGET DARI PETA INLINE */}
         {navPickMode && (
-          <View style={styles.navPickHint}>
-            <Text style={styles.navPickHintText}>🎯 Tap peta untuk memilih titik tujuan navigasi</Text>
-            <TouchableOpacity onPress={() => { setNavPickMode(false); setShowNavPanel(true); }} style={styles.navPickCancel}>
-              <Text style={styles.navPickCancelTxt}>Batal</Text>
+          <View style={[styles.topHintPill, { backgroundColor: '#0284C7' }]}>
+            <Text style={styles.topHintText}>🎯 Ketuk tujuan navigasi di peta</Text>
+            <TouchableOpacity onPress={() => { setNavPickMode(false); setShowNavPanel(true); }} style={styles.topHintCancelBtn}>
+              <Text style={styles.topHintCancelText}>✕</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* HINT PEAGMAN STREET VIEW INLINE */}
         {isPegmanMode && (
-          <View style={[styles.navPickHint, { backgroundColor: '#F59E0B' }]}>
-            <Text style={styles.navPickHintText}>🚶‍♂️ Ketuk peta untuk membuka Street View 360°</Text>
-            <TouchableOpacity onPress={() => setIsPegmanMode(false)} style={styles.navPickCancel}>
-              <Text style={styles.navPickCancelTxt}>Batal</Text>
+          <View style={[styles.topHintPill, { backgroundColor: '#F59E0B' }]}>
+            <Text style={styles.topHintText}>🚶‍♂️ Ketuk peta untuk Street View 360°</Text>
+            <TouchableOpacity onPress={() => setIsPegmanMode(false)} style={styles.topHintCancelBtn}>
+              <Text style={styles.topHintCancelText}>✕</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -957,8 +969,8 @@ const MapPreview = ({
           </View>
         )}
 
-        {/* INFO WILAYAH (BOTTOM-LEFT) — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
-        {!navIsTracking && bottomCardTitle && (
+        {/* INFO WILAYAH (BOTTOM-LEFT) — HANYA JIKA TIDAK SEDANG NAVIGASI / GAMBAR */}
+        {!navIsTracking && drawMode === 'NONE' && !navPickMode && !isPegmanMode && bottomCardTitle && (
           <TouchableOpacity
             style={styles.bottomLeftCard}
             onPress={() => { if (onDetailPolygonPress) onDetailPolygonPress(activePolygon || { nama: bottomCardTitle }); }}
@@ -972,9 +984,9 @@ const MapPreview = ({
           </TouchableOpacity>
         )}
 
-        {/* LEGENDA — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
-        {!navIsTracking && (parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
-          <View style={styles.legendCard}>
+        {/* LEGENDA — HANYA JIKA TIDAK SEDANG NAVIGASI / GAMBAR */}
+        {!navIsTracking && drawMode === 'NONE' && !navPickMode && !isPegmanMode && (parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
+          <View style={[styles.legendCard, bottomCardTitle ? styles.legendCardStacked : styles.legendCardStandalone]}>
             {parsedFinalPolygons.length > 0 && (
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_FINAL_STROKE }]} /><Text style={styles.legendText}>Final ({parsedFinalPolygons.length})</Text></View>
             )}
@@ -990,7 +1002,7 @@ const MapPreview = ({
         {/* SCALE BAR — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
         {!navIsTracking && (
           <View style={styles.scaleBarContainer}>
-            <Text style={styles.scaleText}>0      5      10 km</Text>
+            <Text style={styles.scaleText}>0   5  10 km</Text>
             <View style={styles.scaleRuler}>
               <View style={styles.rulerSegmentWhite} />
               <View style={styles.rulerSegmentBlack} />
@@ -1022,17 +1034,22 @@ const MapPreview = ({
               <Text style={styles.fsTitle}>Peta Batas Desa</Text>
               <Text style={styles.fsSub}>Kab. Konawe Selatan</Text>
             </View>
-            {navIsTracking && (
-              <TouchableOpacity style={styles.fsNavBadge} onPress={() => setShowNavPanel(true)} activeOpacity={0.85}>
-                <Text style={styles.fsNavBadgeTxt}>🧭 {fmtM(Math.round(navDistance))}</Text>
+            <View style={styles.fsHeaderActions}>
+              <TouchableOpacity style={styles.fsLayerBtn} onPress={() => setShowLayerModal(true)} activeOpacity={0.8}>
+                <Text style={styles.fsLayerTxt}>🗺 Layer</Text>
               </TouchableOpacity>
-            )}
+              {navIsTracking && (
+                <TouchableOpacity style={styles.fsNavBadge} onPress={() => setShowNavPanel(true)} activeOpacity={0.85}>
+                  <Text style={styles.fsNavBadgeTxt}>🧭 {fmtM(Math.round(navDistance))}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Right Controls Fullscreen */}
           <View style={[styles.rightControlsStack, styles.fsRightControls]}>
             <TouchableOpacity
-              style={styles.controlCircleBtn}
+              style={[styles.controlCircleBtn, styles.fsControlCircleBtn]}
               onPress={() => fullMapRef.current?.animateCamera?.({ heading: 0, pitch: 0 })}
               activeOpacity={0.75}
               accessibilityLabel="Reset Arah Utara"
@@ -1042,26 +1059,26 @@ const MapPreview = ({
                 <Text style={styles.northLetterN}>N</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.controlCircleBtn} onPress={handleFsZoomIn} activeOpacity={0.75}>
+            <TouchableOpacity style={[styles.controlCircleBtn, styles.fsControlCircleBtn]} onPress={handleFsZoomIn} activeOpacity={0.75}>
               <Text style={styles.zoomIconText}>＋</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.controlCircleBtn} onPress={handleFsZoomOut} activeOpacity={0.75}>
+            <TouchableOpacity style={[styles.controlCircleBtn, styles.fsControlCircleBtn]} onPress={handleFsZoomOut} activeOpacity={0.75}>
               <Text style={styles.zoomIconText}>−</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.controlCircleBtn, styles.controlCircleAccent]} onPress={handleFsCenterLocation} activeOpacity={0.75}>
+            <TouchableOpacity style={[styles.controlCircleBtn, styles.fsControlCircleBtn, styles.controlCircleAccent]} onPress={handleFsCenterLocation} activeOpacity={0.75}>
               <Text style={styles.targetIcon}>🎯</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.controlCircleBtn, showDrawToolbar && styles.controlCircleActive]} onPress={() => setShowDrawToolbar((v) => !v)} activeOpacity={0.75}>
+            <TouchableOpacity style={[styles.controlCircleBtn, styles.fsControlCircleBtn, showDrawToolbar && styles.controlCircleActive]} onPress={() => setShowDrawToolbar((v) => !v)} activeOpacity={0.75}>
               <Text style={styles.drawToolIcon}>✏️</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.controlCircleBtn, !showPlacemarks && styles.controlCircleDim]} onPress={() => setShowPlacemarks((v) => !v)} activeOpacity={0.75}>
+            <TouchableOpacity style={[styles.controlCircleBtn, styles.fsControlCircleBtn, !showPlacemarks && styles.controlCircleDim]} onPress={() => setShowPlacemarks((v) => !v)} activeOpacity={0.75}>
               <Text style={styles.targetIcon}>📌</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.controlCircleBtn, navIsTracking && styles.controlCircleNav]} onPress={() => setShowNavPanel(true)} activeOpacity={0.75}>
+            <TouchableOpacity style={[styles.controlCircleBtn, styles.fsControlCircleBtn, navIsTracking && styles.controlCircleNav]} onPress={() => setShowNavPanel(true)} activeOpacity={0.75}>
               <Text style={styles.navToolIcon}>🧭</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.controlCircleBtn, isPegmanMode && styles.controlCircleActiveStreet]}
+              style={[styles.controlCircleBtn, styles.fsControlCircleBtn, isPegmanMode && styles.controlCircleActiveStreet]}
               onPress={() => {
                 if (drawPoints.length > 0) {
                   const target = drawPoints[drawPoints.length - 1];
@@ -1091,15 +1108,17 @@ const MapPreview = ({
 
           {/* Toolbar Gambar Fullscreen */}
           {showDrawToolbar && (
-            <View style={styles.drawToolbar}>
-              <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYGON' && styles.drawBtnActive]} onPress={() => startDraw('POLYGON')} activeOpacity={0.8}>
-                <Text style={styles.drawBtnText}>⬡ Polygon</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYLINE' && styles.drawBtnActive]} onPress={() => startDraw('POLYLINE')} activeOpacity={0.8}>
-                <Text style={styles.drawBtnText}>〰 Garis</Text>
-              </TouchableOpacity>
+            <View style={[styles.drawToolbar, styles.fsDrawToolbar]}>
+              <View style={styles.drawModeRow}>
+                <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYGON' && styles.drawBtnActive]} onPress={() => startDraw('POLYGON')} activeOpacity={0.8}>
+                  <Text style={[styles.drawBtnText, drawMode === 'POLYGON' && styles.drawBtnTextActive]}>⬡ Polygon</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.drawBtn, drawMode === 'POLYLINE' && styles.drawBtnActive]} onPress={() => startDraw('POLYLINE')} activeOpacity={0.8}>
+                  <Text style={[styles.drawBtnText, drawMode === 'POLYLINE' && styles.drawBtnTextActive]}>〰 Garis</Text>
+                </TouchableOpacity>
+              </View>
               {drawPoints.length > 0 && (
-                <>
+                <View style={styles.drawActionsWrap}>
                   <TouchableOpacity
                     style={styles.drawBtnStreet}
                     onPress={() => {
@@ -1111,52 +1130,59 @@ const MapPreview = ({
                     }}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.drawBtnText, { color: '#B45309' }]}>🚶‍♂️ Street</Text>
+                    <Text style={styles.drawBtnStreetText}>🚶‍♂️ Street</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.drawBtnUndo} onPress={undoLastPoint} activeOpacity={0.8}><Text style={styles.drawBtnText}>↩ Undo</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadKml} activeOpacity={0.8}><Text style={styles.drawBtnText}>📥 KML</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadExcel} activeOpacity={0.8}><Text style={styles.drawBtnText}>📊 Excel</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.drawBtnClear} onPress={clearDraw} activeOpacity={0.8}><Text style={styles.drawBtnText}>✕ Hapus</Text></TouchableOpacity>
-                </>
+                  <TouchableOpacity style={styles.drawBtnUndo} onPress={undoLastPoint} activeOpacity={0.8}>
+                    <Text style={styles.drawBtnText}>↩ Undo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadKml} activeOpacity={0.8}>
+                    <Text style={styles.drawBtnText}>📥 KML</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.drawBtnDownload} onPress={handleDownloadExcel} activeOpacity={0.8}>
+                    <Text style={styles.drawBtnText}>📊 XLS</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.drawBtnClear} onPress={clearDraw} activeOpacity={0.8}>
+                    <Text style={styles.drawBtnClearText}>✕ Hapus</Text>
+                  </TouchableOpacity>
+                </View>
               )}
-            </View>
-          )}
-
-          {/* Metrik Gambar Fullscreen */}
-          {drawMode !== 'NONE' && drawPoints.length >= 2 && (
-            <View style={styles.metricsCard}>
-              {drawMode === 'POLYGON' && drawPoints.length >= 3 ? (
-                <><Text style={styles.metricsValue}>{drawMetrics.m2.toLocaleString()} m²</Text><Text style={styles.metricsLabel}>{drawMetrics.ha} Ha</Text></>
-              ) : (
-                <><Text style={styles.metricsValue}>{fmtM(drawMetrics.lengthM)}</Text><Text style={styles.metricsLabel}>Panjang</Text></>
+              {drawMode !== 'NONE' && drawPoints.length >= 2 && (
+                <View style={styles.metricsBadge}>
+                  <Text style={styles.metricsBadgeText}>
+                    {drawMode === 'POLYGON' && drawPoints.length >= 3 ? (
+                      `📏 ${drawMetrics.m2.toLocaleString()} m² (${drawMetrics.ha} Ha) · ${drawPoints.length} titik`
+                    ) : (
+                      `📏 ${fmtM(drawMetrics.lengthM)} · ${drawPoints.length} titik`
+                    )}
+                  </Text>
+                </View>
               )}
-              <Text style={styles.metricsPoints}>{drawPoints.length} titik</Text>
             </View>
           )}
 
           {/* Hint Gambar Fullscreen */}
-          {drawMode !== 'NONE' && (
-            <View style={[styles.drawHintBanner, { bottom: 80 }]}>
-              <Text style={styles.drawHintText}>{drawMode === 'POLYGON' ? '⬡ Tap peta untuk menambah titik polygon' : '〰 Tap peta untuk menambah titik garis'}</Text>
+          {drawMode !== 'NONE' && drawPoints.length < 2 && (
+            <View style={[styles.topHintPill, styles.fsTopHintPill]}>
+              <Text style={styles.topHintText}>{drawMode === 'POLYGON' ? '⬡ Ketuk peta untuk menambah titik polygon' : '〰 Ketuk peta untuk menambah titik garis'}</Text>
             </View>
           )}
 
           {/* Hint Pilih Target Dari Peta Fullscreen */}
           {navPickMode && (
-            <View style={styles.navPickHint}>
-              <Text style={styles.navPickHintText}>🎯 Tap peta untuk memilih titik tujuan navigasi</Text>
-              <TouchableOpacity onPress={() => { setNavPickMode(false); setShowNavPanel(true); }} style={styles.navPickCancel}>
-                <Text style={styles.navPickCancelTxt}>Batal</Text>
+            <View style={[styles.topHintPill, styles.fsTopHintPill, { backgroundColor: '#0284C7' }]}>
+              <Text style={styles.topHintText}>🎯 Ketuk tujuan navigasi di peta</Text>
+              <TouchableOpacity onPress={() => { setNavPickMode(false); setShowNavPanel(true); }} style={styles.topHintCancelBtn}>
+                <Text style={styles.topHintCancelText}>✕</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Hint Street View Fullscreen */}
           {isPegmanMode && (
-            <View style={[styles.navPickHint, { backgroundColor: '#F59E0B' }]}>
-              <Text style={styles.navPickHintText}>🚶‍♂️ Ketuk peta untuk membuka Street View 360°</Text>
-              <TouchableOpacity onPress={() => setIsPegmanMode(false)} style={styles.navPickCancel}>
-                <Text style={styles.navPickCancelTxt}>Batal</Text>
+            <View style={[styles.topHintPill, styles.fsTopHintPill, { backgroundColor: '#F59E0B' }]}>
+              <Text style={styles.topHintText}>🚶‍♂️ Ketuk peta untuk Street View 360°</Text>
+              <TouchableOpacity onPress={() => setIsPegmanMode(false)} style={styles.topHintCancelBtn}>
+                <Text style={styles.topHintCancelText}>✕</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1212,21 +1238,9 @@ const MapPreview = ({
             </View>
           )}
 
-          {/* Scale Bar Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
-          {!navIsTracking && (
-            <View style={[styles.scaleBarContainer, { bottom: 30 }]}>
-              <Text style={styles.scaleText}>0      5      10 km</Text>
-              <View style={styles.scaleRuler}>
-                <View style={styles.rulerSegmentWhite} />
-                <View style={styles.rulerSegmentBlack} />
-                <View style={styles.rulerSegmentWhite} />
-              </View>
-            </View>
-          )}
-
-          {/* Bottom Card Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
-          {!navIsTracking && bottomCardTitle && (
-            <TouchableOpacity style={[styles.bottomLeftCard, { bottom: 30 }]} onPress={() => { if (onDetailPolygonPress) onDetailPolygonPress(activePolygon); }} activeOpacity={0.88}>
+          {/* Bottom Card Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI / GAMBAR */}
+          {!navIsTracking && drawMode === 'NONE' && !navPickMode && !isPegmanMode && bottomCardTitle && (
+            <TouchableOpacity style={styles.fsBottomLeftCard} onPress={() => { if (onDetailPolygonPress) onDetailPolygonPress(activePolygon); }} activeOpacity={0.88}>
               <View style={styles.bottomCardContent}>
                 <Text style={styles.bottomCardTitle} numberOfLines={1}>{bottomCardTitle}</Text>
                 {bottomCardSub && <Text style={styles.bottomCardSubtitle} numberOfLines={1}>{bottomCardSub}</Text>}
@@ -1235,12 +1249,24 @@ const MapPreview = ({
             </TouchableOpacity>
           )}
 
-          {/* Legenda Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
-          {!navIsTracking && (parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
-            <View style={[styles.legendCard, { bottom: 30, right: 80 }]}>
+          {/* Legenda Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI / GAMBAR */}
+          {!navIsTracking && drawMode === 'NONE' && !navPickMode && !isPegmanMode && (parsedFinalPolygons.length > 0 || parsedDasarPolygons.length > 0) && (
+            <View style={styles.fsLegendCard}>
               {parsedFinalPolygons.length > 0 && <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_FINAL_STROKE }]} /><Text style={styles.legendText}>Final ({parsedFinalPolygons.length})</Text></View>}
               {parsedDasarPolygons.length > 0 && <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_DASAR_STROKE }]} /><Text style={styles.legendText}>Dasar ({parsedDasarPolygons.length})</Text></View>}
               {placemarks.length > 0 && showPlacemarks && <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: C_MINE_PM }]} /><Text style={styles.legendText}>Patok ({placemarks.length})</Text></View>}
+            </View>
+          )}
+
+          {/* Scale Bar Fullscreen — HANYA JIKA TIDAK SEDANG NAVIGASI AKTIF */}
+          {!navIsTracking && (
+            <View style={styles.fsScaleBar}>
+              <Text style={styles.scaleText}>0   5  10 km</Text>
+              <View style={styles.scaleRuler}>
+                <View style={styles.rulerSegmentWhite} />
+                <View style={styles.rulerSegmentBlack} />
+                <View style={styles.rulerSegmentWhite} />
+              </View>
             </View>
           )}
         </View>
@@ -1471,46 +1497,52 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 12, fontWeight: '600', color: '#38BDF8', marginTop: 8 },
 
   topLeftCard: {
-    position: 'absolute', top: 12, left: 12,
-    backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12,
+    position: 'absolute', top: 10, left: 10,
+    backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 5, paddingHorizontal: 9,
     flexDirection: 'row', alignItems: 'center', zIndex: 15,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 2 }, shadowRadius: 5, elevation: 4,
-    borderWidth: 1, borderColor: C_BORDER,
-  },
-  mapIconBadge: { width: 32, height: 32, borderRadius: 9, backgroundColor: C_PRIMARY, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  mapIconImg: { width: 18, height: 18 },
-  topLeftTextCol: { justifyContent: 'center' },
-  mapTitleHeader: { fontSize: 13, fontWeight: '800', color: C_TEXT, letterSpacing: -0.2 },
-  mapSubHeader: { fontSize: 10, fontWeight: '500', color: C_MID, marginTop: 1 },
-
-  layerSelectorBtn: {
-    position: 'absolute', top: 12, right: 12,
-    backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12,
-    flexDirection: 'row', alignItems: 'center', zIndex: 15,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 2 }, shadowRadius: 5, elevation: 4,
-    borderWidth: 1, borderColor: C_BORDER,
-  },
-  layerIcon: { width: 16, height: 16, marginRight: 6 },
-  layerText: { fontSize: 12, fontWeight: '700', color: C_TEXT },
-  layerChevron: { fontSize: 11, color: C_PRIMARY, fontWeight: '800', marginLeft: 6, marginTop: -1 },
-
-  // FULLSCREEN BUTTON
-  fullscreenBtn: {
-    position: 'absolute', top: 56, right: 12,
-    backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 7, paddingHorizontal: 10,
-    flexDirection: 'row', alignItems: 'center', zIndex: 15, gap: 5,
     shadowColor: '#000', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 4,
+    borderWidth: 1, borderColor: C_BORDER, maxWidth: '48%',
+  },
+  mapIconBadge: { width: 24, height: 24, borderRadius: 6, backgroundColor: C_PRIMARY, justifyContent: 'center', alignItems: 'center', marginRight: 7 },
+  mapIconImg: { width: 14, height: 14 },
+  topLeftTextCol: { justifyContent: 'center', flexShrink: 1 },
+  mapTitleHeader: { fontSize: 11, fontWeight: '800', color: C_TEXT, letterSpacing: -0.2 },
+  mapSubHeader: { fontSize: 9, fontWeight: '500', color: C_MID, marginTop: 1 },
+
+  // TOP-RIGHT ROW: LAYER & LAYAR PENUH BERDAMPINGAN
+  topRightActionsRow: {
+    position: 'absolute', top: 10, right: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 5, zIndex: 15,
+  },
+  layerSelectorBtn: {
+    backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 5, paddingHorizontal: 8,
+    flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.14, shadowOffset: { width: 0, height: 1 }, shadowRadius: 3, elevation: 3,
     borderWidth: 1, borderColor: C_BORDER,
   },
-  fullscreenIcon: { fontSize: 14, color: C_TEXT },
+  layerIcon: { width: 13, height: 13, marginRight: 4 },
+  layerText: { fontSize: 11, fontWeight: '700', color: C_TEXT },
+  layerChevron: { fontSize: 10, color: C_PRIMARY, fontWeight: '800', marginLeft: 4, marginTop: -1 },
+
+  fullscreenBtn: {
+    backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 5, paddingHorizontal: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    shadowColor: '#000', shadowOpacity: 0.14, shadowOffset: { width: 0, height: 1 }, shadowRadius: 3, elevation: 3,
+    borderWidth: 1, borderColor: C_BORDER,
+  },
+  fullscreenIcon: { fontSize: 11, color: C_TEXT },
   fullscreenLabel: { fontSize: 11, fontWeight: '700', color: C_TEXT },
 
-  rightControlsStack: { position: 'absolute', top: 100, right: 12, zIndex: 15, gap: 7 },
-  fsRightControls: { top: 80 },
+  // RIGHT CONTROLS STACK (KOMPAK & TIDAK MENUTUPI AREA BAWAH)
+  rightControlsStack: { position: 'absolute', top: 44, right: 10, zIndex: 15, gap: 4 },
+  fsRightControls: { top: Platform.OS === 'android' ? 74 : 92, right: 12, gap: 5 },
   controlCircleBtn: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF',
+    width: 31, height: 31, borderRadius: 15.5, backgroundColor: '#FFFFFF',
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C_BORDER,
-    shadowColor: '#000', shadowOpacity: 0.16, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 3,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 1.5 }, shadowRadius: 3, elevation: 3,
+  },
+  fsControlCircleBtn: {
+    width: 34, height: 34, borderRadius: 17,
   },
   controlCircleAccent: { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' },
   controlCircleActive: { backgroundColor: '#FFF7ED', borderColor: C_DRAW_STROKE },
@@ -1518,102 +1550,137 @@ const styles = StyleSheet.create({
   controlCircleDim: { opacity: 0.45 },
   controlCircleNav: { backgroundColor: '#F0F9FF', borderColor: C_NAV_ACCENT },
   northCompassWrap: { alignItems: 'center', justifyContent: 'center' },
-  northArrowRed: { fontSize: 13, color: '#EF4444', lineHeight: 14, fontWeight: '900' },
-  northLetterN: { fontSize: 10, color: '#475569', lineHeight: 11, fontWeight: '800', marginTop: -1 },
-  navToolIcon: { fontSize: 16 },
-  compassIcon: { fontSize: 18 },
-  zoomIconText: { fontSize: 20, fontWeight: '700', color: C_TEXT, lineHeight: 22 },
-  targetIcon: { fontSize: 16 },
-  drawToolIcon: { fontSize: 16 },
+  northArrowRed: { fontSize: 11, color: '#EF4444', lineHeight: 12, fontWeight: '900' },
+  northLetterN: { fontSize: 8.5, color: '#475569', lineHeight: 9.5, fontWeight: '800', marginTop: -1 },
+  navToolIcon: { fontSize: 14 },
+  compassIcon: { fontSize: 16 },
+  zoomIconText: { fontSize: 17, fontWeight: '700', color: C_TEXT, lineHeight: 19 },
+  targetIcon: { fontSize: 14 },
+  drawToolIcon: { fontSize: 14 },
 
-  drawToolbar: { position: 'absolute', top: 100, left: 12, zIndex: 20, flexDirection: 'column', gap: 6 },
+  // DRAW TOOLBAR (KOMPAK, RAPI, TERINTEGRASI METRIK)
+  drawToolbar: {
+    position: 'absolute', top: 44, left: 10, zIndex: 25,
+    flexDirection: 'column', gap: 4, maxWidth: '62%',
+  },
+  fsDrawToolbar: {
+    top: Platform.OS === 'android' ? 74 : 92, left: 12, maxWidth: '65%',
+  },
+  drawModeRow: { flexDirection: 'row', gap: 4 },
+  drawActionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   drawBtn: {
-    backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 7,
-    borderRadius: 12, borderWidth: 1, borderColor: C_BORDER, elevation: 3,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 1 }, shadowRadius: 3,
+    backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: C_BORDER, elevation: 2,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2,
   },
   drawBtnActive: { backgroundColor: '#FFF7ED', borderColor: C_DRAW_STROKE },
-  drawBtnStreet: { backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#FCD34D', elevation: 2 },
-  drawBtnUndo: { backgroundColor: '#F0F9FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#BAE6FD', elevation: 2 },
-  drawBtnDownload: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#6EE7B7', elevation: 2 },
-  drawBtnClear: { backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', elevation: 2 },
-  drawBtnText: { fontSize: 11, fontWeight: '700', color: C_TEXT },
-
-  metricsCard: {
-    position: 'absolute', bottom: 70, left: 12,
-    backgroundColor: 'rgba(15,23,42,0.85)', borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 8, zIndex: 20, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  drawBtnText: { fontSize: 10, fontWeight: '700', color: C_TEXT },
+  drawBtnTextActive: { color: C_DRAW_STROKE },
+  drawBtnStreet: {
+    backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#FCD34D', elevation: 2,
   },
-  metricsValue: { color: '#00E5FF', fontSize: 14, fontWeight: '800' },
-  metricsLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 1 },
-  metricsPoints: { color: 'rgba(255,255,255,0.5)', fontSize: 9, marginTop: 2 },
-
-  drawHintBanner: {
-    position: 'absolute', bottom: 44, left: 12, right: 12,
-    backgroundColor: 'rgba(249,115,22,0.9)', borderRadius: 10,
-    paddingVertical: 5, paddingHorizontal: 12, zIndex: 18, alignItems: 'center',
+  drawBtnStreetText: { fontSize: 10, fontWeight: '700', color: '#B45309' },
+  drawBtnUndo: {
+    backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#BAE6FD', elevation: 2,
   },
-  drawHintText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
-  drawPointDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C_DRAW_STROKE, borderWidth: 2, borderColor: '#FFFFFF' },
+  drawBtnDownload: {
+    backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#6EE7B7', elevation: 2,
+  },
+  drawBtnClear: {
+    backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#FCA5A5', elevation: 2,
+  },
+  drawBtnClearText: { fontSize: 10, fontWeight: '700', color: '#DC2626' },
 
-  // INLINE COMPACT NAVIGATION BADGE (MAKS 70% AGAR TOMBOL KANAN TIDAK TERTUTUP)
+  metricsBadge: {
+    backgroundColor: 'rgba(15,23,42,0.92)', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    alignSelf: 'flex-start',
+  },
+  metricsBadgeText: { color: 'rgba(255,255,255,0.9)', fontSize: 9.5, fontWeight: '600' },
+  metricsValueBold: { color: '#00E5FF', fontWeight: '800' },
+
+  // HINT PILL (SLIM, FLOATING DI TENGAH BAWAH ATAU ATAS, TIDAK MENABRAK KONTROL)
+  topHintPill: {
+    position: 'absolute', bottom: 10, alignSelf: 'center',
+    backgroundColor: 'rgba(15,23,42,0.92)', borderRadius: 16,
+    paddingVertical: 4, paddingHorizontal: 10, zIndex: 30,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowOffset: { width: 0, height: 1.5 }, shadowRadius: 3, elevation: 4,
+  },
+  fsTopHintPill: {
+    bottom: Platform.OS === 'android' ? 24 : 36,
+  },
+  topHintText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  topHintCancelBtn: {
+    paddingHorizontal: 5, paddingVertical: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 6,
+  },
+  topHintCancelText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  drawPointDot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: C_DRAW_STROKE, borderWidth: 1.8, borderColor: '#FFFFFF' },
+
+  // INLINE COMPACT NAVIGATION BADGE (MAKS 75% AGAR TOMBOL KANAN TIDAK TERTUTUP)
   inlineNavCard: {
     position: 'absolute',
-    bottom: 12,
-    left: 12,
-    maxWidth: '70%',
+    bottom: 10,
+    left: 10,
+    maxWidth: '75%',
     backgroundColor: '#0F172A',
-    borderRadius: 12,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 25,
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     borderColor: '#0284C7',
     shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 6,
   },
   inlineNavContent: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
   },
   inlineNavTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   inlineNavTitle: {
     color: '#38BDF8',
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   inlineNavDist: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
   },
   inlineNavDir: {
     color: '#94A3B8',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
   inlineNavSub: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '500',
     marginTop: 1,
   },
   inlineNavStopBtn: {
     backgroundColor: 'rgba(239,68,68,0.25)',
-    borderRadius: 8,
-    width: 28,
-    height: 28,
+    borderRadius: 7,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -1621,178 +1688,60 @@ const styles = StyleSheet.create({
   },
   inlineNavStopTxt: {
     color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-
-  // FULLSCREEN FLOATING BANNER (DI ATAS BOTTOM BAR HP)
-  activeNavBanner: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 10,
-    backgroundColor: '#0F172A',
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 25,
-    borderWidth: 1.5,
-    borderColor: '#0284C7',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  activeNavBannerFs: {
-    bottom: Platform.OS === 'android' ? 68 : 44,
-    left: 14,
-    right: 14,
-  },
-  activeNavContent: {
-    flex: 1,
-    marginRight: 8,
-  },
-  activeNavHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  activeNavPulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 6,
-  },
-  activeNavBadgeTitle: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    marginRight: 6,
-  },
-  activeNavTargetName: {
-    color: '#F8FAFC',
     fontSize: 11,
-    fontWeight: '700',
-    flex: 1,
-  },
-  activeNavMetricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  activeNavMetricItem: {
-    alignItems: 'center',
-  },
-  activeNavMetricVal: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  activeNavMetricLbl: {
-    color: '#94A3B8',
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  activeNavDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    marginHorizontal: 8,
-  },
-  activeNavActionCol: {
-    flexDirection: 'column',
-    gap: 4,
-    justifyContent: 'center',
-  },
-  activeNavCompassBtn: {
-    backgroundColor: 'rgba(2,132,199,0.3)',
-    borderRadius: 8,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#38BDF8',
-  },
-  activeNavCompassTxt: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  activeNavStopBtn: {
-    backgroundColor: 'rgba(239,68,68,0.25)',
-    borderRadius: 8,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-  },
-  activeNavStopTxt: {
-    color: '#FCA5A5',
-    fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 
-  placemarkBubble: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFFFFF',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: C_MINE_PM,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 3,
-  },
-  placemarkEmoji: { fontSize: 14 },
-
-  navTargetPin: { backgroundColor: 'rgba(14,165,233,0.2)', borderRadius: 20, padding: 4 },
-  navTargetEmoji: { fontSize: 24 },
-
-  markerWithCalloutRow: { flexDirection: 'row', alignItems: 'center' },
-  glowPinCircle: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(14,165,233,0.35)', justifyContent: 'center', alignItems: 'center' },
-  glowPinDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: C_PRIMARY, borderWidth: 2.5, borderColor: '#FFFFFF' },
-  darkCalloutPill: {
-    backgroundColor: '#0B192C', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 4,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000', shadowOpacity: 0.35, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 5,
-  },
-  darkCalloutArrow: {
-    position: 'absolute', left: -5, top: 8, width: 0, height: 0,
-    borderTopWidth: 5, borderBottomWidth: 5, borderRightWidth: 5,
-    borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#0B192C',
-  },
-  darkCalloutText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
-
+  // BOTTOM-LEFT DESA INFO CARD (TERBATAS AGAR TIDAK MENABRAK LEGENDA & SCALE BAR)
   bottomLeftCard: {
-    position: 'absolute', bottom: 12, left: 12, backgroundColor: '#FFFFFF', borderRadius: 14,
-    paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center',
-    zIndex: 15, maxWidth: '68%',
-    shadowColor: '#000', shadowOpacity: 0.18, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6, elevation: 4,
+    position: 'absolute', bottom: 10, left: 10, backgroundColor: '#FFFFFF', borderRadius: 10,
+    paddingVertical: 5, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center',
+    zIndex: 15, maxWidth: '56%',
+    shadowColor: '#000', shadowOpacity: 0.16, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 4,
+    borderWidth: 1, borderColor: C_BORDER,
+  },
+  fsBottomLeftCard: {
+    position: 'absolute', bottom: Platform.OS === 'android' ? 20 : 34, left: 12, backgroundColor: '#FFFFFF', borderRadius: 12,
+    paddingVertical: 7, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center',
+    zIndex: 15, maxWidth: '55%',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 5, elevation: 5,
     borderWidth: 1, borderColor: C_BORDER,
   },
   bottomCardContent: { flex: 1, justifyContent: 'center' },
-  bottomCardTitle: { fontSize: 13, fontWeight: '800', color: C_TEXT },
-  bottomCardSubtitle: { fontSize: 10, fontWeight: '500', color: C_MID, marginTop: 2 },
-  chevronWrap: { paddingLeft: 6, paddingRight: 4 },
-  bottomCardChevron: { fontSize: 18, color: '#94A3B8', fontWeight: '700' },
+  bottomCardTitle: { fontSize: 11, fontWeight: '800', color: C_TEXT },
+  bottomCardSubtitle: { fontSize: 9, fontWeight: '500', color: C_MID, marginTop: 1 },
+  chevronWrap: { paddingLeft: 4 },
+  bottomCardChevron: { fontSize: 15, color: '#94A3B8', fontWeight: '700' },
 
+  // LEGENDA (STACKED RAPI DI ATAS SCALE BAR AGAR TIDAK PERNAH BERTABRAKAN)
   legendCard: {
-    position: 'absolute', bottom: 12, right: 80,
-    backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 6, zIndex: 10, gap: 3,
+    backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 4, zIndex: 10, gap: 2,
     borderWidth: 1, borderColor: C_BORDER,
     shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 2,
   },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 2 },
-  legendText: { fontSize: 9, fontWeight: '600', color: C_TEXT },
-
-  scaleBarContainer: { position: 'absolute', bottom: 12, right: 14, alignItems: 'center', zIndex: 10 },
-  scaleText: {
-    color: '#FFFFFF', fontSize: 9, fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-    marginBottom: 2, letterSpacing: 0.5,
+  legendCardStacked: { position: 'absolute', bottom: 30, right: 10 },
+  legendCardStandalone: { position: 'absolute', bottom: 10, right: 75 },
+  fsLegendCard: {
+    position: 'absolute', bottom: Platform.OS === 'android' ? 44 : 58, right: 12,
+    backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 8,
+    paddingHorizontal: 7, paddingVertical: 4, zIndex: 10, gap: 3,
+    borderWidth: 1, borderColor: C_BORDER,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 3,
   },
-  scaleRuler: { flexDirection: 'row', width: 66, height: 4, borderWidth: 1, borderColor: '#FFFFFF' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 6.5, height: 6.5, borderRadius: 1.5 },
+  legendText: { fontSize: 8.5, fontWeight: '600', color: C_TEXT },
+
+  // SCALE BAR (POJOK KANAN BAWAH)
+  scaleBarContainer: { position: 'absolute', bottom: 10, right: 10, alignItems: 'center', zIndex: 10 },
+  fsScaleBar: { position: 'absolute', bottom: Platform.OS === 'android' ? 20 : 34, right: 12, alignItems: 'center', zIndex: 10 },
+  scaleText: {
+    color: '#FFFFFF', fontSize: 8, fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    marginBottom: 1, letterSpacing: 0.3,
+  },
+  scaleRuler: { flexDirection: 'row', width: 50, height: 3, borderWidth: 0.8, borderColor: '#FFFFFF' },
   rulerSegmentWhite: { flex: 1, backgroundColor: '#FFFFFF' },
   rulerSegmentBlack: { flex: 1, backgroundColor: C_DARK_NAVY },
 
