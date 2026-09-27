@@ -218,8 +218,8 @@ const ConnectionStatus = ({
           finalStatus.hasFinal === true
             ? styles.finalAdaPill
             : finalStatus.hasFinal === false
-            ? styles.finalBelumPill
-            : styles.finalNeutralPill,
+              ? styles.finalBelumPill
+              : styles.finalNeutralPill,
         ]}
         onPress={handlePressPetaFinal}
         activeOpacity={0.75}
@@ -230,8 +230,8 @@ const ConnectionStatus = ({
             finalStatus.hasFinal === true
               ? styles.dotFinalAda
               : finalStatus.hasFinal === false
-              ? styles.dotFinalBelum
-              : styles.dotFinalNeutral,
+                ? styles.dotFinalBelum
+                : styles.dotFinalNeutral,
           ]}
         />
         <Text
@@ -240,16 +240,16 @@ const ConnectionStatus = ({
             finalStatus.hasFinal === true
               ? styles.textFinalAda
               : finalStatus.hasFinal === false
-              ? styles.textFinalBelum
-              : styles.textFinalNeutral,
+                ? styles.textFinalBelum
+                : styles.textFinalNeutral,
           ]}
           numberOfLines={1}
         >
           {finalStatus.hasFinal === true
             ? `Final: Ada${desaInfo?.name ? ` • ${desaInfo.name}` : ''}`
             : finalStatus.hasFinal === false
-            ? `Belum Ada Final${desaInfo?.name ? ` • ${desaInfo.name}` : ''}`
-            : `Peta Final (${finalStatus.count})`}
+              ? `Belum Ada Peta Final${desaInfo?.name ? ` • ${desaInfo.name}` : ''}`
+              : `Peta Final (${finalStatus.count})`}
         </Text>
       </TouchableOpacity>
     </View>
