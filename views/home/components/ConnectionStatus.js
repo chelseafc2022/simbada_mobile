@@ -211,10 +211,10 @@ const ConnectionStatus = ({
         </Text>
       </View>
 
-      {/* Badge Status Peta Final Desa (Flex 1 agar mengisi sisa lebar 100%) */}
+      {/* Badge Status Peta Final Desa (Menyesuaikan panjang huruf) */}
       <TouchableOpacity
         style={[
-          styles.finalPill,
+          styles.statusPill,
           finalStatus.hasFinal === true
             ? styles.finalAdaPill
             : finalStatus.hasFinal === false
@@ -244,7 +244,6 @@ const ConnectionStatus = ({
               : styles.textFinalNeutral,
           ]}
           numberOfLines={1}
-          ellipsizeMode="tail"
         >
           {finalStatus.hasFinal === true
             ? `Final: Ada${desaInfo?.name ? ` • ${desaInfo.name}` : ''}`
@@ -276,17 +275,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 14,
     borderWidth: 1,
-    flexShrink: 0,
-  },
-  finalPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-    borderRadius: 14,
-    borderWidth: 1,
-    minWidth: 0,
   },
   dot: {
     width: 5,
