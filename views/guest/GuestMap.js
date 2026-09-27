@@ -349,7 +349,7 @@ const GuestMap = ({ navigation }) => {
             if (coords.length < 3) return null;
             return (
               <Polygon
-                key={`final-${p.kode_desa || idx}`}
+                key={`final-${p.kode_desa || 'x'}-${idx}`}
                 coordinates={coords}
                 strokeColor={FINAL_STROKE}
                 strokeWidth={2}
@@ -369,7 +369,7 @@ const GuestMap = ({ navigation }) => {
             if (coords.length < 3) return null;
             return (
               <Polygon
-                key={`dasar-${p.kode_desa || idx}`}
+                key={`dasar-${p.kode_desa || 'x'}-${idx}`}
                 coordinates={coords}
                 strokeColor={DASAR_STROKE}
                 strokeWidth={1.8}
