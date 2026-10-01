@@ -20,14 +20,12 @@ import {
   Linking,
   Alert,
   FlatList,
+  InteractionManager,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MapView, { Marker, Polygon, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Import dataset lokal (3.7MB GeoJSON)
-const rawDataset = require('../assets/data/peta_tematik_toponim.json');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -71,9 +69,115 @@ const getCategoryIcon = (klstpn = '') => {
   return 'location';
 };
 
+// ─── IN-MEMORY MODULE CACHE ─────────────────────────────────────────────────
+// Data diparsing sekali saja & disimpan di memori RAM.
+// Saat navigasi kembali ke layar ini (kunjungan kedua dst), pembacaan JSON tidak
+// akan diulang sama sekali (0ms instantaneous render).
+let cachedParsedFeatures = null;
+
+const parseToponimDataset = () => {
+  if (cachedParsedFeatures) return cachedParsedFeatures;
+
+  const rawDataset = require('../assets/data/peta_tematik_toponim.json');
+  if (!rawDataset || !Array.isArray(rawDataset.features)) return [];
+
+  const parsed = rawDataset.features.map((f, idx) => {
+    const p = f.properties || {};
+    const g = f.geometry || {};
+    const geomType = g.type;
+
+    let coordinate = null;
+    let polygonCoords = null;
+
+    if (geomType === 'Point' && Array.isArray(g.coordinates)) {
+      coordinate = {
+        latitude: parseFloat(g.coordinates[1]),
+        longitude: parseFloat(g.coordinates[0]),
+      };
+    } else if (geomType === 'Polygon' && Array.isArray(g.coordinates)) {
+      // Multi-ring polygon (ring 0)
+      const ring = g.coordinates[0] || [];
+      polygonCoords = ring.map((c) => ({
+        latitude: parseFloat(c[1]),
+        longitude: parseFloat(c[0]),
+      }));
+      if (polygonCoords.length > 0) {
+        coordinate = polygonCoords[0];
+      }
+    } else if (geomType === 'LineString' && Array.isArray(g.coordinates)) {
+      polygonCoords = g.coordinates.map((c) => ({
+        latitude: parseFloat(c[1]),
+        longitude: parseFloat(c[0]),
+      }));
+      if (polygonCoords.length > 0) {
+        coordinate = polygonCoords[0];
+      }
+    }
+
+    // Validasi foto (abaikan placeholder blank.png)
+    const validPhotos = [p.foto1, p.foto2, p.foto3, p.foto4].filter(
+      (url) => url && typeof url === 'string' && url.startsWith('http') && !url.includes('blank.png')
+    );
+
+    return {
+      id: p.id_toponim || `feat-${idx}`,
+      name: p.nammap || p.namspe || p.namlok || 'Tanpa Nama',
+      genericName: p.namlok || '',
+      specificName: p.namspe || '',
+      category: p.klstpn || 'Lainnya',
+      featureClass: p.ftype || '',
+      dmsCoord: p.koordinat1 || '',
+      kecamatan: p.wadmkc || '',
+      desa: p.wadmkd || '',
+      kabupaten: p.wadmkk || 'Konawe Selatan',
+      elevation: p.elevasi || '0',
+      accuracy: p.akurasi || '0',
+      surveyor: p.nsurveyor || 'Surveyor BIG',
+      surveyDate: p.tglsurvei || '-',
+      source: p.sumber || 'SINAR BIG',
+      geomType,
+      coordinate,
+      polygonCoords,
+      photos: validPhotos,
+      color: getCategoryColor(p.klstpn),
+      iconName: getCategoryIcon(p.klstpn),
+    };
+  });
+
+  cachedParsedFeatures = parsed;
+  return parsed;
+};
+
 const PetaTematik = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
+
+  // Data & Cache State (Jika sudah ada di memori RAM, langsung pakai 0ms)
+  const [allFeatures, setAllFeatures] = useState(() => cachedParsedFeatures || []);
+  const [isLoadingData, setIsLoadingData] = useState(() => !cachedParsedFeatures);
+
+  useEffect(() => {
+    // Jika cache sudah tersedia, tidak perlu parsing ulang sama sekali
+    if (cachedParsedFeatures) {
+      if (allFeatures.length === 0) setAllFeatures(cachedParsedFeatures);
+      if (isLoadingData) setIsLoadingData(false);
+      return;
+    }
+
+    // Eksekusi parsing setelah animasi transisi layar selesai (UI tetap mulus 60 FPS)
+    const task = InteractionManager.runAfterInteractions(() => {
+      try {
+        const data = parseToponimDataset();
+        setAllFeatures(data);
+      } catch (err) {
+        console.warn('Gagal memuat dataset toponim:', err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    });
+
+    return () => task.cancel();
+  }, []);
 
   // Filter & Search State
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -87,73 +191,6 @@ const PetaTematik = ({ navigation }) => {
 
   // Region Viewport State untuk optimasi render pin di layar
   const [currentRegion, setCurrentRegion] = useState(INITIAL_REGION);
-
-  // Format & parse features sekali saja saat mount
-  const allFeatures = useMemo(() => {
-    if (!rawDataset || !Array.isArray(rawDataset.features)) return [];
-    return rawDataset.features.map((f, idx) => {
-      const p = f.properties || {};
-      const g = f.geometry || {};
-      const geomType = g.type;
-
-      let coordinate = null;
-      let polygonCoords = null;
-
-      if (geomType === 'Point' && Array.isArray(g.coordinates)) {
-        coordinate = {
-          latitude: parseFloat(g.coordinates[1]),
-          longitude: parseFloat(g.coordinates[0]),
-        };
-      } else if (geomType === 'Polygon' && Array.isArray(g.coordinates)) {
-        // Multi-ring polygon (ring 0)
-        const ring = g.coordinates[0] || [];
-        polygonCoords = ring.map((c) => ({
-          latitude: parseFloat(c[1]),
-          longitude: parseFloat(c[0]),
-        }));
-        if (polygonCoords.length > 0) {
-          coordinate = polygonCoords[0];
-        }
-      } else if (geomType === 'LineString' && Array.isArray(g.coordinates)) {
-        polygonCoords = g.coordinates.map((c) => ({
-          latitude: parseFloat(c[1]),
-          longitude: parseFloat(c[0]),
-        }));
-        if (polygonCoords.length > 0) {
-          coordinate = polygonCoords[0];
-        }
-      }
-
-      // Validasi foto (abaikan placeholder blank.png)
-      const validPhotos = [p.foto1, p.foto2, p.foto3, p.foto4].filter(
-        (url) => url && typeof url === 'string' && url.startsWith('http') && !url.includes('blank.png')
-      );
-
-      return {
-        id: p.id_toponim || `feat-${idx}`,
-        name: p.nammap || p.namspe || p.namlok || 'Tanpa Nama',
-        genericName: p.namlok || '',
-        specificName: p.namspe || '',
-        category: p.klstpn || 'Lainnya',
-        featureClass: p.ftype || '',
-        dmsCoord: p.koordinat1 || '',
-        kecamatan: p.wadmkc || '',
-        desa: p.wadmkd || '',
-        kabupaten: p.wadmkk || 'Konawe Selatan',
-        elevation: p.elevasi || '0',
-        accuracy: p.akurasi || '0',
-        surveyor: p.nsurveyor || 'Surveyor BIG',
-        surveyDate: p.tglsurvei || '-',
-        source: p.sumber || 'SINAR BIG',
-        geomType,
-        coordinate,
-        polygonCoords,
-        photos: validPhotos,
-        color: getCategoryColor(p.klstpn),
-        iconName: getCategoryIcon(p.klstpn),
-      };
-    });
-  }, []);
 
   // Filter fitur berdasarkan kategori dan pencarian
   const filteredFeatures = useMemo(() => {
@@ -383,6 +420,14 @@ const PetaTematik = ({ navigation }) => {
 
       {/* ─── 4. MAP VIEW CONTAINER ────────────────────────────────── */}
       <View style={styles.mapContainer}>
+        {/* Loading Banner Latar Belakang (Hanya tampil sejenak pada parsing awal) */}
+        {isLoadingData && (
+          <View style={styles.dataLoadingBanner}>
+            <ActivityIndicator size="small" color="#38BDF8" style={{ marginRight: 8 }} />
+            <Text style={styles.dataLoadingText}>Menyiapkan 1.238 titik toponim...</Text>
+          </View>
+        )}
+
         <MapView
           ref={mapRef}
           style={styles.map}
@@ -978,6 +1023,30 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  dataLoadingBanner: {
+    position: 'absolute',
+    top: 14,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    zIndex: 99,
+  },
+  dataLoadingText: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 
