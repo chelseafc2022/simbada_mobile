@@ -16,7 +16,8 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Picker } from '@react-native-picker/picker';
-import * as turf from '@turf/turf';
+import area from '@turf/area';
+import { polygon } from '@turf/helpers';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Geolocation from '@react-native-community/geolocation';
@@ -61,8 +62,8 @@ const calculateArea = (coordinates) => {
     ) {
       geo.push(geo[0]);
     }
-    const poly = turf.polygon([geo]);
-    return (turf.area(poly) / 1e6).toFixed(2);
+    const poly = polygon([geo]);
+    return (area(poly) / 1e6).toFixed(2);
   } catch {
     return '0.00';
   }

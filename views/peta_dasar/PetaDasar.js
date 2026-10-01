@@ -18,7 +18,8 @@ import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import TabBar from '../components/TabBar';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as turf from '@turf/turf';
+import area from '@turf/area';
+import { polygon } from '@turf/helpers';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,8 +64,8 @@ const calculateArea = (coordinates) => {
     ) {
       geo.push(geo[0]);
     }
-    const poly = turf.polygon([geo]);
-    return (turf.area(poly) / 1e6).toFixed(2);
+    const poly = polygon([geo]);
+    return (area(poly) / 1e6).toFixed(2);
   } catch {
     return '0.00';
   }

@@ -10,7 +10,8 @@ import {
   SafeAreaView,
   TextInput,
 } from 'react-native';
-import * as turf from '@turf/turf';
+import turfArea from '@turf/area';
+import { polygon } from '@turf/helpers';
 
 /**
  * Menghitung luas poligon dalam km² dengan Turf.js
@@ -54,9 +55,9 @@ export const calculatePolygonArea = (coordinates) => {
       geoJSONCoordinates.push([first[0], first[1]]);
     }
 
-    const poly = turf.polygon([geoJSONCoordinates]);
-    const area = turf.area(poly) / 1e6; // Konversi m² ke km²
-    return area.toFixed(4);
+    const poly = polygon([geoJSONCoordinates]);
+    const computedArea = turfArea(poly) / 1e6; // Konversi m² ke km²
+    return computedArea.toFixed(4);
   } catch (error) {
     return '0.00';
   }
