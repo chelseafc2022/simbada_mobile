@@ -15,7 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DocumentPicker from 'react-native-document-picker';
-import moment from 'moment';
+import { formatShortStamp } from '../library/dateUtils';
 import TelemetriPanel from '../telemetri/TelemetriPanel';
 import OfflineLayerDB from '../library/OfflineLayerDB';
 import AppHeader from '../components/AppHeader';
@@ -252,7 +252,7 @@ const MapViewer = ({ navigation, route }) => {
       return;
     }
     const prefix = drawMode === 'POLYGON' ? 'Batas Lahan' : 'Jalur Batas';
-    setLayerName(`${prefix} ${mapMeta?.nama || ''} ${moment().format('DD/MM HH:mm')}`);
+    setLayerName(`${prefix} ${mapMeta?.nama || ''} ${formatShortStamp()}`);
     setLayerNotes('');
     setSaveModalVisible(true);
   };

@@ -12,7 +12,7 @@ import MapView, { Polyline } from 'react-native-maps';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import FastImage from 'react-native-fast-image';
-import moment from 'moment';
+import { formatDateTime, formatDateTimeFull } from '../library/dateUtils';
 import AppHeader from '../components/AppHeader';
 import TrackDB from '../library/TrackDB';
 
@@ -32,7 +32,7 @@ const TrackItem = React.memo(({ item, onPress, onDelete }) => (
   >
     <View style={styles.cardLeft}>
       <Text style={styles.cardTitle} numberOfLines={1}>{item.label}</Text>
-      <Text style={styles.cardDate}>{moment(item.startTime).format('DD MMM YYYY, HH:mm')}</Text>
+      <Text style={styles.cardDate}>{formatDateTime(item.startTime)}</Text>
     </View>
     <View style={styles.cardRight}>
       <Text style={styles.cardDist}>{fmtDist(item.metrics?.totalDistance)}</Text>
@@ -201,7 +201,7 @@ const TrackHistory = ({ navigation }) => {
                 { l: 'Kec. Rata-Rata', v: `${(selected?.metrics?.avgSpeed || 0).toFixed(1)} km/h` },
                 { l: 'Kec. Maksimum', v: `${(selected?.metrics?.maxSpeed || 0).toFixed(1)} km/h` },
                 { l: 'Titik Waypoint', v: `${selected?.waypoints?.length || 0} titik` },
-                { l: 'Mulai', v: moment(selected?.startTime).format('DD MMM YYYY HH:mm') },
+                { l: 'Mulai', v: formatDateTimeFull(selected?.startTime) },
               ].map((s, i) => (
                 <View key={i} style={styles.statCard}>
                   <Text style={styles.statLabel}>{s.l}</Text>

@@ -12,6 +12,8 @@ const QuickActions = ({
   onNavigasiPress,
   onTambahTitikPress,
   onPetaOfflinePress,
+  onPetaTematikPress,
+  onEksporPress,
 }) => {
   const actions = [
     {
@@ -49,6 +51,24 @@ const QuickActions = ({
       iconBg: '#FAF5FF',
       iconTint: '#7C3AED',
       onPress: onPetaOfflinePress,
+    },
+    {
+      id: 'tematik',
+      title: 'Peta Tematik',
+      subtitle: '1.238 Toponim',
+      icon: require('../../assets/img/map.png'),
+      iconBg: '#FEF3C7',
+      iconTint: '#D97706',
+      onPress: onPetaTematikPress,
+    },
+    {
+      id: 'ekspor',
+      title: 'Ekspor Data',
+      subtitle: 'GeoJSON & SHP',
+      icon: require('../../assets/img/upload.png'),
+      iconBg: '#F0FDF4',
+      iconTint: '#059669',
+      onPress: onEksporPress,
     },
   ];
 

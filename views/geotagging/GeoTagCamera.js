@@ -18,7 +18,7 @@ import {
 import Geolocation from '@react-native-community/geolocation';
 import { launchCamera } from 'react-native-image-picker';
 import { useSelector } from 'react-redux';
-import moment from 'moment';
+import { formatDateTimeSec } from '../library/dateUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -33,7 +33,7 @@ const GeoTagCamera = ({ navigation, route }) => {
 
   // State
   const [currentPosition, setCurrentPosition] = useState(null);
-  const [timestamp, setTimestamp] = useState(moment().format('DD-MM-YYYY HH:mm:ss'));
+  const [timestamp, setTimestamp] = useState(formatDateTimeSec());
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [cameraError, setCameraError] = useState(null);
@@ -42,7 +42,7 @@ const GeoTagCamera = ({ navigation, route }) => {
   // Update timestamp setiap detik
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimestamp(moment().format('DD-MM-YYYY HH:mm:ss'));
+      setTimestamp(formatDateTimeSec());
     }, 1000);
     return () => clearInterval(timer);
   }, []);

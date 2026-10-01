@@ -15,7 +15,7 @@ import {
 import FastImage from 'react-native-fast-image';
 import { useSelector } from 'react-redux';
 import { useIsFocused } from '@react-navigation/native';
-import moment from 'moment';
+import { formatDateTime, formatDateShort } from '../library/dateUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMonitoringListQuery, useDesaUsulanQuery } from '../library/queries';
 import TabBar from '../components/TabBar';
@@ -482,7 +482,7 @@ const Monitoring = ({ navigation }) => {
 
                   <View style={styles.cardBottomRow}>
                     <Text style={styles.cardDateText}>
-                      📅 {item.created_at ? moment(item.created_at).format('DD MMM YYYY, HH:mm') : '-'}
+                      📅 {item.created_at ? formatDateTime(item.created_at) : '-'}
                     </Text>
                     <View style={styles.cardActionLink}>
                       <Text style={styles.cardActionText}>Lihat Detail</Text>
@@ -631,7 +631,7 @@ const Monitoring = ({ navigation }) => {
                       <Text style={styles.cardDateText}>
                         📅 Diajukan:{' '}
                         {item.createAt
-                          ? moment(item.createAt).format('DD MMM YYYY')
+                          ? formatDateShort(item.createAt)
                           : '-'}
                       </Text>
                       <View style={styles.cardActionLink}>

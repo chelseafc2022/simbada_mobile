@@ -14,7 +14,6 @@ import MapView, { Polyline, Marker } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import moment from 'moment';
 import FastImage from 'react-native-fast-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TelemetriPanel from '../telemetri/TelemetriPanel';

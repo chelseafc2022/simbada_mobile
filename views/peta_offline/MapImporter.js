@@ -16,7 +16,7 @@ import { useImportedMapsQuery } from '../library/queries';
 import { uuidv4 } from '../library/uuid';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import moment from 'moment';
+import { formatDateTime } from '../library/dateUtils';
 import AppHeader from '../components/AppHeader';
 
 const KEY_MAPS = 'IMPORTED_MAPS';
@@ -175,7 +175,7 @@ const MapImporter = ({ navigation }) => {
             <View style={styles.mapInfo}>
               <Text style={styles.mapName} numberOfLines={1}>{item.nama}</Text>
               <Text style={styles.mapMeta}>{item.format.toUpperCase()} · {fmtSize(item.fileSize)}</Text>
-              <Text style={styles.mapDate}>{moment(item.importedAt).format('DD MMM YYYY, HH:mm')}</Text>
+              <Text style={styles.mapDate}>{formatDateTime(item.importedAt)}</Text>
             </View>
             <View style={styles.mapActions}>
               <TouchableOpacity style={styles.btnView}

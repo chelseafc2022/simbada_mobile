@@ -20,7 +20,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NotificationService from '../library/NotificationService';
-import moment from 'moment';
+import { formatRelative, formatDateTime } from '../library/dateUtils';
 
 const FILTER_OPTIONS = [
   { key: 'all', label: 'Semua' },
@@ -183,15 +183,15 @@ const NotificationList = ({ navigation }) => {
    * Format relative time
    */
   const formatTime = (dateString) => {
-    const now = moment();
-    const date = moment(dateString);
-    const diffMinutes = now.diff(date, 'minutes');
+    if (!dateString) return '-';
+    const diffMs = Date.now() - new Date(dateString).getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
 
     if (diffMinutes < 1) return 'Baru saja';
     if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
     if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)} jam lalu`;
     if (diffMinutes < 10080) return `${Math.floor(diffMinutes / 1440)} hari lalu`;
-    return date.format('DD/MM/YYYY');
+    return formatDateTime(dateString);
   };
 
   /**

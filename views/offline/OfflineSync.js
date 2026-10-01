@@ -23,7 +23,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import AppHeader from '../components/AppHeader';
 import OfflineManager from '../library/OfflineManager';
-import moment from 'moment';
+import { formatDateSlash } from '../library/dateUtils';
 
 const OfflineSync = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -178,7 +178,7 @@ const OfflineSync = ({ navigation }) => {
    */
   const renderItem = ({ item, index }) => {
     const statusInfo = getStatusInfo(item.status);
-    const createdDate = moment(item.createdAt).format('DD/MM/YYYY HH:mm');
+    const createdDate = formatDateSlash(item.createdAt);
 
     return (
       <View style={styles.queueItem}>

@@ -8,14 +8,14 @@
  */
 
 import RNFS from 'react-native-fs';
-import moment from 'moment';
+import { formatFileTimestamp, formatDate, formatShortStamp } from './dateUtils';
 
 // Sanitasi nama file: hapus karakter ilegal
 const sanitizeFilename = (name) =>
   name.replace(/[:\\/*?"<>|]/g, '').replace(/\s+/g, '_').slice(0, 60);
 
 // Timestamp untuk nama file
-const fileTimestamp = () => moment().format('YYYYMMDD_HHmmss');
+const fileTimestamp = () => formatFileTimestamp();
 
 // Direktori ekspor
 const EXPORT_DIR = `${RNFS.ExternalStorageDirectoryPath}/simbada/ekspor`;
@@ -64,7 +64,7 @@ const toKML = (placemarks = [], tracks = []) => {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Simbada Ekspor - ${moment().format('DD MMM YYYY')}</name>
+    <name>Simbada Ekspor - ${formatDate(new Date())}</name>
     <description>Ekspor data lapangan dari aplikasi Simbada Mobile v0.0.5</description>
     <Folder>
       <name>Placemark (${placemarks.length} titik)</name>

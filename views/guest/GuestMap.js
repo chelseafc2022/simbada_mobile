@@ -287,47 +287,63 @@ const GuestMap = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* ─── 2. PILIHAN LAYER CEPAT (DASAR vs FINAL) ─────────────── */}
+      {/* ─── 2. PILIHAN LAYER CEPAT (DASAR vs FINAL & TEMATIK) ─────── */}
       <View style={s.quickLayerBar}>
-        <TouchableOpacity
-          style={[s.layerPill, activeLayerFilter === 'ALL' && s.layerPillActive]}
-          onPress={() => setActiveLayerFilter('ALL')}
-          activeOpacity={0.75}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ alignItems: 'center', gap: 6 }}
         >
-          <Text style={[s.layerPillText, activeLayerFilter === 'ALL' && s.layerPillTextActive]}>
-            Semua ({filteredFinal.length + filteredDasar.length})
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.layerPill, activeLayerFilter === 'ALL' && s.layerPillActive]}
+            onPress={() => setActiveLayerFilter('ALL')}
+            activeOpacity={0.75}
+          >
+            <Text style={[s.layerPillText, activeLayerFilter === 'ALL' && s.layerPillTextActive]}>
+              Semua ({filteredFinal.length + filteredDasar.length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[s.layerPill, activeLayerFilter === 'FINAL' && s.layerPillActiveFinal]}
-          onPress={() => setActiveLayerFilter('FINAL')}
-          activeOpacity={0.75}
-        >
-          <View style={[s.legendColorDot, { backgroundColor: FINAL_STROKE }]} />
-          <Text style={[s.layerPillText, activeLayerFilter === 'FINAL' && s.layerPillTextActiveFinal]}>
-            Peta Final ({rawPetaFinal.length})
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.layerPill, activeLayerFilter === 'FINAL' && s.layerPillActiveFinal]}
+            onPress={() => setActiveLayerFilter('FINAL')}
+            activeOpacity={0.75}
+          >
+            <View style={[s.legendColorDot, { backgroundColor: FINAL_STROKE }]} />
+            <Text style={[s.layerPillText, activeLayerFilter === 'FINAL' && s.layerPillTextActiveFinal]}>
+              Peta Final ({rawPetaFinal.length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[s.layerPill, activeLayerFilter === 'DASAR' && s.layerPillActiveDasar]}
-          onPress={() => setActiveLayerFilter('DASAR')}
-          activeOpacity={0.75}
-        >
-          <View style={[s.legendColorDot, { backgroundColor: DASAR_STROKE }]} />
-          <Text style={[s.layerPillText, activeLayerFilter === 'DASAR' && s.layerPillTextActiveDasar]}>
-            Peta Dasar ({rawPetaDasar.length})
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.layerPill, activeLayerFilter === 'DASAR' && s.layerPillActiveDasar]}
+            onPress={() => setActiveLayerFilter('DASAR')}
+            activeOpacity={0.75}
+          >
+            <View style={[s.legendColorDot, { backgroundColor: DASAR_STROKE }]} />
+            <Text style={[s.layerPillText, activeLayerFilter === 'DASAR' && s.layerPillTextActiveDasar]}>
+              Peta Dasar ({rawPetaDasar.length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={s.layerTypeBtn}
-          onPress={() => setShowLayerModal(true)}
-          activeOpacity={0.75}
-        >
-          <Icon name="layers-outline" size={17} color={PRIMARY} />
-        </TouchableOpacity>
+          {/* Akses Pintas Peta Tematik */}
+          <TouchableOpacity
+            style={[s.layerPill, s.thematicPill]}
+            onPress={() => navigation.navigate('PetaTematik')}
+            activeOpacity={0.75}
+          >
+            <Icon name="map" size={13} color="#F59E0B" style={{ marginRight: 5 }} />
+            <Text style={s.thematicPillText}>Peta Tematik (1.238)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.layerTypeBtn}
+            onPress={() => setShowLayerModal(true)}
+            activeOpacity={0.75}
+          >
+            <Icon name="layers-outline" size={17} color={PRIMARY} />
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* ─── 3. PETA MAPVIEW ──────────────────────────────────────── */}
@@ -501,6 +517,31 @@ const GuestMap = ({ navigation }) => {
                   ))}
                 </Picker>
               </View>
+            </View>
+
+            {/* FITUR PUBLIK / MODE TAMU: PETA TEMATIK */}
+            <View style={{ marginBottom: 12 }}>
+              <TouchableOpacity
+                style={s.thematicBanner}
+                onPress={() => navigation.navigate('PetaTematik')}
+                activeOpacity={0.8}
+              >
+                <View style={s.thematicBannerIconWrap}>
+                  <Icon name="map" size={20} color="#0284C7" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={s.thematicBannerTitle}>Peta Tematik & Fasilitas</Text>
+                    <View style={s.thematicFreeBadge}>
+                      <Text style={s.thematicFreeText}>PUBLIK</Text>
+                    </View>
+                  </View>
+                  <Text style={s.thematicBannerSub} numberOfLines={1}>
+                    1.238 fasilitas toponim, sekolah, kantor, tempat ibadah & foto SINAR BIG
+                  </Text>
+                </View>
+                <Icon name="chevron-forward" size={16} color="#0284C7" />
+              </TouchableOpacity>
             </View>
 
             {/* BARIS MENU / FITUR TERBATAS (JIKA DIKLIK ARAHKAN KE LOGIN) */}
@@ -865,6 +906,55 @@ const s = StyleSheet.create({
   layerPillTextActiveDasar: {
     color: DASAR_STROKE,
     fontWeight: '800',
+  },
+  thematicPill: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  thematicPillText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  thematicBanner: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  thematicBannerIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thematicBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+  thematicFreeBadge: {
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 6,
+  },
+  thematicFreeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  thematicBannerSub: {
+    fontSize: 11,
+    color: '#475569',
+    marginTop: 2,
   },
   layerTypeBtn: {
     width: 30,

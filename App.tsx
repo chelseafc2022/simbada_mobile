@@ -53,6 +53,7 @@ import PlacemarkForm from "./views/placemark/PlacemarkForm";
 import PlacemarkMap from "./views/placemark/PlacemarkMap";
 import MapImporter from "./views/peta_offline/MapImporter";
 import MapViewer from "./views/peta_offline/MapViewer";
+import PetaTematik from "./views/peta_tematik/PetaTematik";
 import EksporData from "./views/ekspor/EksporData";
 import ForceUpdateModal from "./views/components/ForceUpdateModal";
 import VersionCheckService from "./views/library/VersionCheckService";
@@ -188,9 +189,10 @@ const AppContent = () => {
         <Stack.Screen name="PlacemarkForm" component={PlacemarkForm} />
         <Stack.Screen name="PlacemarkMap" component={PlacemarkMap} />
 
-        {/* === Modul PRD: Peta Offline === */}
+        {/* === Modul PRD: Peta Offline & Tematik === */}
         <Stack.Screen name="MapImporter" component={MapImporter} />
         <Stack.Screen name="MapViewer" component={MapViewer} />
+        <Stack.Screen name="PetaTematik" component={PetaTematik} />
 
         {/* === Modul PRD: Ekspor Data === */}
         <Stack.Screen name="EksporData" component={EksporData} />

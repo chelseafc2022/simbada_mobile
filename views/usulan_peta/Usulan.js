@@ -15,7 +15,7 @@ import {
 import FastImage from 'react-native-fast-image';
 import { useSelector } from 'react-redux';
 import { useIsFocused } from '@react-navigation/native';
-import moment from 'moment';
+import { formatDayMonthYear } from '../library/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import TabBar from '../components/TabBar';
@@ -490,7 +490,7 @@ const Usulan = ({ navigation, route }) => {
                     <View style={usulanStyles.cardFooterRow}>
                       <View style={usulanStyles.dateContainer}>
                         <Text style={usulanStyles.dateText}>
-                          📅 {moment(item.createAt || item.created_at).format('DD MMM YYYY')}
+                          📅 {formatDayMonthYear(item.createAt || item.created_at)}
                         </Text>
                       </View>
 

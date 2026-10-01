@@ -3,12 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 // Server Lokal (Development)
-var URL = 'http://192.168.1.7:5073/'; 
-var URLX = 'http://192.168.1.7:5073/'; 
+// var URL = 'http://192.168.1.8:5073/'; 
+// var URLX = 'http://192.168.1.8:5073/'; 
+// var URL = 'http://localhost:5073/';
+// var URLX = 'http://localhost:5073/';
 
 // Server Production:
-// var URL = 'https://server-simbada.konaweselatankab.go.id/'; 
-// var URLX = 'https://server-simbada.konaweselatankab.go.id/'; 
+var URL = 'https://server-simbada.konaweselatankab.go.id/';
+var URLX = 'https://server-simbada.konaweselatankab.go.id/';
 
 
 
@@ -16,53 +18,53 @@ var URLX = 'http://192.168.1.7:5073/';
 
 
 const initialState = {
-    VERSI_APP : '0.0.5',
+  VERSI_APP: '0.0.5',
 
-    URL: {
-        URL_APP: URL,
-        URL_APPX: URLX,
-        LOGIN_URL: URL + "auth/login",
-        GUEST_URL: URL + "auth/guest",
-        URL_LIST_MONITORING : URL + "api/v1/monitoring/",
-        URL_HOME : URL + "api/v1/web_home/",
-        URL_KECAMATAN : URL + "api/v1/petadasarnew/",
-        URL_ADD_ZONA : URL + "api/v1/web_zona_tanah/",
-        URL_PENGGUNA : URL + "api/v1/pengguna/",
-        URL_PETA_FINAL : URL + "api/v1/petafinal/",
-        URL_PLACEMARK : URL + "api/v1/placemark/",
-        URL_TRACK : URL + "api/v1/track/",
-        // URL_VIEW : URL + "api/v1/web_zona_tanah/",
-        // URL_PETA_DASAR : URL + ""
+  URL: {
+    URL_APP: URL,
+    URL_APPX: URLX,
+    LOGIN_URL: URL + "auth/login",
+    GUEST_URL: URL + "auth/guest",
+    URL_LIST_MONITORING: URL + "api/v1/monitoring/",
+    URL_HOME: URL + "api/v1/web_home/",
+    URL_KECAMATAN: URL + "api/v1/petadasarnew/",
+    URL_ADD_ZONA: URL + "api/v1/web_zona_tanah/",
+    URL_PENGGUNA: URL + "api/v1/pengguna/",
+    URL_PETA_FINAL: URL + "api/v1/petafinal/",
+    URL_PLACEMARK: URL + "api/v1/placemark/",
+    URL_TRACK: URL + "api/v1/track/",
+    // URL_VIEW : URL + "api/v1/web_zona_tanah/",
+    // URL_PETA_DASAR : URL + ""
 
-    },
+  },
 
 
-    AUTH_STAT : false,
-    IS_GUEST  : false,
-    TOKEN   : '',
-    PROFILE: null,
+  AUTH_STAT: false,
+  IS_GUEST: false,
+  TOKEN: '',
+  PROFILE: null,
 
-    // === State upgrade modul offline ===
-    IS_ONLINE: true,
-    OFFLINE_QUEUE_COUNT: 0,
-    NOTIFICATION_COUNT: 0,
+  // === State upgrade modul offline ===
+  IS_ONLINE: true,
+  OFFLINE_QUEUE_COUNT: 0,
+  NOTIFICATION_COUNT: 0,
 
-    // === Modul 1: Peta Offline ===
-    ACTIVE_MAP: null,           // Metadata peta aktif { id, nama, path, bounds, format }
+  // === Modul 1: Peta Offline ===
+  ACTIVE_MAP: null,           // Metadata peta aktif { id, nama, path, bounds, format }
 
-    // === Modul 2: Telemetri GPS ===
-    GPS_STATUS: 'idle',         // 'idle' | 'acquiring' | 'active' | 'error'
-    CURRENT_POSITION: null,     // { lat, lon, alt, speed, accH, accV, heading }
+  // === Modul 2: Telemetri GPS ===
+  GPS_STATUS: 'idle',         // 'idle' | 'acquiring' | 'active' | 'error'
+  CURRENT_POSITION: null,     // { lat, lon, alt, speed, accH, accV, heading }
 
-    // === Modul 3: Track Recorder ===
-    TRACK_STATUS: 'idle',       // 'idle' | 'recording' | 'paused'
-    TRACK_METRICS: null,        // { distance, avgSpeed, maxSpeed, duration }
+  // === Modul 3: Track Recorder ===
+  TRACK_STATUS: 'idle',       // 'idle' | 'recording' | 'paused'
+  TRACK_METRICS: null,        // { distance, avgSpeed, maxSpeed, duration }
 
-    // === Modul 5: Placemark ===
-    PLACEMARK_COUNT: 0,         // Jumlah placemark tersimpan (untuk badge)
+  // === Modul 5: Placemark ===
+  PLACEMARK_COUNT: 0,         // Jumlah placemark tersimpan (untuk badge)
 
-    // === Modul Navigasi Background ===
-    ACTIVE_NAVIGATION: null,    // State navigasi aktif { isNavigating, targetLat, targetLng, targetName, currentPos, distance, bearing, ... }
+  // === Modul Navigasi Background ===
+  ACTIVE_NAVIGATION: null,    // State navigasi aktif { isNavigating, targetLat, targetLng, targetName, currentPos, distance, bearing, ... }
 }
 
 
@@ -118,9 +120,9 @@ const reducer = (state = initialState, action = {}) => {
 // Simpan lokasi ke AsyncStorage
 const saveLocations = async (locations) => {
   try {
-      await AsyncStorage.setItem('locations', JSON.stringify(locations));
+    await AsyncStorage.setItem('locations', JSON.stringify(locations));
   } catch (error) {
-      console.error("Error saving locations", error);
+    console.error("Error saving locations", error);
   }
 };
 

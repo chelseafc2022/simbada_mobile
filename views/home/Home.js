@@ -470,12 +470,14 @@ const Home = ({ navigation }) => {
         {/* 6. PRIMARY SURVEY ACTION (Mulai Survei — Action-First) */}
         <PrimarySurveyAction onPress={() => Route('TrackRecorder')} />
 
-        {/* 7. QUICK ACTIONS (2x2 Grid Aksi Lapangan) */}
+        {/* 7. QUICK ACTIONS (Grid Aksi Lapangan & Peta Tematik) */}
         <QuickActions
           onTrackingGpsPress={() => Route('TrackRecorder')}
           onNavigasiPress={() => Route('NavigasiKoordinat')}
           onTambahTitikPress={() => Route('PlacemarkList')}
           onPetaOfflinePress={() => Route('MapImporter')}
+          onPetaTematikPress={() => Route('PetaTematik')}
+          onEksporPress={() => Route('EksporData')}
         />
 
         {/* 8. STATUS DATA & SINKRONISASI (Offline-First) */}

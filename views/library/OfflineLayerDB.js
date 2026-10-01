@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNFS from 'react-native-fs';
-import moment from 'moment';
+import { formatShortDate, formatFileTimestamp, formatShortStamp } from './dateUtils';
 import { uuidv4 } from './uuid';
 
 const KEY_LAYERS = 'OFFLINE_DRAWING_LAYERS';
@@ -43,7 +43,7 @@ const OfflineLayerDB = {
         id,
         mapId: layerData.mapId || null,
         mapName: layerData.mapName || 'Peta Offline',
-        name: layerData.name || `Layer ${moment().format('DD/MM/YY HH:mm')}`,
+        name: layerData.name || `Layer ${formatShortDate()}`,
         notes: layerData.notes || '',
         type: layerData.type || 'polygon', // 'polygon' | 'polyline'
         coordinates: layerData.coordinates || [], // array of { lat, lon }
@@ -172,7 +172,7 @@ const OfflineLayerDB = {
       const exists = await RNFS.exists(outDir);
       if (!exists) await RNFS.mkdir(outDir);
 
-      const fileName = `${sanitizeFilename(isArray ? 'Semua_Layer' : layers[0].name)}_${moment().format('YYYYMMDD_HHmmss')}.geojson`;
+      const fileName = `${sanitizeFilename(isArray ? 'Semua_Layer' : layers[0].name)}_${formatFileTimestamp()}.geojson`;
       const filePath = `${outDir}/${fileName}`;
 
       await RNFS.writeFile(filePath, JSON.stringify(geoJson, null, 2), 'utf8');
@@ -208,7 +208,7 @@ const OfflineLayerDB = {
         if (!feature || !feature.geometry) return;
         const geom = feature.geometry;
         const props = feature.properties || {};
-        const name = props.name || props.NAMOBJ || props.nama || `Import ${moment().format('DD/MM HH:mm')}`;
+        const name = props.name || props.NAMOBJ || props.nama || `Import ${formatShortStamp()}`;
         const notes = props.notes || props.deskripsi || props.REMARK || '';
 
         if (geom.type === 'Polygon' && Array.isArray(geom.coordinates?.[0])) {
@@ -357,7 +357,7 @@ ${placemarkNodes}
       const exists = await RNFS.exists(outDir);
       if (!exists) await RNFS.mkdir(outDir);
 
-      const fileName = `${sanitizeFilename(isArray ? 'Semua_Layer' : layers[0].name)}_${moment().format('YYYYMMDD_HHmmss')}.kml`;
+      const fileName = `${sanitizeFilename(isArray ? 'Semua_Layer' : layers[0].name)}_${formatFileTimestamp()}.kml`;
       const filePath = `${outDir}/${fileName}`;
 
       await RNFS.writeFile(filePath, kmlContent, 'utf8');
@@ -392,7 +392,7 @@ ${placemarkNodes}
       while ((pmMatch = placemarkRegex.exec(kmlText)) !== null) {
         const pmBlock = pmMatch[0];
         const nameMatch = /<name>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/name>/i.exec(pmBlock);
-        const name = (nameMatch && nameMatch[1].trim()) || `KML Import ${moment().format('DD/MM HH:mm')}`;
+        const name = (nameMatch && nameMatch[1].trim()) || `KML Import ${formatShortStamp()}`;
         const descMatch = /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i.exec(pmBlock);
         const notes = (descMatch && descMatch[1].trim()) || '';
 
