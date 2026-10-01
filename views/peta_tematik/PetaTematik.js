@@ -27,7 +27,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import MapView, { Marker, Polygon, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const windowDims = Dimensions.get('window') || {};
+const SCREEN_WIDTH = windowDims.width || 360;
+const SCREEN_HEIGHT = windowDims.height || 740;
 
 // ─── PUSAT WILAYAH KAB. KONAWE SELATAN ─────────────────────────────────────
 const INITIAL_REGION = {
