@@ -5,18 +5,18 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  FlatList,
   ActivityIndicator,
   TextInput,
   StatusBar,
   RefreshControl,
   Alert,
+  Platform,
   StyleSheet as RNStyleSheet,
 } from 'react-native';
-import FastImage from 'react-native-fast-image';
-import { useSelector } from 'react-redux';
+import { useSelector, shallowEqual } from 'react-redux';
 import { useIsFocused } from '@react-navigation/native';
 import { formatDateTime, formatDateShort } from '../library/dateUtils';
-import { useQueryClient } from '@tanstack/react-query';
 import { useMonitoringListQuery, useDesaUsulanQuery } from '../library/queries';
 import TabBar from '../components/TabBar';
 import AppHeader from '../components/AppHeader';
@@ -41,11 +41,22 @@ const getCardinal = (deg) => {
 // Komponen Utama Monitoring
 const Monitoring = ({ navigation }) => {
   const isFocused = useIsFocused();
-  const token = useSelector((state) => state.TOKEN);
-  const profile = useSelector((state) => state.PROFILE);
-  const url = useSelector((state) => state.URL);
-  const activeNavigation = useSelector((state) => state.ACTIVE_NAVIGATION);
-  const offlineQueueCount = useSelector((state) => state.OFFLINE_QUEUE_COUNT);
+  const {
+    token,
+    profile,
+    url,
+    activeNavigation,
+    offlineQueueCount,
+  } = useSelector(
+    (state) => ({
+      token: state.TOKEN,
+      profile: state.PROFILE,
+      url: state.URL,
+      activeNavigation: state.ACTIVE_NAVIGATION,
+      offlineQueueCount: state.OFFLINE_QUEUE_COUNT,
+    }),
+    shallowEqual
+  );
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -149,20 +160,20 @@ const Monitoring = ({ navigation }) => {
     );
   }, [desaUsulanList, desaActiveFilter]);
 
-  const handleSearch = (text) => {
+  const handleSearch = useCallback((text) => {
     setSearchQuery(text);
-  };
+  }, []);
 
-  const handleFilterChange = (status) => {
+  const handleFilterChange = useCallback((status) => {
     setActiveFilter(status);
-  };
+  }, []);
 
-  const handleDesaFilterChange = (status) => {
+  const handleDesaFilterChange = useCallback((status) => {
     setDesaActiveFilter(status);
-  };
+  }, []);
 
   // Hentikan navigasi latar belakang
-  const handleStopNavigation = () => {
+  const handleStopNavigation = useCallback(() => {
     Alert.alert(
       'Hentikan Navigasi?',
       'Apakah Anda yakin ingin menghentikan penjelajahan koordinat yang sedang aktif di latar belakang?',
@@ -177,7 +188,7 @@ const Monitoring = ({ navigation }) => {
         },
       ]
     );
-  };
+  }, []);
 
   // Statistik Kabupaten
   const countPending = dataMonitoring.filter((item) => String(item.status_pengajuan) === '1').length;
@@ -218,6 +229,371 @@ const Monitoring = ({ navigation }) => {
     }
   };
 
+  // ── DESA FLATLIST HELPERS (VIRTUALIZED) ────────────────────────────────────
+  const keyExtractorDesa = useCallback((item, index) => `desa-usulan-${item.id || index}`, []);
+
+  const renderDesaItem = useCallback(
+    ({ item, index }) => (
+      <TouchableOpacity
+        style={styles.cardItem}
+        onPress={() =>
+          navigation.navigate('Zona', {
+            id_usulan: item.id,
+            nik: item.nik,
+            nama: item.nama,
+            alamat: item.alamat,
+            id_kecamatan: item.kecamatan_id,
+            nama_kecamatan: item.nama_kecamatan,
+            id_des_kel: item.des_kel_id,
+            nama_des_kel: item.nama_des_kel,
+            rwrt: item.rwrt,
+            no_telp: item.no_telp,
+            catatan: item.catatan,
+            lokasi: item.lokasi,
+            file: item.file,
+            status_pengajuan: item.status_pengajuan,
+          })
+        }
+        activeOpacity={0.75}
+      >
+        <View style={styles.cardTopRow}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={styles.cardVillageTitle} numberOfLines={1}>
+              {item.nama || 'Usulan Batas'}
+            </Text>
+            <Text style={styles.cardDistrictSub}>
+              {item.nama_des_kel || desaName} • {item.nama_kecamatan || kecamatanName}
+            </Text>
+          </View>
+          {renderStatusBadge(item.status_pengajuan)}
+        </View>
+
+        <View style={styles.cardDivider} />
+
+        <View style={styles.cardBottomRow}>
+          <Text style={styles.cardDateText}>
+            📅 {item.created_at ? formatDateTime(item.created_at) : '-'}
+          </Text>
+          <View style={styles.cardActionLink}>
+            <Text style={styles.cardActionText}>Lihat Detail</Text>
+            <Text style={styles.cardActionArrow}>›</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    ),
+    [navigation, desaName, kecamatanName]
+  );
+
+  const renderEmptyDesa = useCallback(() => {
+    if (desaUsulanLoading) {
+      return (
+        <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color="#0284C7" />
+          <Text style={{ marginTop: 8, color: '#64748B', fontSize: 12 }}>
+            Memuat data usulan desa...
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.desaEmptyCard}>
+        <Text style={{ fontSize: 28, marginBottom: 8 }}>📋</Text>
+        <Text style={styles.desaEmptyTitle}>Belum Ada Usulan</Text>
+        <Text style={styles.desaEmptySub}>
+          {desaActiveFilter === 'ALL'
+            ? 'Belum ada usulan batas yang diajukan oleh desa ini. Mulai dengan membuat usulan batas baru.'
+            : 'Tidak ada usulan batas dengan status filter yang dipilih.'}
+        </Text>
+        <TouchableOpacity
+          style={styles.desaEmptyAddBtn}
+          onPress={() => navigation.navigate('AddUsulan')}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.desaEmptyAddBtnText}>+ Buat Usulan Batas Baru</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }, [desaUsulanLoading, desaActiveFilter, navigation]);
+
+  const renderDesaHeader = useCallback(
+    () => (
+      <View>
+        {/* SECTION 1: STATUS NAVIGASI LAPANGAN */}
+        {activeNavigation && activeNavigation.isNavigating ? (
+          <View style={styles.desaNavActiveCard}>
+            <View style={styles.desaNavHeaderRow}>
+              <View style={styles.desaNavBadge}>
+                <View style={styles.pulsingGreenDot} />
+                <Text style={styles.desaNavBadgeText}>NAVIGASI AKTIF (LATAR BELAKANG)</Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleStopNavigation}
+                style={styles.desaNavStopBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.desaNavStopText}>⏹ Hentikan</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.desaNavTargetTitle} numberOfLines={1}>
+              {activeNavigation.targetName || 'Titik Target'}
+            </Text>
+            {activeNavigation.targetLat != null && activeNavigation.targetLng != null && (
+              <Text style={styles.desaNavCoordSub}>
+                📍 Lat: {activeNavigation.targetLat.toFixed(5)}, Lng: {activeNavigation.targetLng.toFixed(5)}
+              </Text>
+            )}
+
+            {/* Strip Metrik Navigasi */}
+            <View style={styles.desaNavMetricsStrip}>
+              <View style={styles.desaNavMetricCol}>
+                <Text style={styles.desaNavMetricLabel}>JARAK TERSISA</Text>
+                <Text style={styles.desaNavMetricValueCyan}>
+                  {formatDist(activeNavigation.distance)}
+                </Text>
+              </View>
+              <View style={styles.desaNavMetricDivider} />
+              <View style={styles.desaNavMetricCol}>
+                <Text style={styles.desaNavMetricLabel}>ARAH TARGET</Text>
+                <Text style={styles.desaNavMetricValueWhite}>
+                  {Math.round(activeNavigation.bearing || 0)}° {getCardinal(activeNavigation.bearing)}
+                </Text>
+              </View>
+              <View style={styles.desaNavMetricDivider} />
+              <View style={styles.desaNavMetricCol}>
+                <Text style={styles.desaNavMetricLabel}>AKURASI GPS</Text>
+                <Text style={styles.desaNavMetricValueGreen}>
+                  {activeNavigation.gpsAccuracy ? `±${Math.round(activeNavigation.gpsAccuracy)}m` : 'Tersambung'}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.desaNavActionPrimary}
+              onPress={() => navigation.navigate('NavigasiKoordinat')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.desaNavActionPrimaryText}>🧭 Buka Layar Navigasi & Kompas ›</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.desaNavStandbyCard}>
+            <View style={styles.desaNavStandbyLeft}>
+              <View style={styles.desaNavStandbyIconBox}>
+                <Text style={{ fontSize: 22 }}>🧭</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.desaNavStandbyTitle}>Navigasi Titik Batas</Text>
+                <Text style={styles.desaNavStandbySub}>Siap menuntun pencarian titik patok GPS secara offline.</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.desaNavStandbyBtn}
+              onPress={() => navigation.navigate('NavigasiKoordinat')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.desaNavStandbyBtnText}>Mulai ›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* SECTION 2: RINGKASAN METRIK AKTIVITAS LAPANGAN DESA */}
+        <View style={styles.desaSectionContainer}>
+          <Text style={styles.desaSectionTitle}>Aktivitas Lapangan Desa</Text>
+          <Text style={styles.desaSectionSub}>
+            {desaName} {kecamatanName ? `• Kec. ${kecamatanName}` : ''}
+          </Text>
+
+          <View style={styles.desaGrid}>
+            {/* 1. Placemark Titik Patok */}
+            <TouchableOpacity
+              style={styles.desaGridCard}
+              onPress={() => navigation.navigate('PlacemarkList')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.desaGridIconBox, { backgroundColor: '#E0F2FE' }]}>
+                <Text style={{ fontSize: 20 }}>📍</Text>
+              </View>
+              <Text style={styles.desaGridCount}>{placemarkCount}</Text>
+              <Text style={styles.desaGridLabel}>Titik Patok Batas</Text>
+              <Text style={styles.desaGridAction}>Buka Patok ›</Text>
+            </TouchableOpacity>
+
+            {/* 2. Track Recorder */}
+            <TouchableOpacity
+              style={styles.desaGridCard}
+              onPress={() => navigation.navigate('TrackRecorder')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.desaGridIconBox, { backgroundColor: '#DCFCE7' }]}>
+                <Text style={{ fontSize: 20 }}>🛤</Text>
+              </View>
+              <Text style={styles.desaGridCount}>
+                {trackCount} {hasActiveTrack ? '🔴' : ''}
+              </Text>
+              <Text style={styles.desaGridLabel}>Trek Jejak Rute</Text>
+              <Text style={styles.desaGridAction}>Rekam Jejak ›</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* SECTION 3 HEADER: STATUS USULAN BATAS DESA SAYA */}
+        <View style={styles.desaSectionContainer}>
+          <View style={styles.desaUsulanHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.desaSectionTitle}>Status Usulan Batas Desa</Text>
+              <Text style={styles.desaSectionSub}>Daftar pengajuan batas wilayah desa ke Kabupaten</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.desaAddUsulanBtn}
+              onPress={() => navigation.navigate('AddUsulan')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.desaAddUsulanText}>+ Buat Usulan</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Filter Chips Usulan Desa */}
+          <View style={styles.desaFilterChipsRow}>
+            <TouchableOpacity
+              style={[styles.filterChip, desaActiveFilter === 'ALL' && styles.filterChipActive]}
+              onPress={() => handleDesaFilterChange('ALL')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, desaActiveFilter === 'ALL' && styles.filterChipTextActive]}>
+                Semua ({desaUsulanList.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, desaActiveFilter === '1' && styles.filterChipActiveAmber]}
+              onPress={() => handleDesaFilterChange('1')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, desaActiveFilter === '1' && styles.filterChipTextAmber]}>
+                Menunggu ({countDesaPending})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, desaActiveFilter === '3' && styles.filterChipActiveGreen]}
+              onPress={() => handleDesaFilterChange('3')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, desaActiveFilter === '3' && styles.filterChipTextGreen]}>
+                Disetujui ({countDesaApproved})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, desaActiveFilter === '2' && styles.filterChipActiveRed]}
+              onPress={() => handleDesaFilterChange('2')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, desaActiveFilter === '2' && styles.filterChipTextRed]}>
+                Ditolak ({countDesaRejected})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    ),
+    [
+      activeNavigation,
+      handleStopNavigation,
+      navigation,
+      desaName,
+      kecamatanName,
+      placemarkCount,
+      trackCount,
+      hasActiveTrack,
+      desaActiveFilter,
+      desaUsulanList.length,
+      countDesaPending,
+      countDesaApproved,
+      countDesaRejected,
+      handleDesaFilterChange,
+    ]
+  );
+
+  // ── KABUPATEN FLATLIST HELPERS (VIRTUALIZED) ───────────────────────────────
+  const keyExtractorKabupaten = useCallback(
+    (item, index) => String(item.id_usulan || item.id || index),
+    []
+  );
+
+  const renderKabupatenItem = useCallback(
+    ({ item, index }) => (
+      <TouchableOpacity
+        style={styles.cardItem}
+        activeOpacity={0.7}
+        onPress={() =>
+          navigation.navigate('Zona', {
+            ...item,
+            nama_kecamatan: item.nama_kecamatan,
+            nama_des_kel: item.nama_des_kel,
+            id_kecamatan: item.kecamatan_id,
+            id_des_kel: item.des_kel_id,
+            file: item.file,
+            status_pengajuan: item.status_pengajuan,
+          })
+        }
+      >
+        <View style={styles.cardTopRow}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={styles.cardVillageTitle} numberOfLines={1}>
+              {item.nama_des_kel && item.nama_des_kel !== 'undefined'
+                ? item.nama_des_kel
+                : 'Batas Tanpa Nama'}
+            </Text>
+            <Text style={styles.cardDistrictSub}>
+              📍 Kecamatan{' '}
+              {item.nama_kecamatan && item.nama_kecamatan !== 'undefined'
+                ? item.nama_kecamatan
+                : '-'}
+            </Text>
+          </View>
+          {renderStatusBadge(item.status_pengajuan)}
+        </View>
+
+        <View style={styles.cardDivider} />
+
+        <View style={styles.cardBottomRow}>
+          <Text style={styles.cardDateText}>
+            📅 Diajukan:{' '}
+            {item.createAt ? formatDateShort(item.createAt) : '-'}
+          </Text>
+          <View style={styles.cardActionLink}>
+            <Text style={styles.cardActionText}>Detail Peta</Text>
+            <Text style={styles.cardActionArrow}>›</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    ),
+    [navigation]
+  );
+
+  const renderEmptyKabupaten = useCallback(() => (
+    <View style={styles.emptyContainer}>
+      <Text style={{ fontSize: 40, marginBottom: 12 }}>📋</Text>
+      <Text style={styles.emptyTitle}>Tidak Ada Usulan Ditemukan</Text>
+      <Text style={styles.emptyDesc}>
+        {searchQuery.trim() !== ''
+          ? `Tidak ada hasil pencarian untuk "${searchQuery}"`
+          : 'Belum ada usulan batas dengan kriteria status yang dipilih.'}
+      </Text>
+      {(searchQuery !== '' || activeFilter !== 'ALL') && (
+        <TouchableOpacity
+          style={styles.resetFilterBtn}
+          onPress={() => {
+            setSearchQuery('');
+            setActiveFilter('ALL');
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.resetFilterBtnText}>Reset Pencarian & Filter</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  ), [searchQuery, activeFilter]);
+
   return (
     <View style={styles.screenContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -232,10 +608,19 @@ const Monitoring = ({ navigation }) => {
           2. KONTEN TAMPILAN OPERATOR DESA (PUSAT AKTIVITAS LAPANGAN)
       ================================================================ */}
       {isOperatorDesa ? (
-        <ScrollView
+        <FlatList
+          data={filteredDesaUsulan}
+          keyExtractor={keyExtractorDesa}
+          renderItem={renderDesaItem}
+          ListHeaderComponent={renderDesaHeader}
+          ListEmptyComponent={renderEmptyDesa}
           style={styles.desaScroll}
           contentContainerStyle={styles.desaScrollContent}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -244,256 +629,7 @@ const Monitoring = ({ navigation }) => {
               tintColor="#0284C7"
             />
           }
-        >
-          {/* SECTION 1: STATUS NAVIGASI LAPANGAN (PINDAHAN DARI HOME) */}
-          {activeNavigation && activeNavigation.isNavigating ? (
-            <View style={styles.desaNavActiveCard}>
-              <View style={styles.desaNavHeaderRow}>
-                <View style={styles.desaNavBadge}>
-                  <View style={styles.pulsingGreenDot} />
-                  <Text style={styles.desaNavBadgeText}>NAVIGASI AKTIF (LATAR BELAKANG)</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={handleStopNavigation}
-                  style={styles.desaNavStopBtn}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.desaNavStopText}>⏹ Hentikan</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.desaNavTargetTitle} numberOfLines={1}>
-                {activeNavigation.targetName || 'Titik Target'}
-              </Text>
-              {activeNavigation.targetLat != null && activeNavigation.targetLng != null && (
-                <Text style={styles.desaNavCoordSub}>
-                  📍 Lat: {activeNavigation.targetLat.toFixed(5)}, Lng: {activeNavigation.targetLng.toFixed(5)}
-                </Text>
-              )}
-
-              {/* Strip Metrik Navigasi */}
-              <View style={styles.desaNavMetricsStrip}>
-                <View style={styles.desaNavMetricCol}>
-                  <Text style={styles.desaNavMetricLabel}>JARAK TERSISA</Text>
-                  <Text style={styles.desaNavMetricValueCyan}>{formatDist(activeNavigation.distance)}</Text>
-                </View>
-                <View style={styles.desaNavMetricDivider} />
-                <View style={styles.desaNavMetricCol}>
-                  <Text style={styles.desaNavMetricLabel}>ARAH TARGET</Text>
-                  <Text style={styles.desaNavMetricValueWhite}>
-                    {Math.round(activeNavigation.bearing || 0)}° {getCardinal(activeNavigation.bearing)}
-                  </Text>
-                </View>
-                <View style={styles.desaNavMetricDivider} />
-                <View style={styles.desaNavMetricCol}>
-                  <Text style={styles.desaNavMetricLabel}>AKURASI GPS</Text>
-                  <Text style={styles.desaNavMetricValueGreen}>
-                    {activeNavigation.gpsAccuracy ? `±${Math.round(activeNavigation.gpsAccuracy)}m` : 'Tersambung'}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.desaNavActionPrimary}
-                onPress={() => navigation.navigate('NavigasiKoordinat')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.desaNavActionPrimaryText}>🧭 Buka Layar Navigasi & Kompas ›</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.desaNavStandbyCard}>
-              <View style={styles.desaNavStandbyLeft}>
-                <View style={styles.desaNavStandbyIconBox}>
-                  <Text style={{ fontSize: 22 }}>🧭</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.desaNavStandbyTitle}>Navigasi Titik Batas</Text>
-                  <Text style={styles.desaNavStandbySub}>Siap menuntun pencarian titik patok GPS secara offline.</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.desaNavStandbyBtn}
-                onPress={() => navigation.navigate('NavigasiKoordinat')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.desaNavStandbyBtnText}>Mulai ›</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* SECTION 2: RINGKASAN METRIK AKTIVITAS LAPANGAN DESA */}
-          <View style={styles.desaSectionContainer}>
-            <Text style={styles.desaSectionTitle}>Aktivitas Lapangan Desa</Text>
-            <Text style={styles.desaSectionSub}>
-              {desaName} {kecamatanName ? `• Kec. ${kecamatanName}` : ''}
-            </Text>
-
-            <View style={styles.desaGrid}>
-              {/* 1. Placemark Titik Patok */}
-              <TouchableOpacity
-                style={styles.desaGridCard}
-                onPress={() => navigation.navigate('PlacemarkList')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.desaGridIconBox, { backgroundColor: '#E0F2FE' }]}>
-                  <Text style={{ fontSize: 20 }}>📍</Text>
-                </View>
-                <Text style={styles.desaGridCount}>{placemarkCount}</Text>
-                <Text style={styles.desaGridLabel}>Titik Patok Batas</Text>
-                <Text style={styles.desaGridAction}>Buka Patok ›</Text>
-              </TouchableOpacity>
-
-              {/* 2. Track Recorder */}
-              <TouchableOpacity
-                style={styles.desaGridCard}
-                onPress={() => navigation.navigate('TrackRecorder')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.desaGridIconBox, { backgroundColor: '#DCFCE7' }]}>
-                  <Text style={{ fontSize: 20 }}>🛤</Text>
-                </View>
-                <Text style={styles.desaGridCount}>
-                  {trackCount} {hasActiveTrack ? '🔴' : ''}
-                </Text>
-                <Text style={styles.desaGridLabel}>Trek Jejak Rute</Text>
-                <Text style={styles.desaGridAction}>Rekam Jejak ›</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* SECTION 3: STATUS USULAN BATAS DESA SAYA */}
-          <View style={styles.desaSectionContainer}>
-            <View style={styles.desaUsulanHeaderRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.desaSectionTitle}>Status Usulan Batas Desa</Text>
-                <Text style={styles.desaSectionSub}>Daftar pengajuan batas wilayah desa ke Kabupaten</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.desaAddUsulanBtn}
-                onPress={() => navigation.navigate('AddUsulan')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.desaAddUsulanText}>+ Buat Usulan</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Filter Chips Usulan Desa */}
-            <View style={styles.desaFilterChipsRow}>
-              <TouchableOpacity
-                style={[styles.filterChip, desaActiveFilter === 'ALL' && styles.filterChipActive]}
-                onPress={() => handleDesaFilterChange('ALL')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, desaActiveFilter === 'ALL' && styles.filterChipTextActive]}>
-                  Semua ({desaUsulanList.length})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, desaActiveFilter === '1' && styles.filterChipActiveAmber]}
-                onPress={() => handleDesaFilterChange('1')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, desaActiveFilter === '1' && styles.filterChipTextAmber]}>
-                  Menunggu ({countDesaPending})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, desaActiveFilter === '3' && styles.filterChipActiveGreen]}
-                onPress={() => handleDesaFilterChange('3')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, desaActiveFilter === '3' && styles.filterChipTextGreen]}>
-                  Disetujui ({countDesaApproved})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, desaActiveFilter === '2' && styles.filterChipActiveRed]}
-                onPress={() => handleDesaFilterChange('2')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, desaActiveFilter === '2' && styles.filterChipTextRed]}>
-                  Ditolak ({countDesaRejected})
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* List Usulan Desa */}
-            {desaUsulanLoading ? (
-              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#0284C7" />
-                <Text style={{ marginTop: 8, color: '#64748B', fontSize: 12 }}>Memuat data usulan desa...</Text>
-              </View>
-            ) : filteredDesaUsulan.length === 0 ? (
-              <View style={styles.desaEmptyCard}>
-                <Text style={{ fontSize: 28, marginBottom: 8 }}>📋</Text>
-                <Text style={styles.desaEmptyTitle}>Belum Ada Usulan</Text>
-                <Text style={styles.desaEmptySub}>
-                  {desaActiveFilter === 'ALL'
-                    ? 'Belum ada usulan batas yang diajukan oleh desa ini. Mulai dengan membuat usulan batas baru.'
-                    : 'Tidak ada usulan batas dengan status filter yang dipilih.'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.desaEmptyAddBtn}
-                  onPress={() => navigation.navigate('AddUsulan')}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.desaEmptyAddBtnText}>+ Buat Usulan Batas Baru</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredDesaUsulan.map((item, idx) => (
-                <TouchableOpacity
-                  key={`desa-usulan-${item.id || idx}`}
-                  style={styles.cardItem}
-                  onPress={() =>
-                    navigation.navigate('Zona', {
-                      id_usulan: item.id,
-                      nik: item.nik,
-                      nama: item.nama,
-                      alamat: item.alamat,
-                      id_kecamatan: item.kecamatan_id,
-                      nama_kecamatan: item.nama_kecamatan,
-                      id_des_kel: item.des_kel_id,
-                      nama_des_kel: item.nama_des_kel,
-                      rwrt: item.rwrt,
-                      no_telp: item.no_telp,
-                      catatan: item.catatan,
-                      lokasi: item.lokasi,
-                      file: item.file,
-                      status_pengajuan: item.status_pengajuan,
-                    })
-                  }
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.cardTopRow}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={styles.cardVillageTitle} numberOfLines={1}>
-                        {item.nama || 'Usulan Batas'}
-                      </Text>
-                      <Text style={styles.cardDistrictSub}>
-                        {item.nama_des_kel || desaName} • {item.nama_kecamatan || kecamatanName}
-                      </Text>
-                    </View>
-                    {renderStatusBadge(item.status_pengajuan)}
-                  </View>
-
-                  <View style={styles.cardDivider} />
-
-                  <View style={styles.cardBottomRow}>
-                    <Text style={styles.cardDateText}>
-                      📅 {item.created_at ? formatDateTime(item.created_at) : '-'}
-                    </Text>
-                    <View style={styles.cardActionLink}>
-                      <Text style={styles.cardActionText}>Lihat Detail</Text>
-                      <Text style={styles.cardActionArrow}>›</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        </ScrollView>
+        />
       ) : (
         /* ================================================================
             3. KONTEN OPERATOR KABUPATEN (VERIFIKASI & MONITORING REGIONAL)
@@ -570,17 +706,25 @@ const Monitoring = ({ navigation }) => {
             </ScrollView>
           </View>
 
-          {/* CONTENT LIST KABUPATEN */}
+          {/* CONTENT LIST KABUPATEN (FLATLIST VIRTUALIZED) */}
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#0284C7" />
               <Text style={styles.loadingText}>Memuat data monitoring usulan...</Text>
             </View>
           ) : (
-            <ScrollView
+            <FlatList
+              data={filteredData}
+              keyExtractor={keyExtractorKabupaten}
+              renderItem={renderKabupatenItem}
+              ListEmptyComponent={renderEmptyKabupaten}
               style={styles.listContainer}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={7}
+              removeClippedSubviews={Platform.OS === 'android'}
               refreshControl={
                 <RefreshControl
                   refreshing={isRefreshing}
@@ -589,83 +733,7 @@ const Monitoring = ({ navigation }) => {
                   tintColor="#0284C7"
                 />
               }
-            >
-              {filteredData.length > 0 ? (
-                filteredData.map((item, index) => (
-                  <TouchableOpacity
-                    key={`monitoring-${index}-${item.id_usulan || index}`}
-                    style={styles.cardItem}
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      navigation.navigate('Zona', {
-                        ...item,
-                        nama_kecamatan: item.nama_kecamatan,
-                        nama_des_kel: item.nama_des_kel,
-                        id_kecamatan: item.kecamatan_id,
-                        id_des_kel: item.des_kel_id,
-                        file: item.file,
-                        status_pengajuan: item.status_pengajuan,
-                      })
-                    }
-                  >
-                    <View style={styles.cardTopRow}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text style={styles.cardVillageTitle} numberOfLines={1}>
-                          {item.nama_des_kel && item.nama_des_kel !== 'undefined'
-                            ? item.nama_des_kel
-                            : 'Batas Tanpa Nama'}
-                        </Text>
-                        <Text style={styles.cardDistrictSub}>
-                          📍 Kecamatan{' '}
-                          {item.nama_kecamatan && item.nama_kecamatan !== 'undefined'
-                            ? item.nama_kecamatan
-                            : '-'}
-                        </Text>
-                      </View>
-                      {renderStatusBadge(item.status_pengajuan)}
-                    </View>
-
-                    <View style={styles.cardDivider} />
-
-                    <View style={styles.cardBottomRow}>
-                      <Text style={styles.cardDateText}>
-                        📅 Diajukan:{' '}
-                        {item.createAt
-                          ? formatDateShort(item.createAt)
-                          : '-'}
-                      </Text>
-                      <View style={styles.cardActionLink}>
-                        <Text style={styles.cardActionText}>Detail Peta</Text>
-                        <Text style={styles.cardActionArrow}>›</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Text style={{ fontSize: 40, marginBottom: 12 }}>📋</Text>
-                  <Text style={styles.emptyTitle}>Tidak Ada Usulan Ditemukan</Text>
-                  <Text style={styles.emptyDesc}>
-                    {searchQuery.trim() !== ''
-                      ? `Tidak ada hasil pencarian untuk "${searchQuery}"`
-                      : 'Belum ada usulan batas dengan kriteria status yang dipilih.'}
-                  </Text>
-                  {(searchQuery !== '' || activeFilter !== 'ALL') && (
-                    <TouchableOpacity
-                      style={styles.resetFilterBtn}
-                      onPress={() => {
-                        setSearchQuery('');
-                        setActiveFilter('ALL');
-                        applyFilterAndSearch(dataMonitoring, '', 'ALL');
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.resetFilterBtnText}>Reset Pencarian & Filter</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </ScrollView>
+            />
           )}
         </View>
       )}
