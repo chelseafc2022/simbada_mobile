@@ -126,4 +126,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RegionSummary;
+export default React.memo(RegionSummary);

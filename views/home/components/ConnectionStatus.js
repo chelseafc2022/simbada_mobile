@@ -14,13 +14,15 @@ const ConnectionStatus = ({
   petaFinalAll = [],
   navigation = null,
 }) => {
-  const globalPos = useSelector((s) => s.CURRENT_POSITION);
+  // Optimasi: Hanya seleksi nilai Boolean ada/tidaknya posisi, bukan objek koordinat lengkap
+  // sehingga ConnectionStatus tidak re-render setiap detik saat koordinat GPS berubah.
+  const hasGlobalPos = useSelector((s) => Boolean(s.CURRENT_POSITION));
   const globalGpsStatus = useSelector((s) => s.GPS_STATUS);
   const PROFILE = useSelector((s) => s.PROFILE);
 
   const isGpsActive =
     propGpsActive ||
-    !!globalPos ||
+    hasGlobalPos ||
     globalGpsStatus === 'active' ||
     GpsService.hasAcquired();
 
@@ -371,4 +373,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ConnectionStatus;
+export default React.memo(ConnectionStatus);

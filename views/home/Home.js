@@ -2,17 +2,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
   ScrollView,
   Alert,
   StatusBar,
   StyleSheet,
-  Platform,
-  PermissionsAndroid,
   RefreshControl,
 } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, shallowEqual } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
 import GpsService from '../library/GpsService';
 import {
@@ -43,31 +39,92 @@ import TabBar from '../components/TabBar';
  * HOME SIMBADA MOBILE V2
  * Sistem Informasi Batas Desa — Kabupaten Konawe Selatan
  * Filosofi: MAP-FIRST | ACTION-FIRST | OFFLINE-FIRST | MOBILE-FIRST
- * Dioptimalkan dengan TanStack Query untuk caching instan tanpa load/render berulang.
+ * Dioptimalkan dengan TanStack Query & Granular Redux Selectors (shallowEqual + GPS Deadband).
  */
 const Home = ({ navigation }) => {
   const Route = useCallback((routeName) => {
     navigation.navigate(routeName);
   }, [navigation]);
 
+  // Memoized Navigation Callbacks (Mencegah re-render child components React.memo)
+  const handleNotificationPress = useCallback(() => Route('NotificationList'), [Route]);
+  const handleProfilePress = useCallback(() => Route('User'), [Route]);
+  const handleTrackRecorder = useCallback(() => Route('TrackRecorder'), [Route]);
+  const handleNavigasiKoordinat = useCallback(() => Route('NavigasiKoordinat'), [Route]);
+  const handlePlacemarkList = useCallback(() => Route('PlacemarkList'), [Route]);
+  const handleMapImporter = useCallback(() => Route('MapImporter'), [Route]);
+  const handlePetaTematik = useCallback(() => Route('PetaTematik'), [Route]);
+  const handleEksporData = useCallback(() => Route('EksporData'), [Route]);
+  const handleOfflineSync = useCallback(() => Route('OfflineSync'), [Route]);
+  const handleMonitoring = useCallback(() => Route('Monitoring'), [Route]);
+
   const queryClient = useQueryClient();
 
-  // Redux Store State
-  const URL = useSelector((state) => state.URL);
-  const TOKEN = useSelector((state) => state.TOKEN);
-  const PROFILE = useSelector((state) => state.PROFILE);
-  const IS_ONLINE = useSelector((state) => state.IS_ONLINE);
-  const NOTIFICATION_COUNT = useSelector((state) => state.NOTIFICATION_COUNT);
-  const OFFLINE_QUEUE_COUNT = useSelector((state) => state.OFFLINE_QUEUE_COUNT);
+  // ── 1. REDUX STORE STATE (Granular Selection with shallowEqual) ──────────────
+  // Mengelompokkan state konfigurasi/auth dalam satu selector dengan shallowEqual
+  // sehingga hanya re-render jika salah satu nilai properti benar-benar berubah.
+  const {
+    URL,
+    TOKEN,
+    PROFILE,
+    IS_ONLINE,
+    NOTIFICATION_COUNT,
+    OFFLINE_QUEUE_COUNT,
+    globalGpsStatus,
+  } = useSelector(
+    (state) => ({
+      URL: state.URL,
+      TOKEN: state.TOKEN,
+      PROFILE: state.PROFILE,
+      IS_ONLINE: state.IS_ONLINE,
+      NOTIFICATION_COUNT: state.NOTIFICATION_COUNT,
+      OFFLINE_QUEUE_COUNT: state.OFFLINE_QUEUE_COUNT,
+      globalGpsStatus: state.GPS_STATUS,
+    }),
+    shallowEqual
+  );
+
+  // ── 2. GPS DEADBAND SELECTOR ────────────────────────────────────────────────
+  // Mencegah re-render Home setiap detik akibat jitter GPS saat pengguna diam.
+  // Hanya men-trigger update jika posisi bergeser > ~5 meter (0.00005 derajat).
+  const userLocation = useSelector(
+    (state) => {
+      const pos = state.CURRENT_POSITION;
+      if (!pos || isNaN(pos.lat) || isNaN(pos.lon)) return null;
+      return {
+        latitude: pos.lat,
+        longitude: pos.lon,
+        accuracy: pos.accH || 0,
+      };
+    },
+    (prev, next) => {
+      if (prev === next) return true;
+      if (!prev || !next) return false;
+      const latDiff = Math.abs(prev.latitude - next.latitude);
+      const lonDiff = Math.abs(prev.longitude - next.longitude);
+      const accDiff = Math.abs(prev.accuracy - next.accuracy);
+      return latDiff < 0.00005 && lonDiff < 0.00005 && accDiff < 5;
+    }
+  );
+
+  const isGpsActive = Boolean(
+    userLocation || globalGpsStatus === 'active' || GpsService.hasAcquired()
+  );
 
   // Local GIS UI State
   const [selectedKecamatan, setSelectedKecamatan] = useState('');
   const [activePolygon, setActivePolygon] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const mapRef = useRef(null);
+
+  // Inisialisasi pelacakan GPS di latar belakang sekali saat mount
+  useEffect(() => {
+    GpsService.startTracking();
+  }, []);
 
   // ================================================================
-  // 1. TANSTACK QUERY INTEGRATION (ZERO-SPINNER CACHED DATA)
+  // 3. TANSTACK QUERY INTEGRATION (ZERO-SPINNER CACHED DATA)
   // ================================================================
   const { data: kecamatan = [], isLoading: isKecamatanLoading } = useKecamatanQuery(TOKEN, URL);
   const { data: DATA_FINAL = 0, isLoading: isFinalLoading } = usePetaFinalCountQuery(TOKEN, URL);
@@ -112,51 +169,15 @@ const Home = ({ navigation }) => {
     });
   }, [rawPetadasar]);
 
-  // GPS Sensor & Telemetri State
-  const globalPos = useSelector((state) => state.CURRENT_POSITION);
-  const globalGpsStatus = useSelector((state) => state.GPS_STATUS);
-
-  const initialUserLoc = globalPos
-    ? {
-        latitude: globalPos.lat,
-        longitude: globalPos.lon,
-        accuracy: globalPos.accH,
-      }
-    : null;
-
-  const [isGpsActive, setIsGpsActive] = useState(
-    !!globalPos || globalGpsStatus === 'active' || GpsService.hasAcquired()
-  );
-  const [userLocation, setUserLocation] = useState(initialUserLoc);
-  const mapRef = useRef(null);
-
-  // Sinkronisasi posisi GPS langsung dari GpsService / Redux
-  useEffect(() => {
-    if (globalPos) {
-      setUserLocation({
-        latitude: globalPos.lat,
-        longitude: globalPos.lon,
-        accuracy: globalPos.accH,
-      });
-      setIsGpsActive(true);
-    } else if (globalGpsStatus === 'active' || GpsService.hasAcquired()) {
-      setIsGpsActive(true);
-    }
-  }, [globalPos, globalGpsStatus]);
-
-  useEffect(() => {
-    GpsService.startTracking();
-  }, []);
-
   // Center Map to User GPS Location
   const handleCenterLocation = () => {
     const loc =
       userLocation ||
-      (globalPos
+      (GpsService._lastKnownPosition
         ? {
-            latitude: globalPos.lat,
-            longitude: globalPos.lon,
-            accuracy: globalPos.accH,
+            latitude: GpsService._lastKnownPosition.lat,
+            longitude: GpsService._lastKnownPosition.lon,
+            accuracy: GpsService._lastKnownPosition.accH,
           }
         : null);
 
@@ -403,8 +424,8 @@ const Home = ({ navigation }) => {
       {/* 1. HEADER (Compact Modern Government GIS) */}
       <HomeHeader
         notificationCount={NOTIFICATION_COUNT}
-        onNotificationPress={() => Route('NotificationList')}
-        onProfilePress={() => Route('User')}
+        onNotificationPress={handleNotificationPress}
+        onProfilePress={handleProfilePress}
       />
 
       {/* 2. CONNECTION & GPS STATUS INDICATOR */}
@@ -468,16 +489,16 @@ const Home = ({ navigation }) => {
         />
 
         {/* 6. PRIMARY SURVEY ACTION (Mulai Survei — Action-First) */}
-        <PrimarySurveyAction onPress={() => Route('TrackRecorder')} />
+        <PrimarySurveyAction onPress={handleTrackRecorder} />
 
         {/* 7. QUICK ACTIONS (Grid Aksi Lapangan & Peta Tematik) */}
         <QuickActions
-          onTrackingGpsPress={() => Route('TrackRecorder')}
-          onNavigasiPress={() => Route('NavigasiKoordinat')}
-          onTambahTitikPress={() => Route('PlacemarkList')}
-          onPetaOfflinePress={() => Route('MapImporter')}
-          onPetaTematikPress={() => Route('PetaTematik')}
-          onEksporPress={() => Route('EksporData')}
+          onTrackingGpsPress={handleTrackRecorder}
+          onNavigasiPress={handleNavigasiKoordinat}
+          onTambahTitikPress={handlePlacemarkList}
+          onPetaOfflinePress={handleMapImporter}
+          onPetaTematikPress={handlePetaTematik}
+          onEksporPress={handleEksporData}
         />
 
         {/* 8. STATUS DATA & SINKRONISASI (Offline-First) */}
@@ -485,15 +506,15 @@ const Home = ({ navigation }) => {
           isOnline={IS_ONLINE}
           queueCount={OFFLINE_QUEUE_COUNT}
           lastSyncTime="15 September 2026, 16:30"
-          onSyncPress={() => Route('OfflineSync')}
+          onSyncPress={handleOfflineSync}
         />
 
         {/* 9. AKTIVITAS TERBARU (Dinamis & Interaktif) */}
         <RecentActivity
           activities={recentActivities}
-          onViewAllPress={() => Route('Monitoring')}
-          onTambahTitikPress={() => Route('PlacemarkList')}
-          onRekamTrekPress={() => Route('TrackRecorder')}
+          onViewAllPress={handleMonitoring}
+          onTambahTitikPress={handlePlacemarkList}
+          onRekamTrekPress={handleTrackRecorder}
         />
       </ScrollView>
 

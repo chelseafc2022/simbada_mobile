@@ -312,4 +312,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RecentActivity;
+export default React.memo(RecentActivity);

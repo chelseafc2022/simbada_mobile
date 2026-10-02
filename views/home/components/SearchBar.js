@@ -305,4 +305,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SearchBar;
+export default React.memo(SearchBar);

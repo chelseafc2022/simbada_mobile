@@ -200,4 +200,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeHeader;
+export default React.memo(HomeHeader);

@@ -179,4 +179,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SyncStatus;
+export default React.memo(SyncStatus);

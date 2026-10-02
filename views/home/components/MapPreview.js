@@ -364,8 +364,22 @@ const MapPreview = ({
 
   const fullMapRef = useRef(null);
 
-  // Sync GPS dengan Redux
-  const reduxPos = useSelector((s) => s.CURRENT_POSITION);
+  // Sync GPS dengan Redux (Deadband Comparator: hindari re-render jika perpindahan < 5 meter)
+  const reduxPos = useSelector(
+    (s) => {
+      const pos = s.CURRENT_POSITION;
+      if (!pos || isNaN(pos.lat) || isNaN(pos.lon)) return null;
+      return { lat: pos.lat, lon: pos.lon };
+    },
+    (prev, next) => {
+      if (prev === next) return true;
+      if (!prev || !next) return false;
+      return (
+        Math.abs(prev.lat - next.lat) < 0.00005 &&
+        Math.abs(prev.lon - next.lon) < 0.00005
+      );
+    }
+  );
 
   useEffect(() => {
     if (reduxPos) {

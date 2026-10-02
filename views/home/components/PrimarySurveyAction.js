@@ -123,4 +123,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PrimarySurveyAction;
+export default React.memo(PrimarySurveyAction);
