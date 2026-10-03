@@ -8,6 +8,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TrackDB from './TrackDB';
 import PlacemarkDB from './PlacemarkDB';
 
+// ── FAST IN-MEMORY PRELOAD CACHE (INSTANT 0ms HYDRATION) ────────────────────
+let _inMemoryPetaDasar = null;
+let _inMemoryPetaFinal = null;
+
+// Preload dari AsyncStorage ke memori segera saat modul diimport
+AsyncStorage.getItem('@peta_dasar_all_polygon')
+  .then((raw) => {
+    if (raw) {
+      try {
+        _inMemoryPetaDasar = JSON.parse(raw);
+      } catch {}
+    }
+  })
+  .catch(() => {});
+
+AsyncStorage.getItem('@peta_final_all_polygon')
+  .then((raw) => {
+    if (raw) {
+      try {
+        _inMemoryPetaFinal = JSON.parse(raw);
+      } catch {}
+    }
+  })
+  .catch(() => {});
+
 // ── 1. Query Daftar Kecamatan ────────────────────────────────────────────────
 export const useKecamatanQuery = (token, url) => {
   const baseUrl = url?.URL_KECAMATAN || url?.URL_PETA_FINAL;
@@ -142,31 +167,34 @@ export const usePetadasarKecamatanQuery = (token, url, selectedKecamatan) => {
   });
 };
 
-// ── 5. Query Poligon Seluruh Desa (PetaDasar.js) ─────────────────────────────
+// ── 5. Query Poligon Seluruh Desa (PetaDasar.js & GuestMap.js) ───────────────
 export const usePetaDasarAllQuery = (token, url) => {
   const baseUrl = url?.URL_HOME;
   return useQuery({
-    queryKey: ['petadasar_all', token],
+    queryKey: ['petadasar_all'],
+    initialData: () => _inMemoryPetaDasar || undefined,
+    initialDataUpdatedAt: () => (_inMemoryPetaDasar ? Date.now() - 5 * 60 * 1000 : undefined),
     queryFn: async () => {
-      if (!token || !baseUrl) return [];
-      // Cek cache lokal AsyncStorage terlebih dahulu untuk respon instan
-      const CACHE_KEY = '@peta_dasar_all_polygon';
-      let localCached = null;
-      try {
-        const raw = await AsyncStorage.getItem(CACHE_KEY);
-        if (raw) localCached = JSON.parse(raw);
-      } catch {}
+      if (!baseUrl) return _inMemoryPetaDasar || [];
+
+      // Cek AsyncStorage jika memori belum terisi
+      if (!_inMemoryPetaDasar) {
+        try {
+          const raw = await AsyncStorage.getItem('@peta_dasar_all_polygon');
+          if (raw) _inMemoryPetaDasar = JSON.parse(raw);
+        } catch {}
+      }
 
       try {
         const res = await fetch(`${baseUrl}petadasar`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `kikensbatara ${token}`,
+            ...(token ? { Authorization: `kikensbatara ${token}` } : {}),
           },
         });
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           const fmt = data.map((p) => ({
             kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
             nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
@@ -179,62 +207,85 @@ export const usePetaDasarAllQuery = (token, url) => {
               }))
               .filter((c) => isFinite(c.latitude) && isFinite(c.longitude)),
           }));
-          AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fmt)).catch(() => {});
+          _inMemoryPetaDasar = fmt;
+          AsyncStorage.setItem('@peta_dasar_all_polygon', JSON.stringify(fmt)).catch(() => {});
           return fmt;
         }
       } catch (e) {
-        if (localCached) return localCached;
+        if (_inMemoryPetaDasar && _inMemoryPetaDasar.length > 0) return _inMemoryPetaDasar;
         throw e;
       }
-      return localCached || [];
+      return _inMemoryPetaDasar || [];
     },
-    enabled: Boolean(token && baseUrl),
-    staleTime: 20 * 60 * 1000,
+    enabled: Boolean(baseUrl),
+    staleTime: 30 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
   });
 };
 
-// ── 6. Query Poligon Peta Final (PetaFinal.js) ───────────────────────────────
+// ── 6. Query Poligon Peta Final (PetaFinal.js & GuestMap.js) ─────────────────
 export const usePetaFinalAllQuery = (token, url) => {
   const baseUrl = url?.URL_PETA_FINAL;
   return useQuery({
-    queryKey: ['petafinal_all', token],
+    queryKey: ['petafinal_all'],
+    initialData: () => _inMemoryPetaFinal || undefined,
+    initialDataUpdatedAt: () => (_inMemoryPetaFinal ? Date.now() - 5 * 60 * 1000 : undefined),
     queryFn: async () => {
-      if (!token || !baseUrl) return [];
-      const res = await fetch(`${baseUrl}petafinal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `kikensbatara ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (!Array.isArray(data)) return [];
+      if (!baseUrl) return _inMemoryPetaFinal || [];
 
-      return data
-        .filter((p) => (p.lokasi && (Array.isArray(p.lokasi.coordinat) || Array.isArray(p.lokasi))) || Array.isArray(p.coordinates))
-        .map((p) => {
-          const coords = Array.isArray(p.lokasi?.coordinat)
-            ? p.lokasi.coordinat
-            : (Array.isArray(p.lokasi) ? p.lokasi : (p.coordinates || []));
-          return {
-            id: p.lokasi?.id || p.id || '',
-            kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
-            nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
-            kode_kecamatan: p.lokasi?.kode_kecamatan || p.kode_kecamatan || '',
-            nama_kecamatan: p.lokasi?.nama_kecamatan || p.nama_kecamatan || '',
-            status_peta: p.lokasi?.status_peta || p.status_peta || 'Telah Disahkan (Final)',
-            catatan: p.lokasi?.catatan || p.catatan || '',
-            coordinates: coords
-              .map((c) => ({
-                latitude: parseFloat(c.lat || c.latitude),
-                longitude: parseFloat(c.lng || c.longitude),
-              }))
-              .filter((c) => isFinite(c.latitude) && isFinite(c.longitude)),
-          };
+      // Cek AsyncStorage jika memori belum terisi
+      if (!_inMemoryPetaFinal) {
+        try {
+          const raw = await AsyncStorage.getItem('@peta_final_all_polygon');
+          if (raw) _inMemoryPetaFinal = JSON.parse(raw);
+        } catch {}
+      }
+
+      try {
+        const res = await fetch(`${baseUrl}petafinal`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `kikensbatara ${token}` } : {}),
+          },
         });
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const fmt = data
+            .filter((p) => (p.lokasi && (Array.isArray(p.lokasi.coordinat) || Array.isArray(p.lokasi))) || Array.isArray(p.coordinates))
+            .map((p) => {
+              const coords = Array.isArray(p.lokasi?.coordinat)
+                ? p.lokasi.coordinat
+                : (Array.isArray(p.lokasi) ? p.lokasi : (p.coordinates || []));
+              return {
+                id: p.lokasi?.id || p.id || '',
+                kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
+                nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
+                kode_kecamatan: p.lokasi?.kode_kecamatan || p.kode_kecamatan || '',
+                nama_kecamatan: p.lokasi?.nama_kecamatan || p.nama_kecamatan || '',
+                status_peta: p.lokasi?.status_peta || p.status_peta || 'Telah Disahkan (Final)',
+                catatan: p.lokasi?.catatan || p.catatan || '',
+                coordinates: coords
+                  .map((c) => ({
+                    latitude: parseFloat(c.lat || c.latitude),
+                    longitude: parseFloat(c.lng || c.longitude),
+                  }))
+                  .filter((c) => isFinite(c.latitude) && isFinite(c.longitude)),
+              };
+            });
+          _inMemoryPetaFinal = fmt;
+          AsyncStorage.setItem('@peta_final_all_polygon', JSON.stringify(fmt)).catch(() => {});
+          return fmt;
+        }
+      } catch (e) {
+        if (_inMemoryPetaFinal && _inMemoryPetaFinal.length > 0) return _inMemoryPetaFinal;
+        throw e;
+      }
+      return _inMemoryPetaFinal || [];
     },
-    enabled: Boolean(token && baseUrl),
-    staleTime: 20 * 60 * 1000,
+    enabled: Boolean(baseUrl),
+    staleTime: 30 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
   });
 };
 

@@ -411,8 +411,8 @@ const GuestMap = ({ navigation }) => {
           })}
         </MapView>
 
-        {/* Loading Spinner */}
-        {(isFinalLoading || isDasarLoading) && (
+        {/* Loading Spinner (Hanya tampil jika belum ada data poligon sama sekali) */}
+        {(isFinalLoading || isDasarLoading) && rawPetaDasar.length === 0 && rawPetaFinal.length === 0 && (
           <View style={s.loadingBadge}>
             <ActivityIndicator size="small" color="#FFFFFF" />
             <Text style={s.loadingText}>Memuat batas peta...</Text>
