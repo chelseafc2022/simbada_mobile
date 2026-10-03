@@ -149,6 +149,7 @@ const MapContent = React.memo(({
   navIsTracking,
   navTargetName,
   navDistance,
+  currentNavPos,
   handleMapPress,
   handlePolygonPress,
   handleFinalPolygonPress,
