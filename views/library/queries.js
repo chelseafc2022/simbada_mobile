@@ -217,10 +217,13 @@ export const usePetaFinalAllQuery = (token, url) => {
             ? p.lokasi.coordinat
             : (Array.isArray(p.lokasi) ? p.lokasi : (p.coordinates || []));
           return {
+            id: p.lokasi?.id || p.id || '',
             kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
             nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
             kode_kecamatan: p.lokasi?.kode_kecamatan || p.kode_kecamatan || '',
             nama_kecamatan: p.lokasi?.nama_kecamatan || p.nama_kecamatan || '',
+            status_peta: p.lokasi?.status_peta || p.status_peta || 'Telah Disahkan (Final)',
+            catatan: p.lokasi?.catatan || p.catatan || '',
             coordinates: coords
               .map((c) => ({
                 latitude: parseFloat(c.lat || c.latitude),

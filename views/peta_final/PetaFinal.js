@@ -12,6 +12,7 @@ import {
   StatusBar,
   Platform,
   Switch,
+  ScrollView,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import MapView, { Polygon, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -20,6 +21,8 @@ import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { area } from '@turf/area';
+import { polygon } from '@turf/helpers';
 import {
   usePetaFinalAllQuery,
   usePetaDasarAllQuery,
@@ -38,18 +41,39 @@ const TEXT_DARK    = '#0F172A';
 const TEXT_MID     = '#64748B';
 
 // Polygon styles
-const FINAL_STROKE      = '#00E5FF'; // Vibrant cyan-blue border
-const FINAL_FILL        = 'rgba(2, 132, 199, 0.35)'; // Crisp blue fill
-const FINAL_MINE_STROKE = '#EF4444'; // Red for operator's village
-const FINAL_MINE_FILL   = 'rgba(239, 68, 68, 0.40)';
-const DASAR_STROKE      = '#94A3B8'; // Slate gray for dasar overlay
-const DASAR_FILL        = 'rgba(148, 163, 184, 0.22)';
+const FINAL_STROKE          = '#00E5FF'; // Vibrant cyan-blue border
+const FINAL_FILL            = 'rgba(2, 132, 199, 0.35)'; // Crisp blue fill
+const FINAL_MINE_STROKE     = '#EF4444'; // Red for operator's village
+const FINAL_MINE_FILL       = 'rgba(239, 68, 68, 0.40)';
+const FINAL_SELECTED_STROKE = '#F59E0B'; // Vibrant amber for selected polygon
+const FINAL_SELECTED_FILL   = 'rgba(245, 158, 11, 0.45)';
+const DASAR_STROKE          = '#94A3B8'; // Slate gray for dasar overlay
+const DASAR_FILL            = 'rgba(148, 163, 184, 0.22)';
 
 const KONAWE = {
   latitude: -4.2021418,
   longitude: 122.4819808,
   latitudeDelta: 0.9,
   longitudeDelta: 0.9,
+};
+
+const calculateArea = (coordinates) => {
+  try {
+    const geo = coordinates
+      .map((c) => (c.latitude && c.longitude ? [c.longitude, c.latitude] : null))
+      .filter(Boolean);
+    if (geo.length < 3) return '0.00';
+    if (
+      geo[0][0] !== geo[geo.length - 1][0] ||
+      geo[0][1] !== geo[geo.length - 1][1]
+    ) {
+      geo.push(geo[0]);
+    }
+    const poly = polygon([geo]);
+    return (area(poly) / 1e6).toFixed(2);
+  } catch {
+    return '0.00';
+  }
 };
 
 const getCenterPoint = (coords) => {
@@ -79,6 +103,10 @@ const PetaFinal = ({ navigation }) => {
   // Map settings
   const [mapType, setMapType] = useState('hybrid'); // 'hybrid' | 'satellite' | 'standard' | 'terrain'
   const [showLayerModal, setShowLayerModal] = useState(false);
+
+  // Detail Modal & Selected Polygon
+  const [detailModalVisible, setDetailModalVisible]       = useState(false);
+  const [selectedPolygonDetail, setSelectedPolygonDetail] = useState(null);
 
   // Data & Filters
   const [selectedKecamatan, setSelectedKecamatan] = useState(
@@ -319,19 +347,43 @@ const PetaFinal = ({ navigation }) => {
           >
             {/* Dasar overlay (behind) */}
             {showDasar &&
-              activeDasar.map((p, i) => (
-                <Polygon
-                  key={`dasar-${p.kode_desa}-${i}`}
-                  coordinates={p.coordinates}
-                  strokeColor={DASAR_STROKE}
-                  fillColor={DASAR_FILL}
-                  strokeWidth={1.2}
-                  zIndex={1}
-                />
-              ))}
+              activeDasar.map((p, i) => {
+                const isSelected =
+                  selectedPolygonDetail?.kodeDesa === p.kode_desa &&
+                  selectedPolygonDetail?.isDasar;
+                return (
+                  <Polygon
+                    key={`dasar-${p.kode_desa}-${i}`}
+                    coordinates={p.coordinates}
+                    strokeColor={isSelected ? FINAL_SELECTED_STROKE : DASAR_STROKE}
+                    fillColor={isSelected ? FINAL_SELECTED_FILL : DASAR_FILL}
+                    strokeWidth={isSelected ? 3 : 1.2}
+                    zIndex={isSelected ? 8 : 1}
+                    tappable={true}
+                    onPress={() => {
+                      setSelectedPolygonDetail({
+                        id: p.id,
+                        namaDesa: p.nama_desa || 'Desa',
+                        namaKecamatan: p.nama_kecamatan || '',
+                        kodeDesa: p.kode_desa || '',
+                        kodeKecamatan: p.kode_kecamatan || '',
+                        statusPeta: 'Peta Dasar (Pembanding)',
+                        catatan: '',
+                        isMine: false,
+                        isDasar: true,
+                        coordinates: p.coordinates,
+                      });
+                      setDetailModalVisible(true);
+                    }}
+                  />
+                );
+              })}
 
             {/* Final polygons */}
             {activeFinal.map((p, i) => {
+              const isSelected =
+                selectedPolygonDetail?.kodeDesa === p.kode_desa &&
+                !selectedPolygonDetail?.isDasar;
               const isMine =
                 userStatus === 2 &&
                 id_desa_user &&
@@ -341,13 +393,59 @@ const PetaFinal = ({ navigation }) => {
                 <Polygon
                   key={`final-${p.kode_desa}-${i}`}
                   coordinates={p.coordinates}
-                  strokeColor={isMine ? FINAL_MINE_STROKE : FINAL_STROKE}
-                  fillColor={isMine ? FINAL_MINE_FILL : FINAL_FILL}
-                  strokeWidth={isMine ? 2.8 : 2}
-                  zIndex={isMine ? 3 : 2}
+                  strokeColor={
+                    isSelected
+                      ? FINAL_SELECTED_STROKE
+                      : isMine
+                      ? FINAL_MINE_STROKE
+                      : FINAL_STROKE
+                  }
+                  fillColor={
+                    isSelected
+                      ? FINAL_SELECTED_FILL
+                      : isMine
+                      ? FINAL_MINE_FILL
+                      : FINAL_FILL
+                  }
+                  strokeWidth={isSelected ? 3.5 : isMine ? 2.8 : 2}
+                  zIndex={isSelected ? 10 : isMine ? 3 : 2}
+                  tappable={true}
+                  onPress={() => {
+                    setSelectedPolygonDetail({
+                      id: p.id,
+                      namaDesa: p.nama_desa || 'Desa',
+                      namaKecamatan: p.nama_kecamatan || '',
+                      kodeDesa: p.kode_desa || '',
+                      kodeKecamatan: p.kode_kecamatan || '',
+                      statusPeta: p.status_peta || 'Telah Disahkan (Final)',
+                      catatan: p.catatan || '',
+                      isMine,
+                      isDasar: false,
+                      coordinates: p.coordinates,
+                    });
+                    setDetailModalVisible(true);
+                  }}
                 />
               );
             })}
+
+            {/* Marker for selected polygon */}
+            {selectedPolygonDetail?.coordinates?.length > 0 && (() => {
+              const center = getCenterPoint(selectedPolygonDetail.coordinates);
+              if (!center) return null;
+              return (
+                <Marker
+                  coordinate={center}
+                  title={selectedPolygonDetail.namaDesa}
+                  description={
+                    selectedPolygonDetail.namaKecamatan
+                      ? `Kec. ${selectedPolygonDetail.namaKecamatan}`
+                      : selectedPolygonDetail.statusPeta
+                  }
+                  pinColor={selectedPolygonDetail.isDasar ? '#94A3B8' : '#F59E0B'}
+                />
+              );
+            })()}
 
             {/* Marker for operator's village */}
             {userStatus === 2 &&
@@ -602,6 +700,160 @@ const PetaFinal = ({ navigation }) => {
       </Animated.View>
 
       <TabBar />
+
+      {/* DETAIL MODAL DESA FINAL */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={detailModalVisible}
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
+        <View style={ss.modalOverlay}>
+          <View style={ss.modalSheet}>
+            <View style={ss.modalHandleBar} />
+            <View style={ss.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View
+                  style={[
+                    ss.detailBadgeIcon,
+                    selectedPolygonDetail?.isDasar && { backgroundColor: '#F1F5F9' },
+                  ]}
+                >
+                  <FastImage
+                    source={require('../assets/img/gis_pirate-map.png')}
+                    style={{ width: 18, height: 18 }}
+                    resizeMode={FastImage.resizeMode.contain}
+                    tintColor={selectedPolygonDetail?.isDasar ? '#64748B' : PRIMARY}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={ss.modalTitle} numberOfLines={1}>
+                    {selectedPolygonDetail?.namaDesa
+                      ? `DESA ${selectedPolygonDetail.namaDesa.toUpperCase()}`
+                      : 'Detail Wilayah'}
+                  </Text>
+                  <Text style={ss.modalSubtitle}>
+                    {selectedPolygonDetail?.namaKecamatan
+                      ? `Kecamatan ${selectedPolygonDetail.namaKecamatan}`
+                      : 'Kabupaten Konawe Selatan'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setDetailModalVisible(false)}
+                style={ss.modalCloseBtn}
+              >
+                <Text style={ss.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {selectedPolygonDetail && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Status Badge Banner */}
+                <View
+                  style={[
+                    ss.statusBanner,
+                    selectedPolygonDetail.isDasar
+                      ? ss.statusBannerDasar
+                      : ss.statusBannerFinal,
+                  ]}
+                >
+                  <Text style={ss.statusBannerIcon}>
+                    {selectedPolygonDetail.isDasar ? '🗺️' : '✅'}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={
+                        selectedPolygonDetail.isDasar
+                          ? ss.statusBannerTextDasar
+                          : ss.statusBannerTextFinal
+                      }
+                    >
+                      {selectedPolygonDetail.statusPeta}
+                    </Text>
+                    <Text style={ss.statusBannerSub}>
+                      {selectedPolygonDetail.isDasar
+                        ? 'Layer garis batas peta dasar sebagai referensi'
+                        : 'Batas wilayah telah resmi disahkan dan berstatus final'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={ss.infoRow}>
+                  <Text style={ss.infoLabel}>Kode Wilayah (Kemendagri)</Text>
+                  <Text
+                    style={[
+                      ss.infoValue,
+                      { fontFamily: Platform.OS === 'android' ? 'monospace' : 'Courier' },
+                    ]}
+                  >
+                    {selectedPolygonDetail.kodeDesa || '—'}
+                  </Text>
+                </View>
+
+                {selectedPolygonDetail.namaKecamatan ? (
+                  <View style={ss.infoRow}>
+                    <Text style={ss.infoLabel}>Kecamatan</Text>
+                    <Text style={ss.infoValue}>{selectedPolygonDetail.namaKecamatan}</Text>
+                  </View>
+                ) : null}
+
+                <View style={ss.infoRow}>
+                  <Text style={ss.infoLabel}>Estimasi Luas Area</Text>
+                  <Text style={ss.infoValue}>
+                    {calculateArea(selectedPolygonDetail.coordinates)} km²
+                  </Text>
+                </View>
+
+                <View style={ss.infoRow}>
+                  <Text style={ss.infoLabel}>Jumlah Titik Koordinat</Text>
+                  <Text style={ss.infoValue}>
+                    {selectedPolygonDetail.coordinates?.length || 0} titik
+                  </Text>
+                </View>
+
+                {selectedPolygonDetail.catatan ? (
+                  <View style={ss.infoRow}>
+                    <Text style={ss.infoLabel}>Catatan Penetapan</Text>
+                    <Text style={ss.infoValue}>{selectedPolygonDetail.catatan}</Text>
+                  </View>
+                ) : null}
+
+                {/* Quick Action Button: Filter / Focus to this Village */}
+                <TouchableOpacity
+                  style={ss.btnFilterThisDesa}
+                  onPress={() => {
+                    if (selectedPolygonDetail.kodeKecamatan) {
+                      setSelectedKecamatan(selectedPolygonDetail.kodeKecamatan);
+                    }
+                    setSelectedDesa(selectedPolygonDetail.kodeDesa);
+                    setDetailModalVisible(false);
+                    fitPolygons([{ coordinates: selectedPolygonDetail.coordinates }]);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={ss.btnFilterThisDesaText}>🎯 Fokuskan Filter ke Desa Ini</Text>
+                </TouchableOpacity>
+
+                <Text style={ss.coordTitle}>Daftar Titik Koordinat Geospasial</Text>
+                <View style={ss.coordBox}>
+                  {selectedPolygonDetail.coordinates?.slice(0, 10).map((c, i) => (
+                    <Text key={i} style={ss.coordItem}>
+                      {i + 1}.  {c.latitude.toFixed(6)}, {c.longitude.toFixed(6)}
+                    </Text>
+                  ))}
+                  {selectedPolygonDetail.coordinates?.length > 10 && (
+                    <Text style={ss.coordMore}>
+                      + {selectedPolygonDetail.coordinates.length - 10} titik lainnya
+                    </Text>
+                  )}
+                </View>
+                <View style={{ height: 24 }} />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* MODAL PILIH LAYER BASEMAP (IDENTICAL TO MAPPREVIEW) */}
       <Modal
@@ -1184,6 +1436,173 @@ const ss = StyleSheet.create({
     fontWeight: '800',
     color: PRIMARY,
     marginLeft: 8,
+  },
+
+  // DETAIL MODAL DESA FINAL
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+  },
+  modalSheet: {
+    backgroundColor: CARD_BG,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: -4 },
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  modalHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  detailBadgeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    color: TEXT_DARK,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  modalSubtitle: {
+    color: TEXT_MID,
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  modalClose: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+    gap: 10,
+  },
+  statusBannerFinal: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  statusBannerDasar: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusBannerIcon: {
+    fontSize: 20,
+  },
+  statusBannerTextFinal: {
+    color: '#065F46',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  statusBannerTextDasar: {
+    color: '#334155',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  statusBannerSub: {
+    color: TEXT_MID,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+  },
+  infoLabel: {
+    color: TEXT_MID,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  infoValue: {
+    color: TEXT_DARK,
+    fontSize: 14,
+    fontWeight: '700',
+    maxWidth: '60%',
+    textAlign: 'right',
+  },
+  btnFilterThisDesa: {
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 12,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  btnFilterThisDesaText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  coordTitle: {
+    color: TEXT_DARK,
+    fontWeight: '700',
+    fontSize: 13,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  coordBox: {
+    backgroundColor: SURFACE,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+  },
+  coordItem: {
+    color: TEXT_MID,
+    fontSize: 12,
+    marginBottom: 4,
+    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Courier',
+  },
+  coordMore: {
+    color: PRIMARY,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });
 
