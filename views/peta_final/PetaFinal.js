@@ -13,6 +13,8 @@ import {
   Platform,
   Switch,
   ScrollView,
+  TextInput,
+  FlatList,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import MapView, { Polygon, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -108,6 +110,11 @@ const PetaFinal = ({ navigation }) => {
   const [detailModalVisible, setDetailModalVisible]       = useState(false);
   const [selectedPolygonDetail, setSelectedPolygonDetail] = useState(null);
 
+  // Daftar Desa Final Modal & Search
+  const [daftarFinalVisible, setDaftarFinalVisible]       = useState(false);
+  const [daftarSearchQuery, setDaftarSearchQuery]         = useState('');
+  const [daftarSelectedKec, setDaftarSelectedKec]         = useState('');
+
   // Data & Filters
   const [selectedKecamatan, setSelectedKecamatan] = useState(
     parseInt(userStatus) === 2 || parseInt(userStatus) === 3 ? id_kecamatan_user || '' : ''
@@ -122,6 +129,43 @@ const PetaFinal = ({ navigation }) => {
   const { data: initialDasarData = [], isLoading: isDasarLoading } = usePetaDasarAllQuery(TOKEN, URL);
   const { data: kecamatanList = [] } = useKecamatanQuery(TOKEN, URL);
   const { data: desaList = [] } = useDesaQuery(TOKEN, URL, selectedKecamatan);
+
+  // Metrik dan data katalog seluruh desa final
+  const { totalLuasFinal, kecamatanFinalList, filteredDaftarDesa } = useMemo(() => {
+    let sumLuas = 0;
+    const kecMap = new Map();
+
+    initialFinalData.forEach((item) => {
+      const a = parseFloat(calculateArea(item.coordinates));
+      if (!isNaN(a)) sumLuas += a;
+      if (item.nama_kecamatan) {
+        const count = kecMap.get(item.nama_kecamatan) || 0;
+        kecMap.set(item.nama_kecamatan, count + 1);
+      }
+    });
+
+    const kecList = Array.from(kecMap.entries()).map(([name, count]) => ({
+      name,
+      count,
+    }));
+
+    const q = daftarSearchQuery.trim().toLowerCase();
+    const filtered = initialFinalData.filter((item) => {
+      const matchKec = !daftarSelectedKec || item.nama_kecamatan === daftarSelectedKec;
+      if (!matchKec) return false;
+      if (!q) return true;
+      const desaName = (item.nama_desa || '').toLowerCase();
+      const kecName = (item.nama_kecamatan || '').toLowerCase();
+      const kode = (item.kode_desa || '').toLowerCase();
+      return desaName.includes(q) || kecName.includes(q) || kode.includes(q);
+    });
+
+    return {
+      totalLuasFinal: sumLuas.toFixed(2),
+      kecamatanFinalList: kecList,
+      filteredDaftarDesa: filtered,
+    };
+  }, [initialFinalData, daftarSearchQuery, daftarSelectedKec]);
 
   // Bottom Panel animation
   const panelAnim = useRef(new Animated.Value(1)).current;
@@ -242,7 +286,7 @@ const PetaFinal = ({ navigation }) => {
 
   const panelMaxH = panelAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [50, 310],
+    outputRange: [50, 410],
   });
 
   // ── Zoom & Navigation Handlers (Identical to MapPreview) ───────────────────
@@ -561,6 +605,20 @@ const PetaFinal = ({ navigation }) => {
           </View>
         </View>
 
+        {/* TOMBOL FLOATING: DAFTAR DESA FINAL */}
+        <TouchableOpacity
+          style={ss.daftarFinalFloatingBtn}
+          onPress={() => setDaftarFinalVisible(true)}
+          activeOpacity={0.82}
+        >
+          <View style={ss.daftarFinalFloatingBadge}>
+            <Text style={{ fontSize: 13 }}>📋</Text>
+          </View>
+          <Text style={ss.daftarFinalFloatingText}>
+            Daftar Desa Final ({initialFinalData.length})
+          </Text>
+        </TouchableOpacity>
+
         {/* RESET FILTER CHIP (WHEN DESA FILTERED) */}
         {selectedDesa ? (
           <TouchableOpacity
@@ -643,6 +701,26 @@ const PetaFinal = ({ navigation }) => {
                 </View>
               )}
             </View>
+
+            {/* Tombol Akses Cepat: Katalog Seluruh Desa Final */}
+            <TouchableOpacity
+              style={ss.btnKatalogFinal}
+              onPress={() => setDaftarFinalVisible(true)}
+              activeOpacity={0.85}
+            >
+              <View style={ss.katalogIconWrap}>
+                <Text style={{ fontSize: 16 }}>📑</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={ss.katalogTitle}>Daftar Desa yang Sudah Final</Text>
+                <Text style={ss.katalogSub}>
+                  {initialFinalData.length} desa resmi ditetapkan • Cari & sorot cepat
+                </Text>
+              </View>
+              <View style={ss.katalogBadge}>
+                <Text style={ss.katalogBadgeText}>{initialFinalData.length} Desa</Text>
+              </View>
+            </TouchableOpacity>
 
             {/* Dropdown Kecamatan */}
             <View
@@ -851,6 +929,224 @@ const PetaFinal = ({ navigation }) => {
                 <View style={{ height: 24 }} />
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL DAFTAR DESA YANG SUDAH FINAL */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={daftarFinalVisible}
+        onRequestClose={() => setDaftarFinalVisible(false)}
+      >
+        <View style={ss.modalOverlay}>
+          <View style={[ss.modalSheet, { maxHeight: '90%' }]}>
+            <View style={ss.modalHandleBar} />
+
+            {/* Modal Header */}
+            <View style={ss.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={ss.daftarModalBadgeIcon}>
+                  <Text style={{ fontSize: 18 }}>🏛️</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={ss.modalTitle}>DAFTAR DESA FINAL</Text>
+                  <Text style={ss.modalSubtitle}>
+                    {initialFinalData.length} Desa Telah Ditetapkan Resmi
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setDaftarFinalVisible(false)}
+                style={ss.modalCloseBtn}
+              >
+                <Text style={ss.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Metrik Bar Ringkas (3 Cards) */}
+            <View style={ss.daftarStatsRow}>
+              <View style={ss.daftarStatCard}>
+                <Text style={ss.daftarStatLabel}>TOTAL DESA</Text>
+                <Text style={[ss.daftarStatVal, { color: PRIMARY }]}>
+                  {initialFinalData.length} Desa
+                </Text>
+              </View>
+              <View style={ss.daftarStatCard}>
+                <Text style={ss.daftarStatLabel}>KECAMATAN</Text>
+                <Text style={[ss.daftarStatVal, { color: '#059669' }]}>
+                  {kecamatanFinalList.length} Kec.
+                </Text>
+              </View>
+              <View style={ss.daftarStatCard}>
+                <Text style={ss.daftarStatLabel}>TOTAL LUAS</Text>
+                <Text style={[ss.daftarStatVal, { color: '#D97706' }]}>
+                  {totalLuasFinal} km²
+                </Text>
+              </View>
+            </View>
+
+            {/* Search Input Bar */}
+            <View style={ss.searchBarWrap}>
+              <Text style={ss.searchBarIcon}>🔍</Text>
+              <TextInput
+                style={ss.searchBarInput}
+                placeholder="Cari nama desa, kecamatan, atau kode..."
+                placeholderTextColor={TEXT_MID}
+                value={daftarSearchQuery}
+                onChangeText={setDaftarSearchQuery}
+                autoCapitalize="none"
+                clearButtonMode="while-editing"
+              />
+              {daftarSearchQuery ? (
+                <TouchableOpacity
+                  onPress={() => setDaftarSearchQuery('')}
+                  style={ss.searchClearBtn}
+                >
+                  <Text style={ss.searchClearText}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Filter Chip Kecamatan Horizontal */}
+            {kecamatanFinalList.length > 0 && (
+              <View style={ss.filterKecScrollViewWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={ss.filterKecScrollContent}
+                >
+                  <TouchableOpacity
+                    style={[
+                      ss.filterKecChip,
+                      !daftarSelectedKec && ss.filterKecChipActive,
+                    ]}
+                    onPress={() => setDaftarSelectedKec('')}
+                  >
+                    <Text
+                      style={[
+                        ss.filterKecChipText,
+                        !daftarSelectedKec && ss.filterKecChipTextActive,
+                      ]}
+                    >
+                      Semua ({initialFinalData.length})
+                    </Text>
+                  </TouchableOpacity>
+                  {kecamatanFinalList.map((k) => {
+                    const isKecActive = daftarSelectedKec === k.name;
+                    return (
+                      <TouchableOpacity
+                        key={k.name}
+                        style={[
+                          ss.filterKecChip,
+                          isKecActive && ss.filterKecChipActive,
+                        ]}
+                        onPress={() => setDaftarSelectedKec(isKecActive ? '' : k.name)}
+                      >
+                        <Text
+                          style={[
+                            ss.filterKecChipText,
+                            isKecActive && ss.filterKecChipTextActive,
+                          ]}
+                        >
+                          {k.name} ({k.count})
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* List Desa Final */}
+            <FlatList
+              data={filteredDaftarDesa}
+              keyExtractor={(item, index) => item.id || item.kode_desa || `desa-${index}`}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 24, paddingTop: 4 }}
+              ListEmptyComponent={
+                <View style={ss.emptyDaftarBox}>
+                  <Text style={{ fontSize: 32, marginBottom: 8 }}>🔎</Text>
+                  <Text style={ss.emptyDaftarTitle}>Desa Tidak Ditemukan</Text>
+                  <Text style={ss.emptyDaftarSub}>
+                    Tidak ada desa final yang cocok dengan pencarian "{daftarSearchQuery}"
+                  </Text>
+                </View>
+              }
+              renderItem={({ item, index }) => {
+                const desaArea = calculateArea(item.coordinates);
+                const isSelected = selectedPolygonDetail?.kodeDesa === item.kode_desa;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      ss.desaItemCard,
+                      isSelected && ss.desaItemCardSelected,
+                    ]}
+                    onPress={() => {
+                      setDaftarFinalVisible(false);
+                      setSelectedPolygonDetail({
+                        id: item.id,
+                        namaDesa: item.nama_desa || 'Desa',
+                        namaKecamatan: item.nama_kecamatan || '',
+                        kodeDesa: item.kode_desa || '',
+                        kodeKecamatan: item.kode_kecamatan || '',
+                        statusPeta: item.status_peta || 'Telah Disahkan (Final)',
+                        catatan: item.catatan || '',
+                        isMine: false,
+                        isDasar: false,
+                        coordinates: item.coordinates,
+                      });
+                      if (item.kode_kecamatan) {
+                        setSelectedKecamatan(item.kode_kecamatan);
+                      }
+                      setSelectedDesa(item.kode_desa);
+                      fitPolygons([{ coordinates: item.coordinates }]);
+                    }}
+                    activeOpacity={0.78}
+                  >
+                    <View style={ss.desaItemHeaderRow}>
+                      <View style={ss.desaNumberBadge}>
+                        <Text style={ss.desaNumberText}>{index + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={ss.desaItemName} numberOfLines={1}>
+                          {item.nama_desa ? item.nama_desa.toUpperCase() : 'DESA'}
+                        </Text>
+                        <Text style={ss.desaItemKec}>
+                          📍 Kec. {item.nama_kecamatan || 'Konawe Selatan'}
+                        </Text>
+                      </View>
+                      <View style={ss.desaStatusBadge}>
+                        <Text style={ss.desaStatusText}>✓ FINAL</Text>
+                      </View>
+                    </View>
+
+                    <View style={ss.desaItemMetaRow}>
+                      <View style={ss.desaItemMetaChip}>
+                        <Text style={ss.desaItemMetaLabel}>Kode:</Text>
+                        <Text style={ss.desaItemMetaValue}>{item.kode_desa || '—'}</Text>
+                      </View>
+                      <View style={ss.desaItemMetaChip}>
+                        <Text style={ss.desaItemMetaLabel}>Luas:</Text>
+                        <Text style={[ss.desaItemMetaValue, { color: '#059669', fontWeight: '800' }]}>
+                          {desaArea} km²
+                        </Text>
+                      </View>
+                      <View style={ss.desaItemMetaChip}>
+                        <Text style={ss.desaItemMetaLabel}>Titik:</Text>
+                        <Text style={ss.desaItemMetaValue}>{item.coordinates?.length || 0}</Text>
+                      </View>
+                    </View>
+
+                    <View style={ss.desaActionFooter}>
+                      <Text style={ss.desaActionText}>🎯 Lihat di Peta</Text>
+                      <Text style={ss.desaActionArrow}>➔</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
           </View>
         </View>
       </Modal>
@@ -1182,10 +1478,41 @@ const ss = StyleSheet.create({
     backgroundColor: DARK_NAVY,
   },
 
+  // FLOATING DAFTAR FINAL BUTTON
+  daftarFinalFloatingBtn: {
+    position: 'absolute',
+    top: 60,
+    left: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    backgroundColor: '#F0F9FF',
+  },
+  daftarFinalFloatingBadge: {
+    marginRight: 6,
+  },
+  daftarFinalFloatingText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: PRIMARY,
+    letterSpacing: -0.2,
+  },
+
   // RESET CHIP
   resetChip: {
     position: 'absolute',
-    top: 62,
+    top: 104,
     left: 12,
     backgroundColor: '#EF4444',
     paddingHorizontal: 12,
@@ -1603,6 +1930,270 @@ const ss = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,
+  },
+
+  // ── TOMBOL KATALOG DESA FINAL DI DRAWER PANEL ─────────────────────────────
+  btnKatalogFinal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  katalogIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  katalogTitle: {
+    color: PRIMARY_DARK,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  katalogSub: {
+    color: TEXT_MID,
+    fontSize: 10,
+    marginTop: 1,
+  },
+  katalogBadge: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  katalogBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // ── MODAL DAFTAR DESA FINAL ──────────────────────────────────────────────
+  daftarModalBadgeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  daftarStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  daftarStatCard: {
+    flex: 1,
+    backgroundColor: SURFACE,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    alignItems: 'center',
+  },
+  daftarStatLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: TEXT_MID,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  daftarStatVal: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  // SEARCH BAR
+  searchBarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: SURFACE,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 2,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    marginBottom: 10,
+  },
+  searchBarIcon: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  searchBarInput: {
+    flex: 1,
+    fontSize: 13,
+    color: TEXT_DARK,
+    paddingVertical: 4,
+  },
+  searchClearBtn: {
+    padding: 4,
+  },
+  searchClearText: {
+    fontSize: 12,
+    color: TEXT_MID,
+    fontWeight: 'bold',
+  },
+
+  // FILTER CHIP KECAMATAN
+  filterKecScrollViewWrap: {
+    marginBottom: 10,
+  },
+  filterKecScrollContent: {
+    gap: 6,
+    paddingRight: 10,
+  },
+  filterKecChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+  },
+  filterKecChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  filterKecChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: TEXT_MID,
+  },
+  filterKecChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+
+  // EMPTY STATE
+  emptyDaftarBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+  },
+  emptyDaftarTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEXT_DARK,
+  },
+  emptyDaftarSub: {
+    fontSize: 12,
+    color: TEXT_MID,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  // LIST ITEM DESA CARD
+  desaItemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  desaItemCardSelected: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.8,
+  },
+  desaItemHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  desaNumberBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  desaNumberText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: TEXT_DARK,
+  },
+  desaItemName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: TEXT_DARK,
+    letterSpacing: -0.2,
+  },
+  desaItemKec: {
+    fontSize: 11,
+    color: TEXT_MID,
+    marginTop: 1,
+  },
+  desaStatusBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  desaStatusText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  desaItemMetaRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  desaItemMetaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: SURFACE,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  desaItemMetaLabel: {
+    fontSize: 10,
+    color: TEXT_MID,
+    fontWeight: '500',
+  },
+  desaItemMetaValue: {
+    fontSize: 10,
+    color: TEXT_DARK,
+    fontWeight: '700',
+  },
+  desaActionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  desaActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  desaActionArrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: PRIMARY,
   },
 });
 

@@ -149,9 +149,9 @@ const MapContent = React.memo(({
   navIsTracking,
   navTargetName,
   navDistance,
-  currentNavPos,
   handleMapPress,
   handlePolygonPress,
+  handleFinalPolygonPress,
   activePolygon,
 }) => {
   return (
@@ -185,17 +185,31 @@ const MapContent = React.memo(({
         );
       })}
 
-      {/* Peta Final */}
-      {parsedFinalPolygons.map((p) => (
-        <Polygon
-          key={`final-${p.kode_desa}-${p.idx}`}
-          coordinates={p.coordinates}
-          strokeColor={C_FINAL_STROKE}
-          fillColor={C_FINAL_FILL}
-          strokeWidth={2.2}
-          zIndex={2}
-        />
-      ))}
+      {/* Peta Final (Interaktif & Tappable) */}
+      {parsedFinalPolygons.map((p) => {
+        const isSelected = activePolygon && (
+          (activePolygon.des_kel_id && (activePolygon.des_kel_id === p.kode_desa || activePolygon.des_kel_id === p.id)) ||
+          (activePolygon.lokasi?.nama_desa && p.nama_desa && activePolygon.lokasi?.nama_desa?.toLowerCase() === p.nama_desa?.toLowerCase())
+        );
+        return (
+          <Polygon
+            key={`final-${p.kode_desa}-${p.idx}`}
+            coordinates={p.coordinates}
+            strokeColor={isSelected ? '#F59E0B' : C_FINAL_STROKE}
+            fillColor={isSelected ? 'rgba(245, 158, 11, 0.45)' : C_FINAL_FILL}
+            strokeWidth={isSelected ? 3.5 : 2.2}
+            zIndex={isSelected ? 10 : 2}
+            tappable={true}
+            onPress={() => {
+              if (handleFinalPolygonPress) {
+                handleFinalPolygonPress(p);
+              } else if (handlePolygonPress) {
+                handlePolygonPress(p);
+              }
+            }}
+          />
+        );
+      })}
 
       {/* GPS User */}
       {isValidCoord(userLocation) && (
@@ -512,6 +526,32 @@ const MapPreview = ({
     else setInternalActivePolygon(polygon);
   }, [onActivePolygonChange]);
 
+  const handleFinalPolygonPress = useCallback((p) => {
+    if (!p) return;
+    const areaMetrics = calcGeodesicArea(p.coordinates);
+    const areaKm2 = (areaMetrics.ha / 100).toFixed(2);
+    const finalPolygonObj = {
+      _id: p.id,
+      des_kel_id: p.kode_desa,
+      isFinal: true,
+      lokasi: {
+        nama_desa: p.nama_desa,
+        kode_desa: p.kode_desa,
+        kecamatan: p.nama_kecamatan,
+        kode_kecamatan: p.kode_kecamatan,
+        coordinat: p.coordinates,
+      },
+      nama_desa: p.nama_desa,
+      nama_kecamatan: p.nama_kecamatan,
+      kode_desa: p.kode_desa,
+      status: '1',
+      status_peta: p.status_peta || 'Peta Final (Disahkan)',
+      catatan: p.catatan,
+      calculatedArea: areaKm2,
+    };
+    handlePolygonPress(finalPolygonObj);
+  }, [handlePolygonPress]);
+
   const getCentroid = (coords) => {
     if (!coords || !Array.isArray(coords) || coords.length === 0) return null;
     let sumLat = 0, sumLng = 0, n = 0;
@@ -734,6 +774,7 @@ const MapPreview = ({
     currentNavPos: navCurrentPos,
     handleMapPress,
     handlePolygonPress,
+    handleFinalPolygonPress,
     activePolygon,
   };
 
