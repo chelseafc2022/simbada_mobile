@@ -62,11 +62,23 @@ export const useDesaQuery = (token, url, selectedKecamatan) => {
       const data = await res.json();
       if (!Array.isArray(data)) return [];
 
-      return data.map((item) => ({
-        id: item.hasil?.kode_desa || item.kode_desa || '',
-        name: item.hasil?.nama_desa || item.nama_desa || '',
-        kecamatan_id: selectedKecamatan,
-      }));
+      return data.map((item) => {
+        const prop = item.no_prop ? String(item.no_prop).padStart(2, '0') : '';
+        const kab = item.no_kab ? String(item.no_kab).padStart(2, '0') : '';
+        const kec = item.no_kec ? String(item.no_kec).padStart(2, '0') : '';
+        const fullKode = (prop && kab && kec && item.kode != null)
+          ? `${prop}.${kab}.${kec}.${item.kode}`
+          : (item.kode != null ? `${selectedKecamatan}.${item.kode}` : '');
+        const id = item.kode_desa || item.hasil?.kode_desa || fullKode || String(item.kode || item.id || '');
+        const name = item.nama_desa || item.uraian || item.nama || item.hasil?.nama_desa || item.hasil?.uraian || '';
+        return {
+          id,
+          name,
+          kode_desa: id,
+          nama_desa: name,
+          kecamatan_id: selectedKecamatan,
+        };
+      });
     },
     enabled: Boolean(token && baseUrl && selectedKecamatan),
     staleTime: 30 * 60 * 1000,
@@ -156,9 +168,11 @@ export const usePetaDasarAllQuery = (token, url) => {
         const data = await res.json();
         if (Array.isArray(data)) {
           const fmt = data.map((p) => ({
-            kode_desa: p.lokasi?.kode_desa,
-            nama_desa: p.lokasi?.nama_desa || '',
-            coordinates: (p.lokasi?.coordinat || [])
+            kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
+            nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
+            kode_kecamatan: p.lokasi?.kode_kecamatan || p.kode_kecamatan || '',
+            nama_kecamatan: p.lokasi?.nama_kecamatan || p.nama_kecamatan || '',
+            coordinates: (p.lokasi?.coordinat || p.coordinates || [])
               .map((c) => ({
                 latitude: parseFloat(c.lat || c.latitude),
                 longitude: parseFloat(c.lng || c.longitude),
@@ -197,17 +211,24 @@ export const usePetaFinalAllQuery = (token, url) => {
       if (!Array.isArray(data)) return [];
 
       return data
-        .filter((p) => p.lokasi && Array.isArray(p.lokasi.coordinat))
-        .map((p) => ({
-          kode_desa: p.lokasi.kode_desa,
-          nama_desa: p.lokasi.nama_desa || '',
-          coordinates: p.lokasi.coordinat
-            .map((c) => ({
-              latitude: parseFloat(c.lat || c.latitude),
-              longitude: parseFloat(c.lng || c.longitude),
-            }))
-            .filter((c) => isFinite(c.latitude) && isFinite(c.longitude)),
-        }));
+        .filter((p) => (p.lokasi && (Array.isArray(p.lokasi.coordinat) || Array.isArray(p.lokasi))) || Array.isArray(p.coordinates))
+        .map((p) => {
+          const coords = Array.isArray(p.lokasi?.coordinat)
+            ? p.lokasi.coordinat
+            : (Array.isArray(p.lokasi) ? p.lokasi : (p.coordinates || []));
+          return {
+            kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
+            nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
+            kode_kecamatan: p.lokasi?.kode_kecamatan || p.kode_kecamatan || '',
+            nama_kecamatan: p.lokasi?.nama_kecamatan || p.nama_kecamatan || '',
+            coordinates: coords
+              .map((c) => ({
+                latitude: parseFloat(c.lat || c.latitude),
+                longitude: parseFloat(c.lng || c.longitude),
+              }))
+              .filter((c) => isFinite(c.latitude) && isFinite(c.longitude)),
+          };
+        });
     },
     enabled: Boolean(token && baseUrl),
     staleTime: 20 * 60 * 1000,

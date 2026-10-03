@@ -147,36 +147,51 @@ const PetaFinal = ({ navigation }) => {
     }
   }, []);
 
+  // Helper pencocokan kode desa fleksibel
+  const isMatchDesa = useCallback((pKode, filterKode) => {
+    if (!pKode || !filterKode) return false;
+    const pk = String(pKode).trim();
+    const fk = String(filterKode).trim();
+    return (
+      pk === fk ||
+      pk.endsWith(`.${fk}`) ||
+      fk.endsWith(`.${pk}`) ||
+      pk.replace(/\./g, '') === fk.replace(/\./g, '')
+    );
+  }, []);
+
   // Filtered Polygons by Kecamatan / Desa (memoized)
   const activeFinal = useMemo(() => {
     if (!initialFinalData.length) return [];
     if (selectedDesa) {
-      return initialFinalData.filter(
-        (p) => p.kode_desa === selectedDesa || selectedDesa.endsWith(`.${p.kode_desa}`)
-      );
+      const match = initialFinalData.filter((p) => isMatchDesa(p.kode_desa, selectedDesa));
+      if (match.length > 0) return match;
     }
     if (selectedKecamatan) {
       return initialFinalData.filter(
-        (p) => p.kode_desa && p.kode_desa.startsWith(selectedKecamatan)
+        (p) =>
+          (p.kode_kecamatan && p.kode_kecamatan === selectedKecamatan) ||
+          (p.kode_desa && p.kode_desa.startsWith(selectedKecamatan))
       );
     }
     return initialFinalData;
-  }, [selectedDesa, selectedKecamatan, initialFinalData]);
+  }, [selectedDesa, selectedKecamatan, initialFinalData, isMatchDesa]);
 
   const activeDasar = useMemo(() => {
     if (!initialDasarData.length) return [];
     if (selectedDesa) {
-      return initialDasarData.filter(
-        (p) => p.kode_desa === selectedDesa || selectedDesa.endsWith(`.${p.kode_desa}`)
-      );
+      const match = initialDasarData.filter((p) => isMatchDesa(p.kode_desa, selectedDesa));
+      if (match.length > 0) return match;
     }
     if (selectedKecamatan) {
       return initialDasarData.filter(
-        (p) => p.kode_desa && p.kode_desa.startsWith(selectedKecamatan)
+        (p) =>
+          (p.kode_kecamatan && p.kode_kecamatan === selectedKecamatan) ||
+          (p.kode_desa && p.kode_desa.startsWith(selectedKecamatan))
       );
     }
     return initialDasarData;
-  }, [selectedDesa, selectedKecamatan, initialDasarData]);
+  }, [selectedDesa, selectedKecamatan, initialDasarData, isMatchDesa]);
 
   const isLoading = isFinalLoading || isDasarLoading;
 
@@ -454,9 +469,7 @@ const PetaFinal = ({ navigation }) => {
             style={ss.resetChip}
             onPress={() => {
               setSelectedDesa('');
-              setDesaFinalData([]);
-              setDesaDasarData([]);
-              if (kecFinalData.length > 0) fitPolygons(kecFinalData);
+              if (activeFinal.length > 0) fitPolygons(activeFinal);
             }}
           >
             <Text style={ss.resetChipText}>✕ Reset Filter Desa</Text>
@@ -547,10 +560,9 @@ const PetaFinal = ({ navigation }) => {
                 onValueChange={(val) => {
                   setSelectedKecamatan(val);
                   setSelectedDesa('');
-                  if (val) fetchPolygonDataKecamatan(val);
-                  else {
-                    setKecFinalData([]);
-                    setKecDasarData([]);
+                  if (val) {
+                    fetchPolygonDataKecamatan(val);
+                  } else {
                     if (initialFinalData.length > 0) fitPolygons(initialFinalData);
                   }
                 }}

@@ -149,14 +149,24 @@ const GuestMap = ({ navigation }) => {
     }
   }, []);
 
+  const isMatchDesa = (pKode, filterKode) => {
+    if (!pKode || !filterKode) return false;
+    const pk = String(pKode).trim();
+    const fk = String(filterKode).trim();
+    return (
+      pk === fk ||
+      pk.endsWith(`.${fk}`) ||
+      fk.endsWith(`.${pk}`) ||
+      pk.replace(/\./g, '') === fk.replace(/\./g, '')
+    );
+  };
+
   // Filtered Polygons
-  // catatan: usePetaDasarAllQuery & usePetaFinalAllQuery hanya map kode_desa, nama_desa, coordinates
-  // Kecamatan difilter lewat prefix kode_desa (74.05.01 = kecamatan 74.05.01, dst)
   const filteredFinal = useMemo(() => {
     if (activeLayerFilter === 'DASAR') return [];
     return rawPetaFinal.filter((p) => {
       // Filter desa
-      if (selectedDesa && p.kode_desa !== selectedDesa) return false;
+      if (selectedDesa && !isMatchDesa(p.kode_desa, selectedDesa)) return false;
       // Filter kecamatan: kode_kecamatan = 6 karakter pertama kode_desa (misal 74.05.08)
       if (selectedKecamatan && p.kode_desa) {
         const desaPrefix = p.kode_desa.slice(0, selectedKecamatan.length);
@@ -178,7 +188,7 @@ const GuestMap = ({ navigation }) => {
     if (activeLayerFilter === 'FINAL') return [];
     return rawPetaDasar.filter((p) => {
       // Filter desa
-      if (selectedDesa && p.kode_desa !== selectedDesa) return false;
+      if (selectedDesa && !isMatchDesa(p.kode_desa, selectedDesa)) return false;
       // Filter kecamatan: kode_kecamatan = prefix kode_desa
       if (selectedKecamatan && p.kode_desa) {
         const desaPrefix = p.kode_desa.slice(0, selectedKecamatan.length);

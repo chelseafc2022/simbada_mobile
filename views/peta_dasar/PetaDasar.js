@@ -161,13 +161,28 @@ const PetaDasar = ({ navigation }) => {
     }
   }, []);
 
+  // Helper pencocokan kode desa fleksibel (mendukung full code '74.05.01.1001' maupun short code)
+  const isMatchDesa = useCallback((pKode, filterKode) => {
+    if (!pKode || !filterKode) return false;
+    const pk = String(pKode).trim();
+    const fk = String(filterKode).trim();
+    return (
+      pk === fk ||
+      pk.endsWith(`.${fk}`) ||
+      fk.endsWith(`.${pk}`) ||
+      pk.replace(/\./g, '') === fk.replace(/\./g, '')
+    );
+  }, []);
+
   // Memoize polygon parsing for kecamatan
   const kecamatanPolygonData = useMemo(() => {
     if (!Array.isArray(rawKecamatanPolygons) || rawKecamatanPolygons.length === 0) return [];
     return rawKecamatanPolygons.map((p) => ({
-      kode_desa: p.lokasi?.kode_desa,
-      nama_desa: p.lokasi?.nama_desa || '',
-      coordinates: (p.lokasi?.coordinat || [])
+      kode_desa: p.lokasi?.kode_desa || p.kode_desa || '',
+      nama_desa: p.lokasi?.nama_desa || p.nama_desa || '',
+      kode_kecamatan: p.lokasi?.kode_kecamatan || p.kode_kecamatan || '',
+      nama_kecamatan: p.lokasi?.nama_kecamatan || p.nama_kecamatan || '',
+      coordinates: (p.lokasi?.coordinat || p.coordinates || [])
         .map((c) => ({
           latitude: parseFloat(c.lat || c.latitude),
           longitude: parseFloat(c.lng || c.longitude),
@@ -178,15 +193,22 @@ const PetaDasar = ({ navigation }) => {
 
   // Memoize polygon filter by desa
   const desaPolygonData = useMemo(() => {
-    if (!selectedDesa || !kecamatanPolygonData.length) return [];
-    return kecamatanPolygonData.filter(
-      (p) => p.kode_desa === selectedDesa || selectedDesa.endsWith(`.${p.kode_desa}`)
-    );
-  }, [selectedDesa, kecamatanPolygonData]);
+    if (!selectedDesa) return [];
+    const pool = kecamatanPolygonData.length > 0 ? kecamatanPolygonData : initialPolygonData;
+    return pool.filter((p) => isMatchDesa(p.kode_desa, selectedDesa));
+  }, [selectedDesa, kecamatanPolygonData, initialPolygonData, isMatchDesa]);
 
   const activePolygons = useMemo(() => {
     if (selectedDesa && desaPolygonData.length > 0) return desaPolygonData;
     if (selectedKecamatan && kecamatanPolygonData.length > 0) return kecamatanPolygonData;
+    if (selectedKecamatan && initialPolygonData.length > 0) {
+      const filtered = initialPolygonData.filter(
+        (p) =>
+          (p.kode_kecamatan && p.kode_kecamatan === selectedKecamatan) ||
+          (p.kode_desa && p.kode_desa.startsWith(selectedKecamatan))
+      );
+      if (filtered.length > 0) return filtered;
+    }
     return initialPolygonData;
   }, [selectedDesa, selectedKecamatan, desaPolygonData, kecamatanPolygonData, initialPolygonData]);
 
@@ -425,8 +447,11 @@ const PetaDasar = ({ navigation }) => {
             style={ss.resetChip}
             onPress={() => {
               setSelectedDesa('');
-              setDesaPolygonData([]);
-              if (kecamatanPolygonData.length > 0) fitPolygons(kecamatanPolygonData);
+              if (kecamatanPolygonData.length > 0) {
+                fitPolygons(kecamatanPolygonData);
+              } else if (initialPolygonData.length > 0) {
+                fitPolygons(initialPolygonData);
+              }
             }}
           >
             <Text style={ss.resetChipText}>✕ Reset Filter Desa</Text>
@@ -467,9 +492,9 @@ const PetaDasar = ({ navigation }) => {
                 onValueChange={(val) => {
                   setSelectedKecamatan(val);
                   setSelectedDesa('');
-                  if (val) fetchPolygonDataKecamatan(val);
-                  else {
-                    setKecamatanPolygonData([]);
+                  if (val) {
+                    fetchPolygonDataKecamatan(val);
+                  } else {
                     if (initialPolygonData.length > 0) fitPolygons(initialPolygonData);
                   }
                 }}
