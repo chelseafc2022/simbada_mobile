@@ -21,6 +21,7 @@ import {
   Dimensions,
   ScrollView,
   StatusBar,
+  KeyboardAvoidingView,
 } from 'react-native';
 import MapView, { Polygon, Polyline, Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import FastImage from 'react-native-fast-image';
@@ -1332,36 +1333,66 @@ const MapPreview = ({
           MODAL NAVIGASI (Dengan CompassView Asli yang Ringan)
       ══════════════════════════════════════════════════════════════ */}
       <Modal visible={showNavPanel} transparent animationType="slide" onRequestClose={() => setShowNavPanel(false)}>
-        <View style={styles.navModalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.navModalBackdrop}
+        >
+          <TouchableOpacity
+            style={styles.navModalDismissArea}
+            activeOpacity={1}
+            onPress={() => setShowNavPanel(false)}
+          />
           <View style={styles.navModalCard}>
+            {/* Grab Handle */}
+            <View style={styles.navModalHandle} />
+
             {/* Header Navigasi */}
             <View style={styles.navModalHeader}>
-              <Text style={styles.navModalTitle}>🧭 Navigasi Koordinat</Text>
-              <TouchableOpacity onPress={() => setShowNavPanel(false)} style={styles.navModalCloseBtn}>
+              <View style={styles.navModalHeaderTitleWrap}>
+                <Text style={styles.navModalTitle}>🧭 Navigasi Koordinat</Text>
+                {navIsTracking && (
+                  <View style={styles.navActiveBadge}>
+                    <View style={styles.navActiveDot} />
+                    <Text style={styles.navActiveBadgeTxt}>AKTIF</Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => setShowNavPanel(false)} style={styles.navModalCloseBtn} accessibilityLabel="Tutup">
                 <Text style={styles.navModalCloseIcon}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.navModalScrollContent}
+            >
               {/* KOMPAS ANIMASI TERINTEGRASI */}
               {navIsTracking && parsedNavTarget && (
                 <View style={styles.navCompassSection}>
-                  <CompassView heading={navHeading} bearing={navBearing} distance={navDistance} />
+                  <View style={styles.navCompassScaleWrap}>
+                    <CompassView
+                      heading={navHeading}
+                      bearing={navBearing}
+                      distance={navDistance}
+                      showHeadingBadge={false}
+                    />
+                  </View>
                   <View style={styles.navInfoRow}>
                     <View style={styles.navInfoCard}>
-                      <Text style={styles.navInfoVal}>{fmtM(Math.round(navDistance))}</Text>
+                      <Text style={styles.navInfoVal} numberOfLines={1}>{fmtM(Math.round(navDistance))}</Text>
                       <Text style={styles.navInfoLbl}>Jarak</Text>
                     </View>
                     <View style={styles.navInfoCard}>
-                      <Text style={styles.navInfoVal}>{Math.round(navBearing)}°</Text>
+                      <Text style={styles.navInfoVal} numberOfLines={1}>{Math.round(navBearing)}°</Text>
                       <Text style={styles.navInfoLbl}>Bearing</Text>
                     </View>
                     <View style={styles.navInfoCard}>
-                      <Text style={styles.navInfoVal}>{getDir(navBearing)}</Text>
+                      <Text style={styles.navInfoVal} numberOfLines={1}>{getDir(navBearing)}</Text>
                       <Text style={styles.navInfoLbl}>Arah</Text>
                     </View>
                     <View style={styles.navInfoCard}>
-                      <Text style={styles.navInfoVal}>{Math.round(navHeading)}°</Text>
+                      <Text style={styles.navInfoVal} numberOfLines={1}>{Math.round(navHeading)}°</Text>
                       <Text style={styles.navInfoLbl}>Heading</Text>
                     </View>
                   </View>
@@ -1380,7 +1411,7 @@ const MapPreview = ({
 
               <View style={styles.navCoordRow}>
                 <TextInput
-                  style={[styles.navInput, { flex: 1, marginRight: 6 }]}
+                  style={[styles.navInput, styles.navCoordInput, { flex: 1, marginRight: 8 }]}
                   placeholder="Latitude (-90 s/d 90)"
                   placeholderTextColor={C_MID}
                   value={navTargetLat}
@@ -1388,7 +1419,7 @@ const MapPreview = ({
                   keyboardType="numeric"
                 />
                 <TextInput
-                  style={[styles.navInput, { flex: 1 }]}
+                  style={[styles.navInput, styles.navCoordInput, { flex: 1 }]}
                   placeholder="Longitude (-180 s/d 180)"
                   placeholderTextColor={C_MID}
                   value={navTargetLng}
@@ -1422,9 +1453,27 @@ const MapPreview = ({
               {/* PREVIEW JARAK & ARAH SEBELUM MEMULAI */}
               {parsedNavTarget && !navIsTracking && (
                 <View style={styles.navPreviewCard}>
-                  <Text style={styles.navPreviewTitle}>Preview Rute Menuju Target</Text>
-                  <Text style={styles.navPreviewDist}>Jarak Garis Lurus: {fmtM(Math.round(navDistance))}</Text>
-                  <Text style={styles.navPreviewBear}>Arah: {Math.round(navBearing)}° ({getDir(navBearing)})</Text>
+                  <View style={styles.navPreviewTop}>
+                    <Text style={styles.navPreviewTitle}>Preview Rute Menuju Target</Text>
+                    {navTargetName ? (
+                      <View style={styles.navPreviewTargetBadge}>
+                        <Text style={styles.navPreviewTargetTxt} numberOfLines={1}>
+                          🎯 {navTargetName}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.navPreviewRow}>
+                    <View style={styles.navPreviewItem}>
+                      <Text style={styles.navPreviewMetricVal}>{fmtM(Math.round(navDistance))}</Text>
+                      <Text style={styles.navPreviewMetricLbl}>Jarak Lurus</Text>
+                    </View>
+                    <View style={styles.navPreviewDivider} />
+                    <View style={styles.navPreviewItem}>
+                      <Text style={styles.navPreviewMetricVal}>{Math.round(navBearing)}° ({getDir(navBearing)})</Text>
+                      <Text style={styles.navPreviewMetricLbl}>Arah Kompas</Text>
+                    </View>
+                  </View>
                 </View>
               )}
 
@@ -1446,12 +1495,14 @@ const MapPreview = ({
                 )}
               </View>
 
-              {navTargetName && parsedNavTarget && (
-                <Text style={styles.navTargetNameLabel}>🎯 Target: {navTargetName}</Text>
+              {navIsTracking && navTargetName && parsedNavTarget && (
+                <View style={styles.navTargetFooter}>
+                  <Text style={styles.navTargetNameLabel}>🎯 Target Aktif: {navTargetName}</Text>
+                </View>
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -1860,35 +1911,61 @@ const styles = StyleSheet.create({
 
   // MODAL NAVIGASI
   navModalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' },
+  navModalDismissArea: { flex: 1 },
   navModalCard: {
     backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20, paddingTop: 20,
+    paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 24 : 16, paddingTop: 12,
     maxHeight: SCREEN_H * 0.88,
     shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: -4 }, shadowRadius: 12, elevation: 16,
   },
-  navModalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  navModalTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: C_TEXT },
+  navModalHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 12,
+  },
+  navModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  navModalHeaderTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  navModalTitle: { fontSize: 17, fontWeight: '800', color: C_TEXT },
+  navActiveBadge: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 7, paddingVertical: 2.5,
+    borderRadius: 8, borderWidth: 1, borderColor: '#A7F3D0', gap: 4,
+  },
+  navActiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
+  navActiveBadgeTxt: { fontSize: 9.5, fontWeight: '800', color: '#047857' },
   navModalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   navModalCloseIcon: { fontSize: 14, color: C_MID, fontWeight: '700' },
+  navModalScrollContent: { paddingBottom: Platform.OS === 'ios' ? 36 : 24 },
 
-  navCompassSection: { alignItems: 'center', marginBottom: 16 },
-  navInfoRow: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' },
-  navInfoCard: {
-    backgroundColor: '#F0F9FF', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
-    alignItems: 'center', minWidth: 72, borderWidth: 1, borderColor: '#BAE6FD',
+  navCompassSection: { alignItems: 'center', marginBottom: 14 },
+  navCompassScaleWrap: { alignItems: 'center', justifyContent: 'center' },
+  navInfoRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+    width: '100%',
+    justifyContent: 'space-between',
   },
-  navInfoVal: { fontSize: 15, fontWeight: '800', color: C_NAV_ACCENT },
-  navInfoLbl: { fontSize: 10, color: C_MID, marginTop: 2, fontWeight: '600' },
+  navInfoCard: {
+    flex: 1,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    marginHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  navInfoVal: { fontSize: 14, fontWeight: '800', color: C_NAV_ACCENT },
+  navInfoLbl: { fontSize: 9.5, color: C_MID, marginTop: 2, fontWeight: '600' },
 
-  navSectionLabel: { fontSize: 10, fontWeight: '800', color: C_PRIMARY, letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
+  navSectionLabel: { fontSize: 10.5, fontWeight: '800', color: C_PRIMARY, letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
   navInput: {
     backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: C_BORDER,
     paddingHorizontal: 14, paddingVertical: 11, fontSize: 13, color: C_TEXT, marginBottom: 8,
   },
   navCoordRow: { flexDirection: 'row', marginBottom: 8 },
+  navCoordInput: { marginBottom: 0 },
 
   navPickBtn: {
-    backgroundColor: '#F0F9FF', borderRadius: 12, paddingVertical: 12, alignItems: 'center',
+    backgroundColor: '#F0F9FF', borderRadius: 12, paddingVertical: 11, alignItems: 'center',
     borderWidth: 1, borderColor: '#BAE6FD', marginBottom: 10,
   },
   navPickBtnText: { fontSize: 13, fontWeight: '700', color: C_NAV_ACCENT },
@@ -1901,14 +1978,23 @@ const styles = StyleSheet.create({
   navCurrentPosCoord: { fontSize: 12, color: '#047857', marginTop: 3, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
 
   navPreviewCard: {
-    backgroundColor: '#FFF7ED', borderRadius: 12, padding: 12, marginBottom: 10,
+    backgroundColor: '#FFF7ED', borderRadius: 14, padding: 12, marginBottom: 12,
     borderWidth: 1, borderColor: '#FED7AA',
   },
-  navPreviewTitle: { fontSize: 11, fontWeight: '700', color: '#9A3412' },
-  navPreviewDist: { fontSize: 14, fontWeight: '800', color: '#EA580C', marginTop: 4 },
-  navPreviewBear: { fontSize: 12, color: '#C2410C', marginTop: 2 },
+  navPreviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  navPreviewTitle: { fontSize: 11.5, fontWeight: '800', color: '#9A3412' },
+  navPreviewTargetBadge: {
+    backgroundColor: '#FFEDD5', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
+    maxWidth: '50%',
+  },
+  navPreviewTargetTxt: { fontSize: 10.5, fontWeight: '700', color: '#C2410C' },
+  navPreviewRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingTop: 2 },
+  navPreviewItem: { alignItems: 'center', flex: 1 },
+  navPreviewDivider: { width: 1, height: 26, backgroundColor: '#FED7AA' },
+  navPreviewMetricVal: { fontSize: 14, fontWeight: '800', color: '#EA580C' },
+  navPreviewMetricLbl: { fontSize: 9.5, color: '#9A3412', marginTop: 2, fontWeight: '600' },
 
-  navActionRow: { marginBottom: 10 },
+  navActionRow: { marginBottom: 6 },
   navStartBtn: {
     backgroundColor: C_NAV_ACCENT, borderRadius: 14, paddingVertical: 14, alignItems: 'center',
     shadowColor: C_NAV_ACCENT, shadowOpacity: 0.4, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8, elevation: 5,
@@ -1920,7 +2006,8 @@ const styles = StyleSheet.create({
     shadowColor: '#EF4444', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6, elevation: 4,
   },
   navStopBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  navTargetNameLabel: { fontSize: 12, color: C_MID, textAlign: 'center', marginBottom: 6 },
+  navTargetFooter: { alignItems: 'center', marginTop: 4 },
+  navTargetNameLabel: { fontSize: 11.5, color: C_MID, fontWeight: '600', textAlign: 'center' },
 });
 
 export default React.memo(MapPreview);

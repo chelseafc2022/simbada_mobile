@@ -11,7 +11,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 
-const CompassView = ({ heading = 0, bearing = 0, distance = 0 }) => {
+const CompassView = ({ heading = 0, bearing = 0, distance = 0, showHeadingBadge = true, style }) => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const arrowAnim = useRef(new Animated.Value(0)).current;
 
@@ -55,7 +55,7 @@ const CompassView = ({ heading = 0, bearing = 0, distance = 0 }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !showHeadingBadge && styles.containerCompact, style]}>
       {/* Compass Rose */}
       <Animated.View style={[styles.compassRose, { transform: [{ rotate: compassRotation }] }]}>
         {/* N, S, E, W markers */}
@@ -102,9 +102,11 @@ const CompassView = ({ heading = 0, bearing = 0, distance = 0 }) => {
       </View>
 
       {/* Heading display */}
-      <View style={styles.headingDisplay}>
-        <Text style={styles.headingText}>Heading: {Math.round(heading)}°</Text>
-      </View>
+      {showHeadingBadge && (
+        <View style={styles.headingDisplay}>
+          <Text style={styles.headingText}>Heading: {Math.round(heading)}°</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -112,10 +114,15 @@ const CompassView = ({ heading = 0, bearing = 0, distance = 0 }) => {
 const styles = StyleSheet.create({
   container: {
     width: 280,
-    height: 280,
+    height: 308,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
+    paddingBottom: 28,
+  },
+  containerCompact: {
+    height: 270,
+    paddingBottom: 0,
   },
   compassRose: {
     width: 260,
@@ -235,7 +242,7 @@ const styles = StyleSheet.create({
   },
   headingDisplay: {
     position: 'absolute',
-    bottom: -30,
+    bottom: 4,
     backgroundColor: 'rgba(32, 141, 192, 0.1)',
     paddingHorizontal: 16,
     paddingVertical: 4,
