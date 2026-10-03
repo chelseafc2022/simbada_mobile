@@ -19,10 +19,11 @@ import AppHeader from '../components/AppHeader';
 import Geolocation from '@react-native-community/geolocation';
 import { launchCamera } from 'react-native-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 import PlacemarkDB from '../library/PlacemarkDB';
 import ExifWriter from '../library/ExifWriter';
 import GpsService from '../library/GpsService';
+import { usePetaFinalAllQuery, usePetaDasarAllQuery } from '../library/queries';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -57,7 +58,14 @@ const PIN_COLOR = {
 const PlacemarkForm = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const token = useSelector((state) => state.TOKEN);
-  const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
+  const url = useSelector((state) => state.URL);
+  const urlPlacemark = url?.URL_PLACEMARK;
+
+  // Layer overlay: Peta Final (aktif) & Peta Dasar (ceklis)
+  const [showPetaDasar, setShowPetaDasar] = useState(false);
+  const { data: petaFinalAll = [] } = usePetaFinalAllQuery(token, url);
+  const { data: petaDasarAll = [] } = usePetaDasarAllQuery(token, url);
+
   const profile = useSelector((state) => state.PROFILE);
   const currentPos = useSelector((state) => state.CURRENT_POSITION);
   const userId = profile?.id || null;
@@ -445,6 +453,31 @@ const PlacemarkForm = ({ navigation, route }) => {
                 rotateEnabled={false}
                 pitchEnabled={false}
               >
+                {/* 1. Poligon Peta Final */}
+                {petaFinalAll.map((p, i) => (
+                  <Polygon
+                    key={`form-final-${p.kode_desa || i}-${i}`}
+                    coordinates={p.coordinates}
+                    strokeColor="#00E5FF"
+                    fillColor="rgba(2, 132, 199, 0.28)"
+                    strokeWidth={1.8}
+                    zIndex={2}
+                  />
+                ))}
+
+                {/* 2. Poligon Peta Dasar (jika ceklis aktif) */}
+                {showPetaDasar &&
+                  petaDasarAll.map((p, i) => (
+                    <Polygon
+                      key={`form-dasar-${p.kode_desa || i}-${i}`}
+                      coordinates={p.coordinates}
+                      strokeColor="#FBBF24"
+                      fillColor="rgba(251, 191, 36, 0.15)"
+                      strokeWidth={1.4}
+                      zIndex={1}
+                    />
+                  ))}
+
                 <Marker
                   coordinate={{ latitude: parseFloat(lat), longitude: parseFloat(lon) }}
                   title={judul || 'Titik Placemark'}
@@ -483,6 +516,26 @@ const PlacemarkForm = ({ navigation, route }) => {
                 >
                   <Text style={[styles.mapTypeBtnText, mapType === 'terrain' && styles.mapTypeBtnTextActive]}>
                     🏔 Medan
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Baris Kontrol Ceklis Peta Dasar & Info Peta Final */}
+              <View style={styles.polygonLayerRow}>
+                <View style={styles.badgeFinalPeta}>
+                  <View style={[styles.dotPetaFinal, { backgroundColor: '#00E5FF' }]} />
+                  <Text style={styles.badgeFinalText}>Final ({petaFinalAll.length})</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.ceklisDasarBtn, showPetaDasar && styles.ceklisDasarBtnActive]}
+                  onPress={() => setShowPetaDasar((v) => !v)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.checkboxBox, showPetaDasar && styles.checkboxBoxActive]}>
+                    {showPetaDasar ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                  </View>
+                  <Text style={[styles.ceklisDasarText, showPetaDasar && styles.ceklisDasarTextActive]}>
+                    Peta Dasar
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -603,6 +656,31 @@ const PlacemarkForm = ({ navigation, route }) => {
             showsMyLocationButton
             onPress={(e) => setMapPickerCoord(e.nativeEvent.coordinate)}
           >
+            {/* 1. Poligon Peta Final */}
+            {petaFinalAll.map((p, i) => (
+              <Polygon
+                key={`picker-final-${p.kode_desa || i}-${i}`}
+                coordinates={p.coordinates}
+                strokeColor="#00E5FF"
+                fillColor="rgba(2, 132, 199, 0.28)"
+                strokeWidth={1.8}
+                zIndex={2}
+              />
+            ))}
+
+            {/* 2. Poligon Peta Dasar */}
+            {showPetaDasar &&
+              petaDasarAll.map((p, i) => (
+                <Polygon
+                  key={`picker-dasar-${p.kode_desa || i}-${i}`}
+                  coordinates={p.coordinates}
+                  strokeColor="#FBBF24"
+                  fillColor="rgba(251, 191, 36, 0.15)"
+                  strokeWidth={1.4}
+                  zIndex={1}
+                />
+              ))}
+
             {mapPickerCoord && (
               <Marker
                 coordinate={mapPickerCoord}
@@ -637,19 +715,40 @@ const PlacemarkForm = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* Toggle layer peta */}
-          <View style={styles.mapPickerTypeRow}>
-            {['satellite', 'standard', 'terrain'].map((type) => (
+          {/* Baris Toggle Layer Peta & Ceklis Peta Dasar */}
+          <View style={styles.mapPickerControlsBottom}>
+            <View style={styles.mapPickerTypeRow}>
+              {['satellite', 'standard', 'terrain'].map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.mapTypeBtn, mapType === type && styles.mapTypeBtnActive]}
+                  onPress={() => setMapType(type)}
+                >
+                  <Text style={[styles.mapTypeBtnText, mapType === type && styles.mapTypeBtnTextActive]}>
+                    {type === 'satellite' ? '🛰 Satelit' : type === 'standard' ? '🗺 Jalan' : '🏔 Medan'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.mapPickerDasarRow}>
+              <View style={styles.badgeFinalPeta}>
+                <View style={[styles.dotPetaFinal, { backgroundColor: '#00E5FF' }]} />
+                <Text style={styles.badgeFinalText}>Final ({petaFinalAll.length})</Text>
+              </View>
               <TouchableOpacity
-                key={type}
-                style={[styles.mapTypeBtn, mapType === type && styles.mapTypeBtnActive]}
-                onPress={() => setMapType(type)}
+                style={[styles.ceklisDasarBtn, showPetaDasar && styles.ceklisDasarBtnActive]}
+                onPress={() => setShowPetaDasar((v) => !v)}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.mapTypeBtnText, mapType === type && styles.mapTypeBtnTextActive]}>
-                  {type === 'satellite' ? '🛰 Satelit' : type === 'standard' ? '🗺 Jalan' : '🏔 Medan'}
+                <View style={[styles.checkboxBox, showPetaDasar && styles.checkboxBoxActive]}>
+                  {showPetaDasar ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                </View>
+                <Text style={[styles.ceklisDasarText, showPetaDasar && styles.ceklisDasarTextActive]}>
+                  Peta Dasar
                 </Text>
               </TouchableOpacity>
-            ))}
+            </View>
           </View>
         </View>
       </Modal>
@@ -1080,14 +1179,101 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  mapPickerTypeRow: {
-    flexDirection: 'row',
+  mapPickerControlsBottom: {
     backgroundColor: '#0F172A',
     paddingVertical: 10,
     paddingHorizontal: 14,
-    paddingBottom: 20,
+    paddingBottom: 22,
+    gap: 8,
+  },
+  mapPickerTypeRow: {
+    flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
+  },
+  mapPickerDasarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+
+  // PREVIEW MAP LAYER CONTROLS (Peta Dasar & Final)
+  polygonLayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  badgeFinalPeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  dotPetaFinal: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 5,
+  },
+  badgeFinalText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0284C7',
+  },
+  ceklisDasarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  ceklisDasarBtnActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  checkboxBox: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  checkboxBoxActive: {
+    borderColor: '#D97706',
+    backgroundColor: '#F59E0B',
+  },
+  checkboxCheckmark: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+    lineHeight: 10,
+  },
+  ceklisDasarText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  ceklisDasarTextActive: {
+    color: '#B45309',
+    fontWeight: '800',
   },
 });
 

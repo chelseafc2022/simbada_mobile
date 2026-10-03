@@ -15,9 +15,10 @@ import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
 } from 'react-native';
 import { useSelector } from 'react-redux';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Marker, Callout, Polygon } from 'react-native-maps';
 import AppHeader from '../components/AppHeader';
 import PlacemarkDB from '../library/PlacemarkDB';
+import { usePetaFinalAllQuery, usePetaDasarAllQuery } from '../library/queries';
 
 const SYMBOL_EMOJI = {
   pin_merah:'📍', pin_biru:'📌', bangunan:'🏠', pohon:'🌳', air:'💧',
@@ -41,8 +42,14 @@ const MAP_TYPES = [
 const PlacemarkMap = ({ navigation, route }) => {
   const profile = useSelector((state) => state.PROFILE);
   const token = useSelector((state) => state.TOKEN);
-  const urlPlacemark = useSelector((state) => state.URL?.URL_PLACEMARK);
+  const url = useSelector((state) => state.URL);
+  const urlPlacemark = url?.URL_PLACEMARK;
   const userId = profile?.id || null;
+
+  // Layer overlay: Peta Final (aktif) & Peta Dasar (ceklis)
+  const [showPetaDasar, setShowPetaDasar] = useState(false);
+  const { data: petaFinalAll = [] } = usePetaFinalAllQuery(token, url);
+  const { data: petaDasarAll = [] } = usePetaDasarAllQuery(token, url);
 
   const initialPlacemarks = route?.params?.placemarks ?? [];
   const initialMy = route?.params?.myPlacemarks ?? [];
@@ -121,7 +128,7 @@ const PlacemarkMap = ({ navigation, route }) => {
 
       {/* TOOLBAR: LAYER & FILTER TABS */}
       <View style={styles.topControlContainer}>
-        {/* Layer Selector */}
+        {/* Layer Selector & Peta Dasar Toggle */}
         <View style={styles.layerBar}>
           {MAP_TYPES.map(lt => (
             <TouchableOpacity
@@ -135,6 +142,20 @@ const PlacemarkMap = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           ))}
+
+          {/* Toggle Ceklis Peta Dasar */}
+          <TouchableOpacity
+            style={[styles.dasarToggleBtn, showPetaDasar && styles.dasarToggleBtnActive]}
+            onPress={() => setShowPetaDasar(v => !v)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.checkboxBox, showPetaDasar && styles.checkboxBoxActive]}>
+              {showPetaDasar ? <Text style={styles.checkboxCheckmark}>✓</Text> : null}
+            </View>
+            <Text style={[styles.dasarToggleText, showPetaDasar && styles.dasarToggleTextActive]}>
+              Peta Dasar
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Filter Tab: Semua | Milik Saya | Publik */}
@@ -180,6 +201,30 @@ const PlacemarkMap = ({ navigation, route }) => {
         showsUserLocation
         showsMyLocationButton
       >
+        {/* 1. Poligon Peta Final */}
+        {petaFinalAll.map((p, i) => (
+          <Polygon
+            key={`allpm-final-${p.kode_desa || i}-${i}`}
+            coordinates={p.coordinates}
+            strokeColor="#00E5FF"
+            fillColor="rgba(2, 132, 199, 0.28)"
+            strokeWidth={1.8}
+            zIndex={2}
+          />
+        ))}
+
+        {/* 2. Poligon Peta Dasar */}
+        {showPetaDasar &&
+          petaDasarAll.map((p, i) => (
+            <Polygon
+              key={`allpm-dasar-${p.kode_desa || i}-${i}`}
+              coordinates={p.coordinates}
+              strokeColor="#FBBF24"
+              fillColor="rgba(251, 191, 36, 0.15)"
+              strokeWidth={1.4}
+              zIndex={1}
+            />
+          ))}
         {displayPlacemarks.map((pm) => {
           const pinColor = PIN_COLOR[pm.simbol] || '#208DC0';
           const emojiIcon = SYMBOL_EMOJI[pm.simbol] || '📍';
@@ -305,6 +350,51 @@ const styles = StyleSheet.create({
   },
   layerBtnTextActive: {
     color: '#FFFFFF',
+  },
+  dasarToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginLeft: 'auto',
+  },
+  dasarToggleBtnActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  checkboxBox: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  checkboxBoxActive: {
+    borderColor: '#D97706',
+    backgroundColor: '#F59E0B',
+  },
+  checkboxCheckmark: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+    lineHeight: 10,
+  },
+  dasarToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  dasarToggleTextActive: {
+    color: '#B45309',
+    fontWeight: '800',
   },
 
   // FILTER BAR

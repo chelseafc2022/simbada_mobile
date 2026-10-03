@@ -15,13 +15,14 @@ import {
   StyleSheet, Alert, ActivityIndicator, Platform, Dimensions, Modal,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
+import MapView, { Marker, Polyline, Circle, Polygon } from 'react-native-maps';
 import FastImage from 'react-native-fast-image';
 import { useSelector } from 'react-redux';
 import AppHeader from '../components/AppHeader';
 import CompassView from './CompassView';
 import NavigasiService from '../library/NavigasiService';
 import GpsService from '../library/GpsService';
+import { usePetaFinalAllQuery, usePetaDasarAllQuery } from '../library/queries';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -81,6 +82,11 @@ const formatDistance = (d) => {
 const NavigasiKoordinat = ({ navigation }) => {
   const TOKEN = useSelector(state => state.TOKEN);
   const URL = useSelector(state => state.URL);
+
+  // Overlay layer state: Peta Final (aktif default) & Peta Dasar (ceklis)
+  const [showPetaDasar, setShowPetaDasar] = useState(false);
+  const { data: petaFinalAll = [] } = usePetaFinalAllQuery(TOKEN, URL);
+  const { data: petaDasarAll = [] } = usePetaDasarAllQuery(TOKEN, URL);
 
   // Target state
   const [targetLat, setTargetLat] = useState('');
@@ -556,6 +562,31 @@ const NavigasiKoordinat = ({ navigation }) => {
                   }
                 }}
               >
+                {/* 1. Poligon Peta Final (Desa yang sdh difinalkan) */}
+                {petaFinalAll.map((p, i) => (
+                  <Polygon
+                    key={`final-${p.kode_desa || i}-${i}`}
+                    coordinates={p.coordinates}
+                    strokeColor="#00E5FF"
+                    fillColor="rgba(2, 132, 199, 0.28)"
+                    strokeWidth={1.8}
+                    zIndex={2}
+                  />
+                ))}
+
+                {/* 2. Poligon Peta Dasar (jika ceklis aktif) */}
+                {showPetaDasar &&
+                  petaDasarAll.map((p, i) => (
+                    <Polygon
+                      key={`dasar-${p.kode_desa || i}-${i}`}
+                      coordinates={p.coordinates}
+                      strokeColor="#FBBF24"
+                      fillColor="rgba(251, 191, 36, 0.15)"
+                      strokeWidth={1.4}
+                      zIndex={1}
+                    />
+                  ))}
+
                 {/* Posisi Target Marker dengan Callout Pin */}
                 {targetCoord && (
                   <Marker
@@ -632,24 +663,24 @@ const NavigasiKoordinat = ({ navigation }) => {
                 )}
               </MapView>
 
-              {/* TOP-LEFT OVERLAY BADGE */}
-              <View style={s.topLeftCard}>
-                <View style={s.mapIconBadge}>
-                  <FastImage
-                    source={require('../assets/img/map.png')}
-                    style={s.mapIconImg}
-                    resizeMode={FastImage.resizeMode.contain}
-                    tintColor="#FFFFFF"
-                  />
+              {/* TOP-LEFT OVERLAY: CEKLIS PETA DASAR & STATUS FINAL (Menggantikan Kotak Peta Target Navigasi) */}
+              <View style={s.layerToggleRowOverlay}>
+                <View style={s.statusFinalBadge}>
+                  <View style={[s.statusFinalDot, { backgroundColor: '#00E5FF' }]} />
+                  <Text style={s.statusFinalText}>Final ({petaFinalAll.length})</Text>
                 </View>
-                <View style={s.topLeftTextCol}>
-                  <Text style={s.mapTitleHeader}>Peta Target Navigasi</Text>
-                  <Text style={s.mapSubHeader} numberOfLines={1}>
-                    {targetCoord
-                      ? `${targetLat}, ${targetLng}`
-                      : 'Ketuk peta untuk tentukan target'}
+                <TouchableOpacity
+                  style={[s.checkPetaDasarChip, showPetaDasar && s.checkPetaDasarChipActive]}
+                  onPress={() => setShowPetaDasar((v) => !v)}
+                  activeOpacity={0.82}
+                >
+                  <View style={[s.checkboxSquare, showPetaDasar && s.checkboxSquareActive]}>
+                    {showPetaDasar ? <Text style={s.checkboxCheckmark}>✓</Text> : null}
+                  </View>
+                  <Text style={[s.checkPetaDasarLabel, showPetaDasar && s.checkPetaDasarLabelActive]}>
+                    Peta Dasar
                   </Text>
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* TOP-RIGHT OVERLAY: PILIH LAYER BUTTON */}
@@ -961,6 +992,31 @@ const NavigasiKoordinat = ({ navigation }) => {
               showsUserLocation={false}
               showsCompass={false}
             >
+              {/* 1. Poligon Peta Final */}
+              {petaFinalAll.map((p, i) => (
+                <Polygon
+                  key={`track-final-${p.kode_desa || i}-${i}`}
+                  coordinates={p.coordinates}
+                  strokeColor="#00E5FF"
+                  fillColor="rgba(2, 132, 199, 0.28)"
+                  strokeWidth={1.8}
+                  zIndex={2}
+                />
+              ))}
+
+              {/* 2. Poligon Peta Dasar */}
+              {showPetaDasar &&
+                petaDasarAll.map((p, i) => (
+                  <Polygon
+                    key={`track-dasar-${p.kode_desa || i}-${i}`}
+                    coordinates={p.coordinates}
+                    strokeColor="#FBBF24"
+                    fillColor="rgba(251, 191, 36, 0.15)"
+                    strokeWidth={1.4}
+                    zIndex={1}
+                  />
+                ))}
+
               {/* Posisi saat ini */}
               {currentPos && isValidCoord(currentPos) && (
                 <>
@@ -1228,6 +1284,31 @@ const NavigasiKoordinat = ({ navigation }) => {
               showsUserLocation={true}
               showsMyLocationButton={false}
             >
+              {/* 1. Poligon Peta Final */}
+              {petaFinalAll.map((p, i) => (
+                <Polygon
+                  key={`picker-final-${p.kode_desa || i}-${i}`}
+                  coordinates={p.coordinates}
+                  strokeColor="#00E5FF"
+                  fillColor="rgba(2, 132, 199, 0.28)"
+                  strokeWidth={1.8}
+                  zIndex={2}
+                />
+              ))}
+
+              {/* 2. Poligon Peta Dasar */}
+              {showPetaDasar &&
+                petaDasarAll.map((p, i) => (
+                  <Polygon
+                    key={`picker-dasar-${p.kode_desa || i}-${i}`}
+                    coordinates={p.coordinates}
+                    strokeColor="#FBBF24"
+                    fillColor="rgba(251, 191, 36, 0.15)"
+                    strokeWidth={1.4}
+                    zIndex={1}
+                  />
+                ))}
+
               {/* Picked target marker (Red) */}
               {mapPickerCoord && isValidCoord(mapPickerCoord) && (
                 <Marker
@@ -1275,6 +1356,26 @@ const NavigasiKoordinat = ({ navigation }) => {
                   />
                 )}
             </MapView>
+
+            {/* Layer Toggle Overlay (Peta Dasar Checkbox) */}
+            <View style={s.layerToggleRowOverlay}>
+              <View style={s.statusFinalBadge}>
+                <View style={[s.statusFinalDot, { backgroundColor: '#00E5FF' }]} />
+                <Text style={s.statusFinalText}>Final ({petaFinalAll.length})</Text>
+              </View>
+              <TouchableOpacity
+                style={[s.checkPetaDasarChip, showPetaDasar && s.checkPetaDasarChipActive]}
+                onPress={() => setShowPetaDasar((v) => !v)}
+                activeOpacity={0.82}
+              >
+                <View style={[s.checkboxSquare, showPetaDasar && s.checkboxSquareActive]}>
+                  {showPetaDasar ? <Text style={s.checkboxCheckmark}>✓</Text> : null}
+                </View>
+                <Text style={[s.checkPetaDasarLabel, showPetaDasar && s.checkPetaDasarLabelActive]}>
+                  Peta Dasar
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Layer Selector Button di Map Picker */}
             <TouchableOpacity
@@ -1912,54 +2013,90 @@ const s = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  topLeftCard: {
+  // OVERLAY KIRI ATAS: CEKLIS PETA DASAR & STATUS FINAL
+  layerToggleRowOverlay: {
     position: 'absolute',
     top: 12,
     left: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     zIndex: 15,
+  },
+  statusFinalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 5,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusFinalDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusFinalText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0284C7',
+  },
+  checkPetaDasarChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    maxWidth: '55%',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 3,
   },
-  mapIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    backgroundColor: '#0284C7',
+  checkPetaDasarChipActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  checkboxSquare: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 6,
   },
-  mapIconImg: {
-    width: 18,
-    height: 18,
+  checkboxSquareActive: {
+    borderColor: '#D97706',
+    backgroundColor: '#F59E0B',
   },
-  topLeftTextCol: {
-    justifyContent: 'center',
-    flexShrink: 1,
-  },
-  mapTitleHeader: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-  },
-  mapSubHeader: {
+  checkboxCheckmark: {
+    color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '500',
+    fontWeight: '900',
+    lineHeight: 11,
+  },
+  checkPetaDasarLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#64748B',
-    marginTop: 1,
+  },
+  checkPetaDasarLabelActive: {
+    color: '#B45309',
+    fontWeight: '800',
   },
   layerSelectorBtn: {
     position: 'absolute',
