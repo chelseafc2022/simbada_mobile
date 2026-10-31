@@ -16,6 +16,20 @@ const STORAGE_KEY = 'OFFLINE_QUEUE';
 const MAX_RETRY = 3;
 const BATCH_SIZE = 5;
 
+const getSession = async () => {
+  try {
+    const token = await AsyncStorage.getItem('TOKEN');
+    const profile = JSON.parse(await AsyncStorage.getItem('PROFILE') || 'null');
+    const ownerId = profile?.id || profile?._id || profile?.username;
+    if (!token || !ownerId || Number(profile?.profile?.status) === 99 || Number(profile?.status) === 99) {
+      return null;
+    }
+    return { token, ownerId: String(ownerId) };
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Generate unique ID untuk setiap item queue
  */
@@ -56,11 +70,13 @@ const saveQueue = async (queue) => {
  */
 const addToQueue = async (data, endpoint, token) => {
   const queue = await getQueue();
+  const session = await getSession();
   const item = {
     id: generateId(),
     data,
     endpoint,
     token,
+    ownerId: session?.token === token ? session.ownerId : null,
     status: 'pending', // pending | syncing | failed | synced
     retryCount: 0,
     createdAt: new Date().toISOString(),
@@ -76,16 +92,17 @@ const addToQueue = async (data, endpoint, token) => {
 /**
  * Update status item di queue
  */
-const updateItemStatus = async (itemId, status, errorMessage = null) => {
+const updateItemStatus = async (itemId, status, errorMessage = null, authRequired = false) => {
   const queue = await getQueue();
   const index = queue.findIndex(item => item.id === itemId);
   if (index !== -1) {
     queue[index].status = status;
     queue[index].lastAttempt = new Date().toISOString();
+    queue[index].authRequired = authRequired;
     if (errorMessage) {
       queue[index].errorMessage = errorMessage;
     }
-    if (status === 'failed') {
+    if (status === 'failed' && !authRequired) {
       queue[index].retryCount += 1;
     }
     await saveQueue(queue);
@@ -130,6 +147,25 @@ const getQueueStats = async () => {
  */
 const syncItem = async (item) => {
   try {
+    const session = await getSession();
+    // Item lama hanya dapat dikaitkan bila token asal masih sama dengan sesi aktif.
+    // Jangan mengalihkan data akun lain saat login ulang atau berganti akun.
+    const sameOwner = session && (item.ownerId
+      ? item.ownerId === session.ownerId
+      : item.token === session.token);
+    if (!sameOwner) {
+      await updateItemStatus(item.id, 'failed',
+        'Silakan login dengan akun pembuat data. Data lama tanpa identitas pemilik perlu diverifikasi.', true);
+      return false;
+    }
+    if (!item.ownerId) {
+      const queue = await getQueue();
+      const saved = queue.find(entry => entry.id === item.id);
+      if (saved) {
+        saved.ownerId = session.ownerId;
+        await saveQueue(queue);
+      }
+    }
     await updateItemStatus(item.id, 'syncing');
 
     // Build FormData dari data yang disimpan
@@ -148,7 +184,7 @@ const syncItem = async (item) => {
     const response = await fetch(item.endpoint, {
       method: 'POST',
       headers: {
-        Authorization: 'kikensbatara ' + item.token,
+        Authorization: 'kikensbatara ' + session.token,
       },
       body: formData,
     });
@@ -158,6 +194,13 @@ const syncItem = async (item) => {
       console.log('[OfflineManager] Item synced successfully:', item.id);
       return true;
     } else {
+      if (response.status === 401 || response.status === 403) {
+        await updateItemStatus(item.id, 'failed',
+          response.status === 401
+            ? 'Sesi berakhir. Silakan login kembali dengan akun pembuat data, lalu ulangi sinkronisasi.'
+            : 'Akses ditolak. Periksa izin akun pembuat data sebelum mengulangi sinkronisasi.', true);
+        return false;
+      }
       const errorText = await response.text();
       await updateItemStatus(item.id, 'failed', `Server error: ${response.status} - ${errorText}`);
       return false;
@@ -183,7 +226,8 @@ const syncAll = async (onProgress = null) => {
 
   const queue = await getQueue();
   const toSync = queue.filter(
-    item => (item.status === 'pending' || item.status === 'failed') && item.retryCount < MAX_RETRY
+    item => (item.status === 'pending' || item.status === 'failed') &&
+      (item.authRequired || item.retryCount < MAX_RETRY)
   );
 
   let synced = 0;
@@ -192,7 +236,11 @@ const syncAll = async (onProgress = null) => {
   // Proses per batch
   for (let i = 0; i < toSync.length; i += BATCH_SIZE) {
     const batch = toSync.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(item => syncItem(item)));
+    // Perubahan status memakai satu key penyimpanan; urutkan untuk mencegah update saling menimpa.
+    const results = [];
+    for (const item of batch) {
+      results.push(await syncItem(item));
+    }
     
     results.forEach(success => {
       if (success) synced++;

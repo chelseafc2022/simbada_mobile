@@ -91,9 +91,13 @@ const OfflineSync = ({ navigation }) => {
     setIsSyncing(false);
     await loadQueue();
 
+    const remaining = await OfflineManager.getQueue();
+    const authIssue = remaining.find(item => item.authRequired);
+
     Alert.alert(
       'Sinkronisasi Selesai',
-      `✅ Berhasil: ${result.synced}\n❌ Gagal: ${result.failed}\n📊 Total: ${result.total}`
+      `✅ Berhasil: ${result.synced}\n❌ Gagal: ${result.failed}\n📊 Total: ${result.total}` +
+        (authIssue ? `\n\n${authIssue.errorMessage}` : '')
     );
   };
 
@@ -133,7 +137,9 @@ const OfflineSync = ({ navigation }) => {
     if (success) {
       Alert.alert('Berhasil', 'Data berhasil disinkronkan!');
     } else {
-      Alert.alert('Gagal', 'Gagal mengirim data. Coba lagi nanti.');
+      const currentQueue = await OfflineManager.getQueue();
+      const currentItem = currentQueue.find(entry => entry.id === item.id);
+      Alert.alert('Gagal', currentItem?.errorMessage || 'Gagal mengirim data. Coba lagi nanti.');
     }
   };
 

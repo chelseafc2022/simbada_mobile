@@ -340,7 +340,7 @@ const GuestMap = ({ navigation }) => {
           {/* Akses Pintas Peta Tematik */}
           <TouchableOpacity
             style={[s.layerPill, s.thematicPill]}
-            onPress={() => navigation.navigate('PetaTematik')}
+            onPress={() => handleRestrictedAccess('Peta Tematik')}
             activeOpacity={0.75}
           >
             <Icon name="map" size={13} color="#F59E0B" style={{ marginRight: 5 }} />

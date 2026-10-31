@@ -8,9 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // var URL = 'http://localhost:5073/';
 // var URLX = 'http://localhost:5073/';
 
-// Server Production:
-var URL = 'https://server-simbada.konaweselatankab.go.id/';
-var URLX = 'https://server-simbada.konaweselatankab.go.id/';
+// Debug memakai backend lokal dengan database sesuai server/.env; release memakai backend production.
+var URL = __DEV__ ? 'http://localhost:5073/' : 'https://server-simbada.konaweselatankab.go.id/';
+var URLX = URL;
 
 
 
