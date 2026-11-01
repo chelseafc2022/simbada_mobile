@@ -1,3 +1,6 @@
+import NotificationService from '../library/NotificationService';
+import { clearPrivateFiles } from '../library/PrivateFiles';
+import notifee from '@notifee/react-native';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -331,6 +334,22 @@ const User = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              const savedToken = await AsyncStorage.getItem('TOKEN');
+              const deviceToken = await AsyncStorage.getItem('FCM_DEVICE_TOKEN');
+              await NotificationService.clearAllNotifications();
+              await clearPrivateFiles().catch(() => {});
+              const displayed = await notifee.getDisplayedNotifications().catch(() => []);
+              for (const item of displayed) {
+                if (!item.notification.android?.asForegroundService && !['simbada_track_recorder','simbada_navigation'].includes(item.id)) {
+                  await notifee.cancelNotification(item.id).catch(() => {});
+                }
+              }
+              if (savedToken && deviceToken) {
+                fetch(URL.URL_PENGGUNA + 'unregister_device', {method:'POST',headers:{'content-type':'application/json',Authorization:`Bearer ${savedToken}`},body:JSON.stringify({device_token:deviceToken})}).catch(() => {});
+              }
+              if(savedToken){
+                fetch(URL.URL_PENGGUNA+'logout',{method:'POST',headers:{'content-type':'application/json',Authorization:`Bearer ${savedToken}`},body:'{}'}).catch(()=>{});
+              }
               await AsyncStorage.multiRemove([
                 'TOKEN',
                 'PROFILE',

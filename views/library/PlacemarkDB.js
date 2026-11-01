@@ -262,15 +262,16 @@ const PlacemarkDB = {
     try {
       // 1. PUSH: Kirim data lokal milik user ke server
       const localMy = await PlacemarkDB.getAll(userId);
-      if (localMy.length > 0) {
-        await fetch(`${baseUrl}sync`, {
+      for (let offset = 0; offset < localMy.length; offset += 50) {
+        const pushed = await fetch(`${baseUrl}sync`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ placemarks: localMy }),
+          body: JSON.stringify({ placemarks: localMy.slice(offset, offset + 50) }),
         });
+        if (!pushed.ok) { throw new Error('Sinkronisasi ditolak server. Data lokal tetap disimpan.'); }
       }
 
       // 2. PULL: Ambil data milik user dari server (berguna saat login di HP baru)
@@ -282,7 +283,9 @@ const PlacemarkDB = {
         },
         body: JSON.stringify({ userId }),
       });
+      if (!myRes.ok) { throw new Error('Gagal mengambil data dari server.'); }
       const myData = await myRes.json();
+      if (!myData.success) { throw new Error('Respons sinkronisasi tidak berhasil.'); }
       if (myData.success && Array.isArray(myData.data)) {
         // Gabungkan data dari server ke lokal
         const localMap = new Map();
@@ -299,7 +302,9 @@ const PlacemarkDB = {
           Authorization: `Bearer ${token}`,
         },
       });
+      if (!pubRes.ok) { throw new Error('Gagal mengambil data publik.'); }
       const pubData = await pubRes.json();
+      if (!pubData.success) { throw new Error('Respons data publik tidak berhasil.'); }
       if (pubData.success && Array.isArray(pubData.data)) {
         await AsyncStorage.setItem(PUBLIC_CACHE_KEY, JSON.stringify(pubData.data));
       }

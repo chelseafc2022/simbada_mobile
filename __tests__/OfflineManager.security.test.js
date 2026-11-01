@@ -28,7 +28,8 @@ test('akun berbeda tidak mengirim data dan antrean tetap disimpan tanpa menghabi
   storage.PROFILE = JSON.stringify({ id: 'b', profile: { status: 2 } });
   expect(await OfflineManager.syncItem(item)).toBe(false);
   expect(fetch).not.toHaveBeenCalled();
-  const [saved] = await OfflineManager.getQueue();
+  expect(await OfflineManager.getQueue()).toEqual([]);
+  const [saved] = JSON.parse(storage.OFFLINE_QUEUE);
   expect(saved.data.nama).toBe('Uji');
   expect(saved.retryCount).toBe(0);
 });
@@ -50,7 +51,8 @@ test('legacy dengan token berubah ditahan karena kepemilikan belum dapat dipasti
   storage.OFFLINE_QUEUE = JSON.stringify([legacy]);
   expect(await OfflineManager.syncItem(legacy)).toBe(false);
   expect(fetch).not.toHaveBeenCalled();
-  expect((await OfflineManager.getQueue())[0].data.nama).toBe('Legacy');
+  expect(await OfflineManager.getQueue()).toEqual([]);
+  expect(JSON.parse(storage.OFFLINE_QUEUE)[0].data.nama).toBe('Legacy');
 });
 
 test('legacy dengan token sesi yang sama dapat dikaitkan, lalu pulih setelah login ulang', async () => {

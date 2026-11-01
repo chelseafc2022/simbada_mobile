@@ -20,7 +20,7 @@ import NotificationService from './views/library/NotificationService';
 
 // Handle FCM Push Notification di background (aplikasi minimize / mati)
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-  console.log('[FCM Background] Remote message received:', remoteMessage);
+  if (!await NotificationService.canReceiveMessage(remoteMessage)) { return; }
 
   try {
     const channelId = await notifee.createChannel({
@@ -46,7 +46,9 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
       console.warn('[FCM Background] Error saving to storage:', saveErr);
     }
 
+    if (!await NotificationService.canReceiveMessage(remoteMessage)) { return; }
     await notifee.displayNotification({
+      id: `simbada_msg_${Date.now()}`,
       title,
       body,
       data: remoteMessage.data || {},

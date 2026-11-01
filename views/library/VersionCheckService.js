@@ -1,7 +1,7 @@
 // views/library/VersionCheckService.js
 import { Platform } from 'react-native';
 
-export const APP_VERSION_CODE = 7;
+export const APP_VERSION_CODE = 8;
 export const APP_VERSION_NAME = '2.0.0';
 
 /**

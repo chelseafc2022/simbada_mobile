@@ -50,6 +50,13 @@ const getQueue = async () => {
   }
 };
 
+// UI/sinkronisasi hanya melihat antrean sesi aktif; antrean akun lain tetap tersimpan.
+const getVisibleQueue = async () => {
+  const active = await getSession();
+  if (!active) { return []; }
+  return (await getQueue()).filter(item => item.ownerId ? item.ownerId === active.ownerId : item.token === active.token);
+};
+
 /**
  * Simpan queue ke AsyncStorage
  */
@@ -113,6 +120,7 @@ const updateItemStatus = async (itemId, status, errorMessage = null, authRequire
  * Hapus item dari queue
  */
 const removeFromQueue = async (itemId) => {
+  if (!(await getVisibleQueue()).some(item => item.id === itemId)) { return; }
   let queue = await getQueue();
   queue = queue.filter(item => item.id !== itemId);
   await saveQueue(queue);
@@ -132,7 +140,7 @@ const clearSyncedItems = async () => {
  * Hitung jumlah item per status
  */
 const getQueueStats = async () => {
-  const queue = await getQueue();
+  const queue = await getVisibleQueue();
   return {
     total: queue.length,
     pending: queue.filter(i => i.status === 'pending').length,
@@ -224,7 +232,7 @@ const syncAll = async (onProgress = null) => {
     return { synced: 0, failed: 0, total: 0 };
   }
 
-  const queue = await getQueue();
+  const queue = await getVisibleQueue();
   const toSync = queue.filter(
     item => (item.status === 'pending' || item.status === 'failed') &&
       (item.authRequired || item.retryCount < MAX_RETRY)
@@ -302,7 +310,7 @@ const setupAutoSync = (onStatusChange, dispatch = null) => {
 
 export default {
   addToQueue,
-  getQueue,
+  getQueue: getVisibleQueue,
   removeFromQueue,
   clearSyncedItems,
   getQueueStats,

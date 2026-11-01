@@ -20,6 +20,7 @@ import TelemetriPanel from '../telemetri/TelemetriPanel';
 import OfflineLayerDB from '../library/OfflineLayerDB';
 import AppHeader from '../components/AppHeader';
 import CompassView from '../navigasi/CompassView';
+import offlineMapHtml from '../assets/offline-map.json';
 
 const fmtDist = (m) => {
   if (m == null) return '--';
@@ -414,17 +415,18 @@ const MapViewer = ({ navigation, route }) => {
       <View style={styles.mapContainer}>
         <WebView
           ref={webviewRef}
-          source={{ uri: 'file:///android_asset/offline_map.html' }}
+          source={{ html: offlineMapHtml.html, baseUrl: 'https://simbada-offline.local/' }}
           style={styles.webview}
           onLoad={loadMap}
           onMessage={handleWebViewMessage}
           onError={(e) => setLoadError(e.nativeEvent.description)}
           javaScriptEnabled
-          allowFileAccess
-          allowUniversalAccessFromFileURLs
-          allowFileAccessFromFileURLs
-          mixedContentMode="always"
-          originWhitelist={['*']}
+          allowFileAccess={false}
+          allowUniversalAccessFromFileURLs={false}
+          allowFileAccessFromFileURLs={false}
+          mixedContentMode="never"
+          originWhitelist={['https://simbada-offline.local', 'about:blank']}
+          onShouldStartLoadWithRequest={request => request.url === 'about:blank' || request.url === 'https://simbada-offline.local/'}
           scrollEnabled={false}
         />
 

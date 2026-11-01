@@ -103,7 +103,7 @@ const Login = ({ navigation }) => {
         return;
       }
 
-      console.log('LOGIN ATTEMPT URL:', URL?.LOGIN_URL, 'form:', form);
+
       fetch(URL.LOGIN_URL, {
         method: 'POST',
         headers: {
@@ -128,7 +128,7 @@ const Login = ({ navigation }) => {
           });
         })
         .then(async (res_data) => {
-          console.log('LOGIN SUCCESS:', res_data);
+
           await saveDataToken('TOKEN', res_data.token);
           await saveDataToken('PROFILE', JSON.stringify(res_data.profile));
           await AsyncStorage.setItem('LAST_LOGIN', Date.now().toString());

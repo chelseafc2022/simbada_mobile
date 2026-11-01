@@ -1,3 +1,4 @@
+import { fileSource, openPrivateDocument } from '../library/PrivateFiles';
 //import libraries
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import styles from '../assets/style';
@@ -208,14 +209,14 @@ const Zona = ({ navigation, route }) => {
                     { text: 'Batal', style: 'cancel' },
                     { 
                         text: 'Buka / Unduh', 
-                        onPress: () => Linking.openURL(fullUrl).catch(() => {
+                        onPress: () => openPrivateDocument(fullUrl, URL.URL_APP, TOKEN).catch(() => {
                             Alert.alert('Error', 'Gagal membuka berkas dokumen.');
                         })
                     }
                 ]
             );
         } else {
-            Linking.openURL(fullUrl).catch(() => {
+            openPrivateDocument(fullUrl, URL.URL_APP, TOKEN).catch(() => {
                 Alert.alert('Error', 'Gagal membuka berkas.');
             });
         }
@@ -852,7 +853,7 @@ const Zona = ({ navigation, route }) => {
                                                 activeOpacity={0.8}
                                             >
                                                 <Image 
-                                                    source={{ uri: fullPhotoUrl }} 
+                                                    source={fileSource(fullPhotoUrl, URL.URL_APP, TOKEN)}
                                                     style={localStyles.thumbnailImage} 
                                                 />
                                                 <View style={localStyles.zoomOverlay}>
@@ -911,7 +912,7 @@ const Zona = ({ navigation, route }) => {
 
                         {selectedPhoto.uri ? (
                             <Image
-                                source={{ uri: selectedPhoto.uri }}
+                                source={fileSource(selectedPhoto.uri, URL.URL_APP, TOKEN)}
                                 style={localStyles.modalFullImage}
                                 resizeMode="contain"
                             />

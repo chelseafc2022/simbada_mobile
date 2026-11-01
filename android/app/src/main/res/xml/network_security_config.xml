@@ -5,18 +5,19 @@
         <domain includeSubdomains="true">konaweselatankab.go.id</domain>
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
+
             <certificates src="@raw/root_yr" />
             <certificates src="@raw/root_yr_by_x1" />
         </trust-anchors>
     </domain-config>
 
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
+
             <certificates src="@raw/root_yr" />
             <certificates src="@raw/root_yr_by_x1" />
         </trust-anchors>
     </base-config>
+    <debug-overrides><trust-anchors><certificates src="user" /></trust-anchors></debug-overrides>
 </network-security-config>

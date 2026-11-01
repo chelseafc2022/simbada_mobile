@@ -297,15 +297,16 @@ const TrackDB = {
     try {
       // 1. PUSH: Kirim data lokal milik user ke server
       const localMy = await TrackDB.getAllTracks(userId);
-      if (localMy.length > 0) {
-        await fetch(`${baseUrl}sync`, {
+      for (let offset = 0; offset < localMy.length; offset += 50) {
+        const pushed = await fetch(`${baseUrl}sync`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ tracks: localMy }),
+          body: JSON.stringify({ tracks: localMy.slice(offset, offset + 50) }),
         });
+        if (!pushed.ok) { throw new Error('Sinkronisasi ditolak server. Data lokal tetap disimpan.'); }
       }
 
       // 2. PULL: Ambil data milik user dari server (saat login di perangkat baru)
@@ -317,7 +318,9 @@ const TrackDB = {
         },
         body: JSON.stringify({ userId }),
       });
+      if (!myRes.ok) { throw new Error('Gagal mengambil data dari server.'); }
       const myData = await myRes.json();
+      if (!myData.success) { throw new Error('Respons sinkronisasi tidak berhasil.'); }
       if (myData.success && Array.isArray(myData.data)) {
         // Gabungkan data server dengan lokal tanpa duplikasi id
         const localMap = new Map();

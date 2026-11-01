@@ -16,13 +16,29 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 
 const NOTIF_STORAGE_KEY = 'NOTIFICATIONS_LIST';
 const FCM_TOKEN_KEY = 'FCM_DEVICE_TOKEN';
+const session = async () => {
+  try {
+    const [token, raw] = await Promise.all([AsyncStorage.getItem('TOKEN'), AsyncStorage.getItem('PROFILE')]);
+    const profile = JSON.parse(raw || 'null');
+    return token && profile?.id ? { id: String(profile.id), token, status: Number(profile.profile?.status) } : null;
+  } catch { return null; }
+};
+const storageKey = ownerId => `${NOTIF_STORAGE_KEY}:${ownerId}`;
+const canReceiveMessage = async message => {
+  const active = await session();
+  const recipient = message?.data?.recipientId;
+  return !!active && (recipient === active.id || recipient === 'all' || (recipient === 'admin' && [1,4].includes(active.status)));
+};
+
 
 /**
  * Ambil daftar notifikasi dari storage lokal
  */
-const getNotifications = async () => {
+const getNotifications = async (ownerId = null) => {
   try {
-    const data = await AsyncStorage.getItem(NOTIF_STORAGE_KEY);
+    ownerId = ownerId || (await session())?.id;
+    if (!ownerId) { return []; }
+    const data = await AsyncStorage.getItem(storageKey(ownerId));
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('[NotificationService] Error getting notifications:', error);
@@ -33,9 +49,10 @@ const getNotifications = async () => {
 /**
  * Simpan notifikasi ke storage lokal
  */
-const saveNotifications = async (notifications) => {
+const saveNotifications = async (notifications, ownerId = null) => {
   try {
-    await AsyncStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(notifications));
+    ownerId = ownerId || (await session())?.id;
+    if (ownerId) { await AsyncStorage.setItem(storageKey(ownerId), JSON.stringify(notifications)); }
   } catch (error) {
     console.error('[NotificationService] Error saving notifications:', error);
   }
@@ -45,7 +62,11 @@ const saveNotifications = async (notifications) => {
  * Tambah notifikasi baru ke list lokal
  */
 const addNotification = async (notification) => {
-  const list = await getNotifications();
+  const active = await session();
+  const ownerId = active?.id;
+  const recipient = notification?.data?.recipientId;
+  if (!active || !(recipient === ownerId || recipient === 'all' || (recipient === 'admin' && [1,4].includes(active.status)))) { return null; }
+  const list = await getNotifications(ownerId);
   const newNotif = {
     id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
     title: notification.title || 'Notifikasi SIMBADA',
@@ -62,7 +83,7 @@ const addNotification = async (notification) => {
     list.splice(100);
   }
   
-  await saveNotifications(list);
+  await saveNotifications(list, ownerId);
   return newNotif;
 };
 
@@ -70,11 +91,13 @@ const addNotification = async (notification) => {
  * Tandai notifikasi sebagai sudah dibaca
  */
 const markAsRead = async (notifId) => {
-  const list = await getNotifications();
+  const ownerId = (await session())?.id;
+  if (!ownerId) { return null; }
+  const list = await getNotifications(ownerId);
   const index = list.findIndex(n => n.id === notifId);
   if (index !== -1) {
     list[index].isRead = true;
-    await saveNotifications(list);
+    await saveNotifications(list, ownerId);
   }
 };
 
@@ -82,9 +105,11 @@ const markAsRead = async (notifId) => {
  * Tandai semua notifikasi sebagai sudah dibaca
  */
 const markAllAsRead = async () => {
-  const list = await getNotifications();
+  const ownerId = (await session())?.id;
+  if (!ownerId) { return null; }
+  const list = await getNotifications(ownerId);
   list.forEach(n => n.isRead = true);
-  await saveNotifications(list);
+  await saveNotifications(list, ownerId);
 };
 
 /**
@@ -99,15 +124,19 @@ const getUnreadCount = async () => {
  * Hapus notifikasi
  */
 const deleteNotification = async (notifId) => {
-  let list = await getNotifications();
+  const ownerId = (await session())?.id;
+  if (!ownerId) { return null; }
+  let list = await getNotifications(ownerId);
   list = list.filter(n => n.id !== notifId);
-  await saveNotifications(list);
+  await saveNotifications(list, ownerId);
 };
 
 /**
  * Hapus semua notifikasi
  */
 const clearAllNotifications = async () => {
+  const ownerId = (await session())?.id;
+  if (ownerId) { await AsyncStorage.removeItem(storageKey(ownerId)); }
   await AsyncStorage.removeItem(NOTIF_STORAGE_KEY);
 };
 
@@ -177,7 +206,7 @@ const setupForegroundHandler = (onNotificationReceived) => {
     const messaging = require('@react-native-firebase/messaging').default;
     
     const unsubscribe = messaging().onMessage(async remoteMessage => {
-      console.log('[NotificationService] Foreground message:', remoteMessage);
+      if (!await canReceiveMessage(remoteMessage)) { return; }
 
       const title = remoteMessage.notification?.title || remoteMessage.data?.title || 'Pemberitahuan SIMBADA';
       const body = remoteMessage.notification?.body || remoteMessage.data?.body || '';
@@ -190,6 +219,7 @@ const setupForegroundHandler = (onNotificationReceived) => {
         data: remoteMessage.data || {},
       });
 
+      if (!notif || !await canReceiveMessage(remoteMessage)) { return; }
       // Tampilkan banner heads-up notifikasi via Notifee
       try {
         const channelId = await notifee.createChannel({
@@ -201,6 +231,7 @@ const setupForegroundHandler = (onNotificationReceived) => {
         });
 
         await notifee.displayNotification({
+          id: `simbada_msg_${notif.id}`,
           title,
           body,
           data: remoteMessage.data || {},
@@ -267,6 +298,9 @@ const handleNotificationPress = (notification, navigation) => {
  * Fetch notifikasi dari backend (In-App Notification Center)
  */
 const fetchFromServer = async (URL, TOKEN, userId) => {
+  const active = await session();
+  if (!active || active.token !== TOKEN) { return []; }
+  const ownerId = active.id;
   try {
     const url = URL.URL_PENGGUNA + 'notifications' + (userId ? `?userId=${encodeURIComponent(userId)}` : '');
     const response = await fetch(url, {
@@ -279,6 +313,7 @@ const fetchFromServer = async (URL, TOKEN, userId) => {
 
     if (response.ok) {
       const resJson = await response.json();
+      if ((await session())?.token !== TOKEN) { return []; }
       const rawList = resJson.data && Array.isArray(resJson.data) ? resJson.data : (Array.isArray(resJson) ? resJson : []);
       
       const serverNotifs = rawList.map(n => ({
@@ -292,7 +327,7 @@ const fetchFromServer = async (URL, TOKEN, userId) => {
       }));
 
       // Gabungkan notifikasi server dan lokal dengan cerdas
-      const localNotifs = await getNotifications();
+      const localNotifs = await getNotifications(ownerId);
       const map = new Map();
 
       // Masukkan lokal terlebih dahulu
@@ -317,7 +352,7 @@ const fetchFromServer = async (URL, TOKEN, userId) => {
         (a, b) => new Date(b.receivedAt) - new Date(a.receivedAt)
       );
 
-      await saveNotifications(merged.slice(0, 100));
+      await saveNotifications(merged.slice(0, 100), ownerId);
       return merged;
     } else {
       console.log('[NotificationService] Fetch returned status:', response.status);
@@ -329,6 +364,7 @@ const fetchFromServer = async (URL, TOKEN, userId) => {
 };
 
 export default {
+  canReceiveMessage,
   getNotifications,
   addNotification,
   markAsRead,

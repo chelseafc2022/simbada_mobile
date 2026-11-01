@@ -529,7 +529,7 @@ const StreetViewModal = ({
                                 <WebView
                                     ref={webViewRef}
                                     key={`pano-${centerLat}-${centerLng}`}
-                                    originWhitelist={['*']}
+                                    originWhitelist={['https://maps.googleapis.com', 'about:blank']}
                                     source={{
                                         html: panoHtml,
                                         baseUrl: 'https://maps.googleapis.com'
@@ -537,12 +537,13 @@ const StreetViewModal = ({
                                     style={{ flex: 1, backgroundColor: '#0F172A' }}
                                     javaScriptEnabled={true}
                                     domStorageEnabled={true}
-                                    allowFileAccess={true}
-                                    allowUniversalAccessFromFileURLs={true}
-                                    allowFileAccessFromFileURLs={true}
-                                    mixedContentMode="always"
+                                    allowFileAccess={false}
+                                    allowUniversalAccessFromFileURLs={false}
+                                    allowFileAccessFromFileURLs={false}
+                                    mixedContentMode="never"
                                     androidHardwareAccelerationDisabled={false}
                                     androidLayerType="hardware"
+                                    onShouldStartLoadWithRequest={request => request.url === 'about:blank' || request.url.startsWith('https://maps.googleapis.com/')}
                                     onMessage={handleWebViewMessage}
                                     onError={(e) => {
                                         setWebViewError(e.nativeEvent?.description || 'Gagal memuat citra Street View');

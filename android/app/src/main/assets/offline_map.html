@@ -423,6 +423,8 @@ async function loadGeoPDF(base64, name) {
 
     var loadingTask = pdfjsLib.getDocument({
       data: bytes,
+      isEvalSupported: false,
+      enableScripting: false,
       cMapPacked: false,
       disableFontFace: false
     });
@@ -787,64 +789,55 @@ function stopNavigation() {
 // -------------------------------------------------------------
 // SAVED LAYERS (POLYGONS & POLYLINES) OVERLAY
 // -------------------------------------------------------------
+function layerPopup(layer, lines, target, color) {
+  var box = document.createElement('div');
+  box.style.cssText = 'font-family:sans-serif;font-size:13px;line-height:1.5';
+  var title = document.createElement('b');
+  title.style.cssText = 'font-size:14px;color:' + color;
+  title.textContent = typeof layer.name === 'string' ? layer.name : 'Layer Peta';
+  box.appendChild(title);
+  if (typeof layer.notes === 'string' && layer.notes) {
+    var notes = document.createElement('p');
+    notes.style.color = '#94A3B8'; notes.textContent = layer.notes; box.appendChild(notes);
+  }
+  lines.forEach(function(text) {
+    var line = document.createElement('div'); line.textContent = text; box.appendChild(line);
+  });
+  var button = document.createElement('button');
+  button.className = 'popup-btn'; button.textContent = '🎯 Navigasi ke Titik';
+  button.addEventListener('click', function() { setNavTarget(target[0], target[1]); });
+  box.appendChild(button);
+  return box;
+}
+function layerNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
 function loadLayers(layers) {
   savedLayersGroup.clearLayers();
   if (!Array.isArray(layers)) return;
-
   layers.forEach(function(l) {
-    if (!l.visible) return;
-    var coords = (l.coordinates || []).map(function(c) { return [c.lat, c.lon]; });
-    if (!coords.length) return;
-
+    if (!l || !l.visible || !Array.isArray(l.coordinates) || l.coordinates.length > 50000) return;
+    var coords = l.coordinates.filter(function(c) {
+      return c && typeof c.lat === 'number' && typeof c.lon === 'number' &&
+        Number.isFinite(c.lat) && Number.isFinite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180;
+    }).map(function(c) { return [c.lat, c.lon]; });
+    if (coords.length !== l.coordinates.length || !coords.length) return;
+    var color = typeof l.color === 'string' && /^#[0-9a-f]{6}$/i.test(l.color) ? l.color : '#06B6D4';
     if (l.type === 'polygon' && coords.length >= 3) {
-      var poly = L.polygon(coords, {
-        color: l.color || '#06B6D4',
-        fillColor: l.color || '#06B6D4',
-        fillOpacity: 0.25,
-        weight: 2.5
-      }).addTo(savedLayersGroup);
-
-      // Centroid untuk navigasi
-      var latSum = 0, lonSum = 0;
-      for (var i = 0; i < coords.length; i++) {
-        latSum += coords[i][0];
-        lonSum += coords[i][1];
-      }
-      var cLat = latSum / coords.length;
-      var cLon = lonSum / coords.length;
-
-      var popupHtml = '<div style="font-family:sans-serif;font-size:13px;line-height:1.5;">' +
-        '<b style="font-size:14px;color:#38BDF8;">' + (l.name || 'Bidang Poligon') + '</b><br/>' +
-        (l.notes ? '<span style="color:#94A3B8;">' + l.notes + '</span><br/>' : '') +
-        '<div style="margin-top:6px;padding:6px;background:rgba(255,255,255,0.05);border-radius:6px;">' +
-        '📐 Luas: <b>' + (l.areaM2 ? l.areaM2.toLocaleString('id-ID') : '0') + ' m²</b> (' + (l.areaHa || 0) + ' ha)<br/>' +
-        '📏 Keliling: <b>' + (l.perimeterM ? l.perimeterM.toLocaleString('id-ID') : '0') + ' m</b>' +
-        '</div>' +
-        '<button onclick="setNavTarget(' + cLat + ',' + cLon + ')" class="popup-btn">🎯 Navigasi ke Titik Tengah</button>' +
-        '</div>';
-
-      poly.bindPopup(popupHtml, { className: 'custom-popup' });
+      var poly = L.polygon(coords, {color:color,fillColor:color,fillOpacity:0.25,weight:2.5}).addTo(savedLayersGroup);
+      var target = coords.reduce(function(sum,c) { return [sum[0]+c[0]/coords.length,sum[1]+c[1]/coords.length]; },[0,0]);
+      poly.bindPopup(layerPopup(l,[
+        '📐 Luas: ' + layerNumber(l.areaM2).toLocaleString('id-ID') + ' m² (' + layerNumber(l.areaHa) + ' ha)',
+        '📏 Keliling: ' + layerNumber(l.perimeterM).toLocaleString('id-ID') + ' m'
+      ],target,'#38BDF8'),{className:'custom-popup'});
     } else if (l.type === 'polyline' && coords.length >= 2) {
-      var line = L.polyline(coords, {
-        color: l.color || '#F59E0B',
-        weight: 3.5,
-        dashArray: '5, 5'
-      }).addTo(savedLayersGroup);
-
-      var p1 = coords[0];
-      var popupHtml = '<div style="font-family:sans-serif;font-size:13px;line-height:1.5;">' +
-        '<b style="font-size:14px;color:#FBBF24;">' + (l.name || 'Garis Polyline') + '</b><br/>' +
-        (l.notes ? '<span style="color:#94A3B8;">' + l.notes + '</span><br/>' : '') +
-        '<div style="margin-top:6px;padding:6px;background:rgba(255,255,255,0.05);border-radius:6px;">' +
-        '📏 Panjang: <b>' + (l.lengthM >= 1000 ? (l.lengthM / 1000).toFixed(2) + ' km' : (l.lengthM || 0) + ' m') + '</b>' +
-        '</div>' +
-        '<button onclick="setNavTarget(' + p1[0] + ',' + p1[1] + ')" class="popup-btn">🎯 Navigasi ke Titik Awal</button>' +
-        '</div>';
-
-      line.bindPopup(popupHtml, { className: 'custom-popup' });
+      var line = L.polyline(coords,{color:color,weight:3.5,dashArray:'5, 5'}).addTo(savedLayersGroup);
+      var length = layerNumber(l.lengthM);
+      line.bindPopup(layerPopup(l,['📏 Panjang: ' + (length >= 1000 ? (length/1000).toFixed(2)+' km' : length+' m')],coords[0],'#FBBF24'),{className:'custom-popup'});
     }
   });
 }
+
 </script>
 </body>
 </html>
