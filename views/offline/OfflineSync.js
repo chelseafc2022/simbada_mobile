@@ -356,8 +356,45 @@ const OfflineSync = ({ navigation }) => {
             </View>
             <ScrollView style={{ padding: 15, paddingBottom: 30 }}>
               {selectedItem && (() => {
-                const d = selectedItem.data;
-                const coords = Array.isArray(d?.lokasi) ? d.lokasi : [];
+                let d = selectedItem.data;
+                if (typeof d === 'string') {
+                  try { d = JSON.parse(d); } catch (e) { d = {}; }
+                }
+                d = d || {};
+
+                let rawCoords = [];
+                if (typeof d.lokasi === 'string') {
+                  try { rawCoords = JSON.parse(d.lokasi); } catch (e) { rawCoords = []; }
+                } else if (Array.isArray(d.lokasi)) {
+                  rawCoords = d.lokasi;
+                }
+
+                // Normalisasi koordinat agar selalu memiliki format { latitude: number, longitude: number }
+                const normalizedCoords = rawCoords
+                  .map((c, i) => {
+                    if (!c) return null;
+                    const lat = parseFloat(c.latitude !== undefined ? c.latitude : (c.lat !== undefined ? c.lat : NaN));
+                    const lng = parseFloat(c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : (c.lon !== undefined ? c.lon : NaN)));
+                    if (!isFinite(lat) || !isFinite(lng)) return null;
+                    return { latitude: lat, longitude: lng, label: `Titik ${i + 1}` };
+                  })
+                  .filter(Boolean);
+
+                const hasCoords = normalizedCoords.length > 0;
+                const initialRegion = hasCoords
+                  ? {
+                      latitude: normalizedCoords[0].latitude,
+                      longitude: normalizedCoords[0].longitude,
+                      latitudeDelta: 0.015,
+                      longitudeDelta: 0.015,
+                    }
+                  : {
+                      latitude: -4.25,
+                      longitude: 122.4,
+                      latitudeDelta: 0.5,
+                      longitudeDelta: 0.5,
+                    };
+
                 return (
                   <View style={{ paddingBottom: 30 }}>
                     <Text style={styles.detailLabel}>Nama Pemohon: <Text style={styles.detailValue}>{d?.nama || '-'}</Text></Text>
@@ -366,42 +403,51 @@ const OfflineSync = ({ navigation }) => {
                     <Text style={styles.detailLabel}>Desa: <Text style={styles.detailValue}>{d?.nama_des_kel || '-'}</Text></Text>
                     <Text style={styles.detailLabel}>RT/RW: <Text style={styles.detailValue}>{d?.rwrt || '-'}</Text></Text>
                     <Text style={styles.detailLabel}>Alamat: <Text style={styles.detailValue}>{d?.alamat || '-'}</Text></Text>
+                    {d?.catatan && (
+                      <Text style={styles.detailLabel}>Catatan: <Text style={styles.detailValue}>{d.catatan}</Text></Text>
+                    )}
                     
                     <Text style={[styles.detailLabel, { marginTop: 15 }]}>
-                      Jumlah Titik Koordinat: <Text style={styles.detailValue}>{coords.length}</Text>
+                      Jumlah Titik Koordinat: <Text style={styles.detailValue}>{normalizedCoords.length}</Text>
                     </Text>
 
-                    {coords.length > 0 && (
+                    {hasCoords ? (
                       <View style={styles.mapPreviewContainer}>
                         <MapView
                           style={{ flex: 1 }}
                           provider="google"
-                          initialRegion={{
-                            latitude: coords[0].latitude,
-                            longitude: coords[0].longitude,
-                            latitudeDelta: 0.01,
-                            longitudeDelta: 0.01,
-                          }}
+                          initialRegion={initialRegion}
                         >
-                          {(!d.tipe || d.tipe === 'polygon') && coords.length >= 3 && (
+                          {(!d.tipe || d.tipe === 'polygon') && normalizedCoords.length >= 3 && (
                             <Polygon
-                              coordinates={coords}
+                              coordinates={normalizedCoords}
                               strokeColor="#EF4444"
                               fillColor="rgba(239, 68, 68, 0.2)"
                               strokeWidth={2}
                             />
                           )}
-                          {d.tipe === 'polyline' && coords.length >= 2 && (
+                          {d.tipe === 'polyline' && normalizedCoords.length >= 2 && (
                             <Polyline
-                              coordinates={coords}
+                              coordinates={normalizedCoords}
                               strokeColor="#3B82F6"
                               strokeWidth={3}
                             />
                           )}
-                          {coords.map((c, i) => (
-                            <Marker key={i} coordinate={c} />
+                          {normalizedCoords.map((c, i) => (
+                            <Marker
+                              key={`coord-marker-${i}`}
+                              coordinate={{ latitude: c.latitude, longitude: c.longitude }}
+                              title={c.label}
+                              description={`${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)}`}
+                            />
                           ))}
                         </MapView>
+                      </View>
+                    ) : (
+                      <View style={[styles.mapPreviewContainer, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }]}>
+                        <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center' }}>
+                          Tidak ada titik koordinat yang dapat dipetakan.
+                        </Text>
                       </View>
                     )}
                   </View>

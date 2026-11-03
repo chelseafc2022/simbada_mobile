@@ -90,7 +90,7 @@ android {
         applicationId "com.simbadakonselv2"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
+        versionCode 10
         versionName "2.0.0"
         multiDexEnabled true
         ndk {

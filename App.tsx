@@ -82,7 +82,7 @@ const AppContent = () => {
       try {
         const baseUrl = URL?.URL_APP || 'https://server-simbada.konaweselatankab.go.id/';
         const res = await VersionCheckService.checkAppVersion(baseUrl);
-        if (res && res.needs_update && res.force_update) {
+        if (res && res.needs_update) {
           setUpdateData(res);
           setShowForceUpdate(true);
         }
@@ -198,8 +198,12 @@ const AppContent = () => {
         <Stack.Screen name="EksporData" component={EksporData} />
       </Stack.Navigator>
 
-      {/* Dialog Pembaruan Wajib Server (Force Update) */}
-      <ForceUpdateModal visible={showForceUpdate} updateData={updateData} />
+      {/* Dialog Pembaruan Aplikasi (Force / Optional Update) */}
+      <ForceUpdateModal
+        visible={showForceUpdate}
+        updateData={updateData}
+        onDismiss={() => setShowForceUpdate(false)}
+      />
     </NavigationContainer>
   );
 };

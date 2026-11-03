@@ -13,11 +13,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Alert, Image, KeyboardAvoidingView, Platform,
-  StatusBar, Modal, Dimensions,
+  StatusBar, Modal, Dimensions, PermissionsAndroid,
 } from 'react-native';
 import AppHeader from '../components/AppHeader';
 import Geolocation from '@react-native-community/geolocation';
-import { launchCamera } from 'react-native-image-picker';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import MapView, { Marker, Polygon } from 'react-native-maps';
 import PlacemarkDB from '../library/PlacemarkDB';
@@ -171,18 +171,90 @@ const PlacemarkForm = ({ navigation, route }) => {
   };
 
   // Ambil foto & injeksi EXIF
-  const takePhoto = () => {
-    if (foto.length >= 5) { Alert.alert('Batas Foto', 'Maksimal 5 foto per placemark.'); return; }
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Izin Akses Kamera',
+            message: 'SIMBADA memerlukan izin kamera untuk mendokumentasikan foto patok batas.',
+            buttonPositive: 'Izinkan',
+            buttonNegative: 'Batal',
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn('[PlacemarkForm] Error requesting camera permission:', err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const processCapturedAsset = async (asset) => {
+    if (!asset?.uri) return;
+    const photoUri = asset.uri.replace('file://', '');
+    let exifOk = false;
+    const coords = { lat: parseFloat(lat), lon: parseFloat(lon), alt: parseFloat(alt) };
+    if (!isNaN(coords.lat) && !isNaN(coords.lon)) {
+      try {
+        await ExifWriter.injectExif(photoUri, coords);
+        exifOk = true;
+      } catch (e) {
+        console.warn('[PlacemarkForm] EXIF injection gagal:', e.message);
+      }
+    }
+    const newPhoto = {
+      uri: asset.uri,
+      capturedAt: new Date().toISOString(),
+      lat: coords.lat,
+      lon: coords.lon,
+      exifInjected: exifOk,
+    };
+    setFoto(prev => [...prev, newPhoto]);
+  };
+
+  const openDirectCamera = async () => {
+    const hasPerm = await requestCameraPermission();
+    if (!hasPerm) {
+      Alert.alert(
+        'Izin Kamera Diperlukan',
+        'Aplikasi tidak dapat membuka kamera karena izin belum diberikan. Silakan aktifkan izin kamera untuk SIMBADA di Pengaturan HP Anda.'
+      );
+      return;
+    }
+
     launchCamera(
-      { mediaType: 'photo', quality: 0.8, maxWidth: 1920, maxHeight: 1080, includeBase64: false },
+      { mediaType: 'photo', quality: 0.8, maxWidth: 1920, maxHeight: 1080, includeBase64: false, saveToPhotos: false },
       async (res) => {
-        if (res.didCancel || res.errorCode) return;
+        if (res.didCancel) return;
+        if (res.errorCode) {
+          Alert.alert('Gagal Membuka Kamera', res.errorMessage || `Kode error: ${res.errorCode}`);
+          return;
+        }
         const asset = res.assets?.[0];
-        if (!asset?.uri) return;
-        const photoUri = asset.uri.replace('file://', '');
+        if (asset) {
+          await processCapturedAsset(asset);
+        }
+      }
+    );
+  };
+
+  const openGeoTagCamera = () => {
+    navigation.navigate('GeoTagCamera', {
+      desaId: profile?.desa_id || profile?.id_desa || '',
+      desaNama: profile?.nama_desa || profile?.profile?.nama_desa || 'Konawe Selatan',
+      onPhotoTaken: async (photoData) => {
+        if (!photoData?.uri) return;
+        const photoUri = photoData.uri.replace('file://', '');
         let exifOk = false;
-        const coords = { lat: parseFloat(lat), lon: parseFloat(lon), alt: parseFloat(alt) };
-        if (!isNaN(coords.lat) && !isNaN(coords.lon)) {
+        const coords = {
+          lat: parseFloat(lat) || photoData?.metadata?.latitude || 0,
+          lon: parseFloat(lon) || photoData?.metadata?.longitude || 0,
+          alt: parseFloat(alt) || 0,
+        };
+        if (!isNaN(coords.lat) && !isNaN(coords.lon) && coords.lat !== 0) {
           try {
             await ExifWriter.injectExif(photoUri, coords);
             exifOk = true;
@@ -190,10 +262,62 @@ const PlacemarkForm = ({ navigation, route }) => {
             console.warn('[PlacemarkForm] EXIF injection gagal:', e.message);
           }
         }
-        const newPhoto = { uri: asset.uri, capturedAt: new Date().toISOString(),
-          lat: coords.lat, lon: coords.lon, exifInjected: exifOk };
+        const newPhoto = {
+          uri: photoData.uri,
+          capturedAt: photoData?.metadata?.capturedAt || new Date().toISOString(),
+          lat: coords.lat,
+          lon: coords.lon,
+          exifInjected: exifOk,
+        };
         setFoto(prev => [...prev, newPhoto]);
+      },
+    });
+  };
+
+  const openGallery = () => {
+    launchImageLibrary(
+      { mediaType: 'photo', quality: 0.8, maxWidth: 1920, maxHeight: 1080, includeBase64: false },
+      async (res) => {
+        if (res.didCancel) return;
+        if (res.errorCode) {
+          Alert.alert('Gagal Membuka Galeri', res.errorMessage || `Kode error: ${res.errorCode}`);
+          return;
+        }
+        const asset = res.assets?.[0];
+        if (asset) {
+          await processCapturedAsset(asset);
+        }
       }
+    );
+  };
+
+  const takePhoto = () => {
+    if (foto.length >= 5) {
+      Alert.alert('Batas Foto', 'Maksimal 5 foto per placemark.');
+      return;
+    }
+
+    Alert.alert(
+      'Foto Dokumentasi Patok',
+      'Pilih metode pengambilan foto:',
+      [
+        {
+          text: '📷 Kamera Langsung',
+          onPress: openDirectCamera,
+        },
+        {
+          text: '📍 Kamera Geotagging (Watermark)',
+          onPress: openGeoTagCamera,
+        },
+        {
+          text: '🖼️ Pilih dari Galeri',
+          onPress: openGallery,
+        },
+        {
+          text: 'Batal',
+          style: 'cancel',
+        },
+      ]
     );
   };
 

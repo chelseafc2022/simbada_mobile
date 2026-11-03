@@ -13,17 +13,21 @@ import {
 
 /**
  * ForceUpdateModal
- * Dialog pembaruan wajib yang tidak dapat ditutup jika versi aplikasi di bawah batas minimum server
+ * Dialog pembaruan aplikasi dengan dukungan:
+ * - force_update = true (Wajib update, modal tidak bisa ditutup / dismiss, back button terkunci)
+ * - force_update = false (Opsional update, ada tombol 'Nanti Saja' / tombol silang untuk menutup)
  */
-const ForceUpdateModal = ({ visible, updateData }) => {
-  // Cegah tombol back hardware Android menutup modal jika update wajib
+const ForceUpdateModal = ({ visible, updateData, onDismiss }) => {
+  const isForceUpdate = Boolean(updateData?.force_update);
+
+  // Cegah tombol back hardware Android menutup modal HANYA jika update wajib (force_update: true)
   useEffect(() => {
-    if (visible && updateData?.force_update) {
+    if (visible && isForceUpdate) {
       const onBackPress = () => true; // Trap back press
       const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => sub.remove();
     }
-  }, [visible, updateData]);
+  }, [visible, isForceUpdate]);
 
   if (!visible || !updateData) return null;
 
@@ -48,45 +52,82 @@ const ForceUpdateModal = ({ visible, updateData }) => {
       });
   };
 
+  const handleDismiss = () => {
+    if (!isForceUpdate && onDismiss) {
+      onDismiss();
+    }
+  };
+
   return (
     <Modal
       transparent
       visible={visible}
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={() => {}}
+      onRequestClose={handleDismiss}
     >
       <View style={styles.overlay}>
         <View style={styles.dialogCard}>
+          {/* Tombol Tutup (X) HANYA jika opsional (force_update = false) */}
+          {!isForceUpdate && (
+            <TouchableOpacity
+              style={styles.closeIconBtn}
+              onPress={handleDismiss}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.closeIconText}>✕</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Header Icon */}
-          <View style={styles.iconCircle}>
-            <Text style={{ fontSize: 32 }}>🚀</Text>
+          <View
+            style={[
+              styles.iconCircle,
+              !isForceUpdate && { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+            ]}
+          >
+            <Text style={{ fontSize: 32 }}>{isForceUpdate ? '🚀' : '✨'}</Text>
           </View>
 
           {/* Title & Badge */}
-          <View style={styles.badgeBox}>
-            <Text style={styles.badgeText}>VERSI TERBARU TERSEDIA</Text>
+          <View
+            style={[
+              styles.badgeBox,
+              !isForceUpdate && { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.badgeText,
+                !isForceUpdate && { color: '#15803D' },
+              ]}
+            >
+              {isForceUpdate ? 'PEMBARUAN WAJIB' : 'PEMBARUAN TERSEDIA'}
+            </Text>
           </View>
 
           <Text style={styles.title}>
-            {updateData.title || 'Pembaruan Aplikasi Wajib'}
+            {updateData.title ||
+              (isForceUpdate ? 'Pembaruan Aplikasi Wajib' : 'Pembaruan Baru Tersedia')}
           </Text>
 
           {/* Version Info Chip */}
           <View style={styles.versionRow}>
             <Text style={styles.versionCurrent}>
-              Versi Terpasang: v{updateData.client_version_name || '1.0.2'}
+              Versi Anda: v{updateData.client_version_name || '2.0.0'}
             </Text>
             <Text style={styles.arrowText}>➔</Text>
             <Text style={styles.versionLatest}>
-              v{updateData.latest_version_name || '1.0.3'}
+              v{updateData.latest_version_name || '2.0.0'}
             </Text>
           </View>
 
           {/* Message */}
           <Text style={styles.message}>
             {updateData.message ||
-              'Aplikasi SIMBADA Mobile memerlukan pembaruan untuk mematuhi regulasi Google Play terbaru (Android 16 / API 36) dan pelindungan data batas desa.'}
+              (isForceUpdate
+                ? 'Aplikasi SIMBADA Mobile memerlukan pembaruan penting untuk mematuhi regulasi Google Play terbaru dan perlindungan data batas desa.'
+                : 'Versi terbaru SIMBADA Mobile telah tersedia di Google Play Store dengan fitur dan perbaikan performa.')}
           </Text>
 
           {/* Changelog */}
@@ -105,16 +146,27 @@ const ForceUpdateModal = ({ visible, updateData }) => {
               </View>
             )}
 
-          {/* Action Button */}
+          {/* Action Buttons */}
           <TouchableOpacity
             style={styles.btnPrimary}
             activeOpacity={0.85}
             onPress={handleOpenPlayStore}
           >
             <Text style={styles.btnPrimaryText}>
-              Perbarui di Google Play Store
+              Perbarui Sekarang di Play Store
             </Text>
           </TouchableOpacity>
+
+          {/* Tombol Nanti Saja jika opsional (force_update = false) */}
+          {!isForceUpdate && (
+            <TouchableOpacity
+              style={styles.btnSecondary}
+              activeOpacity={0.7}
+              onPress={handleDismiss}
+            >
+              <Text style={styles.btnSecondaryText}>Nanti Saja</Text>
+            </TouchableOpacity>
+          )}
 
           <Text style={styles.policyNotice}>
             Pemerintah Kabupaten Konawe Selatan • SPBE 2026
@@ -261,6 +313,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
+  },
+  btnSecondary: {
+    width: '100%',
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  btnSecondaryText: {
+    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  closeIconBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  closeIconText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '700',
   },
   policyNotice: {
     fontSize: 9.5,
