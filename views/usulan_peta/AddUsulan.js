@@ -924,43 +924,33 @@ const AddUsulan = ({navigation}) => {
                 <View style={localStyles.card}>
                     <Text style={localStyles.cardTitle}>Pemetaan & Lampiran</Text>
 
-                    <Text style={localStyles.inputLabel}>Pilih Metode Pemetaan</Text>
-                    <View style={localStyles.methodContainer}>
-                        <TouchableOpacity 
-                            style={[localStyles.methodButton, { backgroundColor: '#208DC0' }]} 
-                            onPress={() => navigation.navigate('MetodeText', { 
-                                lokasiAwal: form.lokasi || [],
-                                des_kel_id: form.des_kel_id || PROFILE?.profile?.id_desa || PROFILE?.profile?.id_kelurahan,
-                                kecamatan_id: form.kecamatan_id || PROFILE?.profile?.id_kecamatan,
-                                nama_des_kel: form.nama_des_kel || PROFILE?.profile?.nama_desa || PROFILE?.profile?.nama_kelurahan,
-                                onLokasiUpdate: (updatedLokasi) => {
-                                    SET_FORM((prevForm) => ({
-                                        ...prevForm,
-                                        lokasi: updatedLokasi,
-                                        tipe: 'polygon'
-                                    }));
-                                }
-                            })}
-                        >
-                            <Text style={localStyles.methodButtonText}>📍 POLYGON</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={[localStyles.methodButton, { backgroundColor: '#26A69A' }]} 
-                            onPress={() => navigation.navigate('MetodePolyline', { 
-                                lokasiAwal: form.lokasi || [],
-                                onLokasiUpdate: (updatedLokasi) => {
-                                    SET_FORM(prevForm => ({ 
-                                        ...prevForm, 
-                                        lokasi: updatedLokasi,
-                                        tipe: 'polyline'
-                                    }));
-                                }
-                            })}
-                        >
-                            <Text style={localStyles.methodButtonText}>〰️ POLYLINE</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={localStyles.inputLabel}>Pemetaan Batas Wilayah (Polygon)</Text>
+                    <TouchableOpacity 
+                        style={localStyles.polygonPrimaryButton} 
+                        onPress={() => navigation.navigate('MetodeText', { 
+                            lokasiAwal: form.lokasi || [],
+                            des_kel_id: form.des_kel_id || PROFILE?.profile?.id_desa || PROFILE?.profile?.id_kelurahan,
+                            kecamatan_id: form.kecamatan_id || PROFILE?.profile?.id_kecamatan,
+                            nama_des_kel: form.nama_des_kel || PROFILE?.profile?.nama_desa || PROFILE?.profile?.nama_kelurahan,
+                            onLokasiUpdate: (updatedLokasi) => {
+                                SET_FORM((prevForm) => ({
+                                    ...prevForm,
+                                    lokasi: updatedLokasi,
+                                    tipe: 'polygon'
+                                }));
+                            }
+                        })}
+                        activeOpacity={0.85}
+                    >
+                        <View style={localStyles.polygonIconBox}>
+                            <Text style={{ fontSize: 20 }}>🗺️</Text>
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={localStyles.polygonTitle}>PETAKAN KOORDINAT BATAS (POLYGON)</Text>
+                            <Text style={localStyles.polygonSub}>Gambar garis batas di peta satelit atau input koordinat</Text>
+                        </View>
+                        <Text style={localStyles.polygonChevron}>›</Text>
+                    </TouchableOpacity>
 
                     {/* Tombol Unggah File KML / GPX */}
                     <TouchableOpacity 
@@ -980,7 +970,7 @@ const AddUsulan = ({navigation}) => {
                     {form.lokasi && form.lokasi.length > 0 && (
                         <View style={localStyles.statusLokasi}>
                             <Text style={localStyles.statusLokasiText}>
-                                ✅ Tersimpan {form.lokasi.length} titik koordinat ({form.tipe === 'polygon' ? 'Polygon' : 'Polyline'})
+                                ✅ Tersimpan {form.lokasi.length} titik koordinat (Polygon Batas Wilayah)
                             </Text>
                             {geoFileName ? (
                                 <Text style={{ fontSize: 11, color: '#1B5E20', marginTop: 2, fontWeight: '600' }}>
@@ -1120,24 +1110,44 @@ const localStyles = StyleSheet.create({
     pickerElement: {
         color: '#333',
     },
-    methodContainer: {
+    polygonPrimaryButton: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#0284C7',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
         marginTop: 5,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
     },
-    methodButton: {
-        flex: 1,
-        height: 45,
-        borderRadius: 8,
+    polygonIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 5,
-        elevation: 2,
     },
-    methodButtonText: {
-        color: '#fff',
+    polygonTitle: {
+        fontSize: 12.5,
         fontWeight: 'bold',
-        fontSize: 13,
+        color: '#FFFFFF',
+        letterSpacing: 0.3,
+    },
+    polygonSub: {
+        fontSize: 10.5,
+        color: 'rgba(255, 255, 255, 0.85)',
+        marginTop: 2,
+    },
+    polygonChevron: {
+        fontSize: 22,
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        marginLeft: 6,
     },
     uploadGeoButton: {
         flexDirection: 'row',

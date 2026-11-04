@@ -18,7 +18,7 @@ var URLX = URL;
 
 
 const initialState = {
-  VERSI_APP: '2.0.0',
+  VERSI_APP: '2.0.1',
 
   URL: {
     URL_APP: URL,

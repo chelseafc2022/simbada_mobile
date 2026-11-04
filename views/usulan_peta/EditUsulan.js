@@ -484,60 +484,32 @@ const EditUsulan = ({ route, navigation }) => {
                                 Anda dapat mengganti atau memperbarui titik koordinat dan metode pemetaan batas desa:
                             </Text>
 
-                            <View style={localStyles.methodRow}>
-                                <TouchableOpacity 
-                                    style={[
-                                        localStyles.methodBtn, 
-                                        form.tipe === 'polygon' ? localStyles.methodBtnActivePolygon : localStyles.methodBtnInactive
-                                    ]}
-                                    onPress={() => navigation.navigate('MetodeText', { 
-                                        lokasiAwal: form.lokasi || [],
-                                        des_kel_id: form.id_des_kel || id_des_kel,
-                                        kecamatan_id: form.id_kecamatan || id_kecamatan,
-                                        nama_des_kel: form.nama_des_kel || nama_des_kel,
-                                        onLokasiUpdate: (updatedLokasi) => {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                lokasi: updatedLokasi,
-                                                tipe: 'polygon'
-                                            }));
-                                        }
-                                    })}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={[localStyles.methodBtnTitle, form.tipe === 'polygon' && { color: '#fff' }]}>
-                                        📍 POLYGON
-                                    </Text>
-                                    <Text style={[localStyles.methodBtnSub, form.tipe === 'polygon' && { color: 'rgba(255,255,255,0.85)' }]}>
-                                        Area Batas Wilayah
-                                    </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    style={[
-                                        localStyles.methodBtn, 
-                                        form.tipe === 'polyline' ? localStyles.methodBtnActivePolyline : localStyles.methodBtnInactive
-                                    ]}
-                                    onPress={() => navigation.navigate('MetodePolyline', { 
-                                        lokasiAwal: form.lokasi || [],
-                                        onLokasiUpdate: (updatedLokasi) => {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                lokasi: updatedLokasi,
-                                                tipe: 'polyline'
-                                            }));
-                                        }
-                                    })}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={[localStyles.methodBtnTitle, form.tipe === 'polyline' && { color: '#fff' }]}>
-                                        〰️ POLYLINE
-                                    </Text>
-                                    <Text style={[localStyles.methodBtnSub, form.tipe === 'polyline' && { color: 'rgba(255,255,255,0.85)' }]}>
-                                        Garis Batas Jalan/Sungai
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                            <TouchableOpacity 
+                                style={localStyles.polygonPrimaryButton} 
+                                onPress={() => navigation.navigate('MetodeText', { 
+                                    lokasiAwal: form.lokasi || [],
+                                    des_kel_id: form.id_des_kel || id_des_kel,
+                                    kecamatan_id: form.id_kecamatan || id_kecamatan,
+                                    nama_des_kel: form.nama_des_kel || nama_des_kel,
+                                    onLokasiUpdate: (updatedLokasi) => {
+                                        setForm(prev => ({
+                                            ...prev,
+                                            lokasi: updatedLokasi,
+                                            tipe: 'polygon'
+                                        }));
+                                    }
+                                })}
+                                activeOpacity={0.85}
+                            >
+                                <View style={localStyles.polygonIconBox}>
+                                    <Text style={{ fontSize: 20 }}>🗺️</Text>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={localStyles.polygonTitle}>PETAKAN KOORDINAT BATAS (POLYGON)</Text>
+                                    <Text style={localStyles.polygonSub}>Gambar garis batas di peta satelit atau input koordinat</Text>
+                                </View>
+                                <Text style={localStyles.polygonChevron}>›</Text>
+                            </TouchableOpacity>
 
                             {/* Tombol Impor KML / GPX */}
                             <TouchableOpacity 
@@ -559,7 +531,7 @@ const EditUsulan = ({ route, navigation }) => {
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <Text style={{ fontSize: 16, marginRight: 6 }}>✅</Text>
                                         <Text style={localStyles.statusLokasiText}>
-                                            Tersimpan {form.lokasi.length} titik koordinat ({form.tipe === 'polyline' ? 'Polyline' : 'Polygon'})
+                                            Tersimpan {form.lokasi.length} titik koordinat (Polygon Batas Wilayah)
                                         </Text>
                                     </View>
                                     {geoFileName ? (
@@ -569,8 +541,7 @@ const EditUsulan = ({ route, navigation }) => {
                                     ) : null}
                                     <TouchableOpacity
                                         onPress={() => {
-                                            const targetScreen = form.tipe === 'polyline' ? 'MetodePolyline' : 'MetodeText';
-                                            navigation.navigate(targetScreen, { 
+                                            navigation.navigate('MetodeText', { 
                                                 lokasiAwal: form.lokasi || [],
                                                 des_kel_id: form.id_des_kel || id_des_kel,
                                                 kecamatan_id: form.id_kecamatan || id_kecamatan,
@@ -579,6 +550,7 @@ const EditUsulan = ({ route, navigation }) => {
                                                     setForm(prev => ({
                                                         ...prev,
                                                         lokasi: updatedLokasi,
+                                                        tipe: 'polygon'
                                                     }));
                                                 }
                                             });
@@ -727,42 +699,44 @@ const localStyles = StyleSheet.create({
         color: '#1E293B',
         marginBottom: 8,
     },
-    methodRow: {
+    polygonPrimaryButton: {
         flexDirection: 'row',
-        gap: 10,
-        marginBottom: 12,
-    },
-    methodBtn: {
-        flex: 1,
-        paddingVertical: 14,
-        paddingHorizontal: 10,
-        borderRadius: 10,
         alignItems: 'center',
+        backgroundColor: '#0284C7',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        marginBottom: 10,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+    },
+    polygonIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
-        borderWidth: 1.5,
-        marginRight: 6,
+        alignItems: 'center',
     },
-    methodBtnActivePolygon: {
-        backgroundColor: '#208DC0',
-        borderColor: '#0284C7',
-    },
-    methodBtnActivePolyline: {
-        backgroundColor: '#0D9488',
-        borderColor: '#0F766E',
-    },
-    methodBtnInactive: {
-        backgroundColor: '#F8FAFC',
-        borderColor: '#E2E8F0',
-    },
-    methodBtnTitle: {
-        fontSize: 13,
+    polygonTitle: {
+        fontSize: 12.5,
         fontWeight: 'bold',
-        color: '#334155',
+        color: '#FFFFFF',
+        letterSpacing: 0.3,
     },
-    methodBtnSub: {
-        fontSize: 10,
-        color: '#64748B',
+    polygonSub: {
+        fontSize: 10.5,
+        color: 'rgba(255, 255, 255, 0.85)',
         marginTop: 2,
+    },
+    polygonChevron: {
+        fontSize: 22,
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        marginLeft: 6,
     },
     uploadGeoButton: {
         flexDirection: 'row',

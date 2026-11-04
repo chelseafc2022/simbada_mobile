@@ -499,7 +499,7 @@ const Login = ({ navigation }) => {
             style={ui.footerLogo}
             resizeMode={FastImage.resizeMode.contain}
           /> */}
-          <Text style={ui.footerText}>SIMBADA Mobile v2.0.0 (2026)</Text>
+          <Text style={ui.footerText}>SIMBADA Mobile v2.0.1 (2026)</Text>
           <Text style={ui.footerCopy}>© 2026 Pemkab Konawe Selatan</Text>
         </View>
       </ScrollView>
