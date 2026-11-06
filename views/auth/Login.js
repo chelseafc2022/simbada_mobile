@@ -481,7 +481,7 @@ const Login = ({ navigation }) => {
                   </View>
                   <View>
                     <Text style={ui.guestBtnTitle}>Mode Tamu (Guest)</Text>
-                    <Text style={ui.guestBtnSub}>Hanya Peta Dasar & Peta Final</Text>
+                    <Text style={ui.guestBtnSub}>Peta Dasar, Final & Tematik</Text>
                   </View>
                 </View>
                 <Icon name="chevron-forward" size={18} color="#0284C7" />

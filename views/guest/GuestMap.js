@@ -265,7 +265,7 @@ const GuestMap = ({ navigation }) => {
   };
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="light-content" backgroundColor={DARK_NAVY} />
 
       {/* ─── 1. HEADER KHUSUS MODE TAMU ─────────────────────────── */}
@@ -340,7 +340,7 @@ const GuestMap = ({ navigation }) => {
           {/* Akses Pintas Peta Tematik */}
           <TouchableOpacity
             style={[s.layerPill, s.thematicPill]}
-            onPress={() => handleRestrictedAccess('Peta Tematik')}
+            onPress={() => navigation.navigate('PetaTematik')}
             activeOpacity={0.75}
           >
             <Icon name="map" size={13} color="#F59E0B" style={{ marginRight: 5 }} />
@@ -453,7 +453,7 @@ const GuestMap = ({ navigation }) => {
         style={[
           s.bottomPanel,
           {
-            paddingBottom: Math.max(insets.bottom, 12),
+            paddingBottom: 12,
             maxHeight: panelAnim.interpolate({
               inputRange: [0, 1],
               outputRange: [48, 310],
@@ -477,7 +477,7 @@ const GuestMap = ({ navigation }) => {
         </TouchableOpacity>
 
         {isPanelOpen && (
-          <ScrollView style={s.panelBody} showsVerticalScrollIndicator={false}>
+          <ScrollView style={s.panelBody} contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
             {/* Input Pencarian Desa */}
             <View style={s.searchBox}>
               <Icon name="search-outline" size={18} color="#94A3B8" style={{ marginRight: 6 }} />
@@ -631,7 +631,7 @@ const GuestMap = ({ navigation }) => {
         animationType="fade"
         onRequestClose={() => setDetailModalVisible(false)}
       >
-        <View style={s.modalOverlay}>
+        <View style={[s.modalOverlay, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={s.detailCard}>
             <View style={s.detailHeaderRow}>
               <View style={{ flex: 1 }}>
@@ -699,7 +699,7 @@ const GuestMap = ({ navigation }) => {
         animationType="fade"
         onRequestClose={() => setRestrictedModalVisible(false)}
       >
-        <View style={s.modalOverlay}>
+        <View style={[s.modalOverlay, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={s.restrictedModalCard}>
             <View style={s.restrictedHeaderIcon}>
               <Icon name="lock-closed" size={32} color="#0284C7" />
@@ -713,7 +713,7 @@ const GuestMap = ({ navigation }) => {
               memerlukan akun terdaftar (Petugas Survei, Admin Kecamatan, atau Operator Desa).
             </Text>
             <Text style={s.restrictedModalSubDesc}>
-              Dalam mode tamu, Anda hanya dapat melihat Peta Dasar dan Peta Final Kabupaten Konawe Selatan.
+              Dalam mode tamu, Anda dapat melihat Peta Dasar, Peta Final, dan Peta Tematik Kabupaten Konawe Selatan.
             </Text>
 
             <View style={s.restrictedBtnRow}>
@@ -746,7 +746,7 @@ const GuestMap = ({ navigation }) => {
         onRequestClose={() => setShowLayerModal(false)}
       >
         <TouchableOpacity
-          style={s.modalOverlay}
+          style={[s.modalOverlay, { paddingBottom: Math.max(insets.bottom, 16) }]}
           activeOpacity={1}
           onPress={() => setShowLayerModal(false)}
         >

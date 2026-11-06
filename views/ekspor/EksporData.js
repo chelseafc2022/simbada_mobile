@@ -174,8 +174,8 @@ const EksporData = ({ navigation }) => {
         {/* Info */}
         <View style={styles.infoBox}>
           <Text style={styles.infoTxt}>
-            📁 File disimpan di:{'\n'}
-            /sdcard/simbada/ekspor/
+            📁 File disimpan di folder ekspor aplikasi.{'\n'}
+            Gunakan Bagikan untuk mengirim atau menyimpan salinan file.
           </Text>
         </View>
       </ScrollView>

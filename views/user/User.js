@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
+import { WebView } from 'react-native-webview';
 import TabBar from '../components/TabBar';
 import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,21 +56,49 @@ const statusMapping = {
   7: { label: 'Stakeholder Home', color: '#059669', bg: '#ECFDF5', icon: '🏠' },
 };
 
-const getDriveLink = (userStatus) => {
-  switch (parseInt(userStatus)) {
-    case 1:
-      return 'https://drive.google.com/drive/u/9/folders/1I11vcZ5EJw7yKeancH8wSkEopTq7Ncsq';
-    case 2:
-      return 'https://drive.google.com/file/d/1kquuuYuPkpOpZstnFyGO_sjHyv70uUXQ/view?usp=sharing';
-    case 3:
-      return 'https://drive.google.com/file/d/10xnnShnsb4n5VdKLuTHC2DNmuhJHpMxb/view?usp=sharing';
-    case 4:
-    case 5:
-    case 6:
-      return 'https://drive.google.com/file/d/1kuDZwXheQwQWSWs0I9rjztAcKS__ae2N/view?usp=sharing';
-    default:
-      return 'https://drive.google.com/default-link';
-  }
+const GUIDE_URL = 'https://drive.google.com/file/d/1u4URrjz72VrrZKfXTmVPJkDcED7qzmWE/preview';
+
+const GuideModal = ({ onClose }) => {
+  const insets = useSafeAreaInsets();
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  return (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.guideHeader}>
+          <Text style={styles.topBarTitle}>Buku Panduan</Text>
+          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Tutup buku panduan" style={styles.guideClose}>
+            <Text style={styles.retryBtnText}>Tutup</Text>
+          </TouchableOpacity>
+        </View>
+        {failed ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.errorDesc}>Panduan gagal dimuat. Periksa koneksi internet Anda.</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => { setFailed(false); setAttempt(value => value + 1); }}>
+              <Text style={styles.retryBtnText}>Coba Lagi</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <WebView
+            key={attempt}
+            source={{ uri: GUIDE_URL }}
+            style={styles.guideWebView}
+            originWhitelist={['https://*']}
+            onShouldStartLoadWithRequest={({ url }) => url === 'about:blank' || url.startsWith('https://')}
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={false}
+            allowFileAccess={false}
+            mixedContentMode="never"
+            startInLoadingState
+            renderLoading={() => <View style={styles.guideLoading}><ActivityIndicator size="large" color={C.PRIMARY} /></View>}
+            onError={() => setFailed(true)}
+            onHttpError={({ nativeEvent }) => { if (nativeEvent.url === GUIDE_URL) { setFailed(true); } }}
+          />
+        )}
+      </View>
+    </Modal>
+  );
 };
 
 // ─────────────────────────────────────────────────────────
@@ -251,6 +280,7 @@ const User = ({ navigation }) => {
   const [userInfo, setUserInfo] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAbout, setShowAbout] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const PROFILE = useSelector((state) => state.PROFILE);
   const URL = useSelector((state) => state.URL);
@@ -452,11 +482,8 @@ const User = ({ navigation }) => {
           <MenuItem
             icon="📘"
             label="Buku Panduan"
-            subtitle="Unduh panduan penggunaan aplikasi"
-            onPress={() => {
-              const driveLink = getDriveLink(statusCode);
-              Linking.openURL(driveLink);
-            }}
+            subtitle="Baca panduan penggunaan aplikasi"
+            onPress={() => setShowGuide(true)}
           />
           <MenuItem
             icon="ℹ️"
@@ -501,6 +528,7 @@ const User = ({ navigation }) => {
       </ScrollView>
 
       <TabBar />
+      {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
       <AboutModal visible={showAbout} onClose={() => setShowAbout(false)} />
     </View>
   );
@@ -510,6 +538,17 @@ const User = ({ navigation }) => {
 // STYLES
 // ═════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
+  guideHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: C.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: C.SLATE_200,
+  },
+  guideClose: { paddingHorizontal: 16, paddingVertical: 10 },
+  guideWebView: { flex: 1 },
+  guideLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: C.WHITE },
   screen: {
     flex: 1,
     backgroundColor: C.SURFACE,

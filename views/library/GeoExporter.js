@@ -18,7 +18,8 @@ const sanitizeFilename = (name) =>
 const fileTimestamp = () => formatFileTimestamp();
 
 // Direktori ekspor
-const EXPORT_DIR = `${RNFS.ExternalStorageDirectoryPath}/simbada/ekspor`;
+// App-owned storage works with Android scoped storage without storage permissions.
+const EXPORT_DIR = `${RNFS.DocumentDirectoryPath}/ekspor`;
 
 // Pastikan direktori ada
 const ensureDir = async () => {
@@ -170,8 +171,13 @@ const GeoExporter = {
 
   shareFile: async (filePath, mimeType = 'application/octet-stream') => {
     const Share = require('react-native-share').default;
+    // The share provider exposes cache files, rather than private documents.
+    const shareDir = `${RNFS.CachesDirectoryPath}/ekspor`;
+    await RNFS.mkdir(shareDir);
+    const sharePath = `${shareDir}/${filePath.split('/').pop()}`;
+    await RNFS.copyFile(filePath, sharePath);
     await Share.open({
-      url: `file://${filePath}`,
+      url: `file://${sharePath}`,
       type: mimeType,
       title: 'Bagikan Data Lapangan Simbada',
       subject: 'Data GIS Simbada Mobile',

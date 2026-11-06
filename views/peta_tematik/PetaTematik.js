@@ -319,7 +319,7 @@ const PetaTematik = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
 
       {/* ─── 1. HEADER UTAMA ─────────────────────────────────────── */}
@@ -535,7 +535,7 @@ const PetaTematik = ({ navigation }) => {
             onPress={() => setModalVisible(false)}
           />
 
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { paddingBottom: insets.bottom }]}>
             <View style={styles.modalHandleBar} />
 
             {selectedFeature && (
