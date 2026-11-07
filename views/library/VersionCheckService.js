@@ -1,8 +1,8 @@
 // views/library/VersionCheckService.js
 import { Platform } from 'react-native';
 
-export const APP_VERSION_CODE = 11;
-export const APP_VERSION_NAME = '2.0.1';
+export const APP_VERSION_CODE = 12;
+export const APP_VERSION_NAME = '2.0.2';
 
 /**
  * Service untuk memeriksa versi aplikasi ke server

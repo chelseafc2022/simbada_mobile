@@ -114,11 +114,11 @@ const ForceUpdateModal = ({ visible, updateData, onDismiss }) => {
           {/* Version Info Chip */}
           <View style={styles.versionRow}>
             <Text style={styles.versionCurrent}>
-              Versi Anda: v{updateData.client_version_name || '2.0.1'}
+              Versi Anda: v{updateData.client_version_name || '2.0.2'}
             </Text>
             <Text style={styles.arrowText}>➔</Text>
             <Text style={styles.versionLatest}>
-              v{updateData.latest_version_name || '2.0.1'}
+              v{updateData.latest_version_name || '2.0.2'}
             </Text>
           </View>
 

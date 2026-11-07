@@ -253,7 +253,7 @@ const AboutModal = ({ visible, onClose }) => (
         <Text style={styles.modalTitle}>SIMBADA Mobile</Text>
         <Text style={styles.modalSubtitle}>Sistem Informasi Batas Desa</Text>
         <View style={styles.modalDivider} />
-        <Text style={styles.modalVersion}>Versi 2.0.1 (2026)</Text>
+        <Text style={styles.modalVersion}>Versi 2.0.2 (2026)</Text>
         <Text style={styles.modalDesc}>
           Aplikasi mobile untuk pengelolaan dan penetapan batas desa di wilayah Kabupaten Konawe Selatan.
         </Text>
@@ -488,7 +488,7 @@ const User = ({ navigation }) => {
           <MenuItem
             icon="ℹ️"
             label="Tentang Aplikasi"
-            subtitle="SIMBADA Mobile v2.0.1"
+            subtitle="SIMBADA Mobile v2.0.2"
             onPress={() => setShowAbout(true)}
           />
           <MenuItem
@@ -500,9 +500,12 @@ const User = ({ navigation }) => {
           <MenuItem
             icon="📞"
             label="Hubungi Bantuan"
-            subtitle="Laporkan masalah atau saran"
+            subtitle="Hubungi Admin Kabupaten • Bagian Tata Pemerintahan"
             onPress={() => {
-              Linking.openURL('https://wa.me/6281234567890?text=Halo%20Admin%20SIMBADA');
+              const message = 'Halo Bapak Muhammad Aksar Wiratama, saya ingin meminta bantuan terkait aplikasi SIMBADA.';
+              Linking.openURL(`https://wa.me/6285239501295?text=${encodeURIComponent(message)}`).catch(() => {
+                Alert.alert('Tidak dapat membuka WhatsApp', 'Silakan hubungi admin kabupaten di +62 852-3950-1295.');
+              });
             }}
           />
           <MenuItem
@@ -522,7 +525,7 @@ const User = ({ navigation }) => {
             style={styles.footerLogo}
             resizeMode={FastImage.resizeMode.contain}
           />
-          <Text style={styles.footerText}>SIMBADA Mobile v2.0.1 (2026)</Text>
+          <Text style={styles.footerText}>SIMBADA Mobile v2.0.2 (2026)</Text>
           <Text style={styles.footerCopy}>© 2026 Pemkab Konawe Selatan</Text>
         </View>
       </ScrollView>

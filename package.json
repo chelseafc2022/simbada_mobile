@@ -1,6 +1,6 @@
 {
   "name": "simbada",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "scripts": {
     "android": "adb reverse tcp:5073 tcp:5073 && react-native run-android",
